@@ -376,6 +376,53 @@ tbody tr:hover {
   background: #fbfdff;
 }
 
+.reason-details {
+  max-width: 320px;
+}
+
+.reason-details summary {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  border: 1px solid #fcd34d;
+  border-radius: 6px;
+  background: #fffbeb;
+  color: #92400e;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.reason-details summary:hover {
+  background: #fef3c7;
+}
+
+.reason-details ul {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.reason-details li {
+  display: grid;
+  gap: 3px;
+  border-left: 3px solid #f59e0b;
+  padding-left: 8px;
+}
+
+.reason-details li strong {
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.reason-details li span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .person-link {
   border: 0;
   background: transparent;

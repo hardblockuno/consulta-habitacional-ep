@@ -195,6 +195,7 @@ function renderPersonasTable(query = "", estado = "") {
             <th>Persona</th>
             <th>Comite</th>
             <th>Estado</th>
+            <th>Motivos</th>
             <th>RSH</th>
             <th>Ahorro</th>
             <th>Alertas</th>
@@ -207,13 +208,14 @@ function renderPersonasTable(query = "", estado = "") {
                 <tr>
                   <td>
                     <button class="person-link" data-rut="${escapeAttr(persona.rut)}">${escapeHtml(persona.nombre)}</button>
-                    <div class="muted small">${escapeHtml(persona.rut)} · ${escapeHtml(persona.telefono || "Sin telefono")}</div>
+                    <div class="muted small">${escapeHtml(persona.rut)} - ${escapeHtml(persona.telefono || "Sin telefono")}</div>
                   </td>
                   <td>
                     ${escapeHtml(persona.comite.nombre || "Sin comite")}
                     <div class="muted small">${escapeHtml(persona.comite.comuna || "Sin comuna")}</div>
                   </td>
                   <td>${badge(persona.estadoGeneral)}</td>
+                  <td>${reasonDetails(persona)}</td>
                   <td>${formatPercent(persona.rsh.porcentaje)}</td>
                   <td>${formatUf(persona.ahorro.montoActual)}</td>
                   <td>${persona.alertas.filter((alerta) => alerta.activa).length}</td>
@@ -1011,6 +1013,36 @@ function renderDocuments(documents) {
         .join("")}
     </div>
   `;
+}
+
+function reasonDetails(persona) {
+  const alerts = activeAlerts(persona);
+  if (!alerts.length) {
+    return '<span class="muted small">Sin alertas activas</span>';
+  }
+
+  const label = alerts.length === 1 ? "1 motivo" : `${alerts.length} motivos`;
+  return `
+    <details class="reason-details">
+      <summary>${escapeHtml(label)}</summary>
+      <ul>
+        ${alerts
+          .map(
+            (alerta) => `
+              <li>
+                <strong>${escapeHtml(alerta.titulo)}</strong>
+                <span>${escapeHtml(alerta.detalle || alerta.tipo)}</span>
+              </li>
+            `
+          )
+          .join("")}
+      </ul>
+    </details>
+  `;
+}
+
+function activeAlerts(persona) {
+  return (persona.alertas || []).filter((alerta) => alerta.activa);
 }
 
 function renderAlertList(alerts) {
