@@ -21,7 +21,8 @@ const COLUMN_ALIASES = {
   comuna: ["comuna"],
   parentesco: ["parentesco", "parentezco"],
   tipoFamilia: ["tipofamilia", "familia"],
-  integrantes: ["integrantes", "nintegrantes", "grupofamiliar"],
+  grupoFamiliar: ["grupofamiliar", "grupfam", "grupofam"],
+  integrantes: ["integrantes", "nintegrantes", "cantidadintegrantes"],
   ahorro: ["ahorro", "saldoahorro", "montoahorro", "ahorrodia", "ahorroal"],
   cedulaVencimiento: [
     "vencimientocedula",
@@ -87,9 +88,19 @@ function normalizeLoadedState(data) {
   const personas = (data.personas || []).map((persona) => {
     const alertas = (persona.alertas || [])
       .filter((alerta) => !isRshAlert(alerta))
+      .filter((alerta) => !isAhorroAlert(alerta))
       .map(normalizeAlert);
+    const caracterizacion = { ...(persona.caracterizacion || {}) };
+    if (
+      !cleanString(caracterizacion.grupoFamiliar) &&
+      caracterizacion.integrantes !== null &&
+      caracterizacion.integrantes !== undefined
+    ) {
+      caracterizacion.grupoFamiliar = cleanString(caracterizacion.integrantes);
+    }
     return {
       ...persona,
+      caracterizacion,
       alertas,
       estadoGeneral: getGeneralStatus(alertas),
     };
@@ -110,6 +121,11 @@ function normalizeAlert(alerta) {
 function isRshAlert(alerta) {
   const text = `${normalize(alerta.tipo)}${normalize(alerta.titulo)}${normalize(alerta.detalle)}`;
   return text.includes("rsh") || text.includes("tramorshinformado");
+}
+
+function isAhorroAlert(alerta) {
+  const text = `${normalize(alerta.tipo)}${normalize(alerta.titulo)}${normalize(alerta.detalle)}`;
+  return text.includes("ahorro") || text.includes("financiera");
 }
 
 function saveState() {
@@ -145,7 +161,6 @@ function renderDashboard() {
       ${stat("Personas mayores", resumen.personasMayores, "cyan")}
       ${stat("Discapacidad", resumen.discapacidad, "indigo")}
       ${stat("RSH sobre 40%", resumen.rshSobre40, "amber")}
-      ${stat("Ahorro insuficiente", resumen.ahorroInsuficiente, "rose")}
     </section>
     <section class="grid two" style="margin-top: 18px;">
       <div class="panel">
@@ -227,7 +242,6 @@ function renderPersonasTable(query = "", estado = "") {
             <th>Estado</th>
             <th>Motivos</th>
             <th>RSH</th>
-            <th>Ahorro</th>
             <th>Alertas</th>
           </tr>
         </thead>
@@ -239,6 +253,7 @@ function renderPersonasTable(query = "", estado = "") {
                   <td>
                     <button class="person-link" data-rut="${escapeAttr(persona.rut)}">${escapeHtml(persona.nombre)}</button>
                     <div class="muted small">${escapeHtml(persona.rut)} - ${escapeHtml(persona.telefono || "Sin telefono")}</div>
+                    ${personFlags(persona)}
                   </td>
                   <td>
                     ${escapeHtml(persona.comite.nombre || "Sin comite")}
@@ -247,7 +262,6 @@ function renderPersonasTable(query = "", estado = "") {
                   <td>${badge(persona.estadoGeneral)}</td>
                   <td>${reasonDetails(persona)}</td>
                   <td>${formatPercent(persona.rsh.porcentaje)}</td>
-                  <td>${formatUf(persona.ahorro.montoActual)}</td>
                   <td>${persona.alertas.filter((alerta) => alerta.activa).length}</td>
                 </tr>
               `
@@ -283,10 +297,6 @@ function renderImportar() {
             <input id="comuna" class="input" placeholder="Comuna" />
           </label>
           <label class="field">
-            <span>Ahorro minimo UF</span>
-            <input id="ahorroMinimo" class="input" type="number" value="10" min="0" step="0.01" />
-          </label>
-          <label class="field">
             <span>Archivo</span>
             <input id="excelFile" class="input" type="file" accept=".xlsx,.xls" />
           </label>
@@ -313,7 +323,7 @@ async function handleExcelImport(event) {
   const file = document.getElementById("excelFile").files[0];
   const comiteNombre = document.getElementById("comiteNombre").value.trim();
   const comuna = document.getElementById("comuna").value.trim();
-  const ahorroMinimo = Number(document.getElementById("ahorroMinimo").value || 10);
+  const ahorroMinimo = 0;
 
   if (!window.XLSX) {
     message.innerHTML = notice("No se pudo cargar el lector Excel. Revisa tu conexion a internet.", "error");
@@ -448,6 +458,7 @@ function rowToPersona(row, headers, columnMap, options) {
       comuna: cleanString(value("comuna")),
       parentesco: cleanString(value("parentesco")),
       tipoFamilia: cleanString(value("tipoFamilia")),
+      grupoFamiliar: cleanString(value("grupoFamiliar")),
       integrantes: parseInteger(value("integrantes")),
     },
     rsh: {
@@ -503,23 +514,6 @@ function buildAlerts(persona, cedulaVencimiento) {
       fecha: new Date().toISOString(),
     });
   };
-
-  if (persona.ahorro.montoActual === null) {
-    add(
-      "financiera",
-      "preventiva",
-      "Ahorro no informado",
-      "No se encontro monto de ahorro en la fila importada.",
-      false
-    );
-  } else if (persona.ahorro.insuficiente) {
-    add(
-      "financiera",
-      "preventiva",
-      "Ahorro insuficiente",
-      `Ahorro informado ${persona.ahorro.montoActual}; minimo requerido ${persona.ahorro.minimo}.`
-    );
-  }
 
   if (cedulaVencimiento) {
     const today = atStartOfDay(new Date());
@@ -596,9 +590,18 @@ function renderFicha(rut) {
           ${kv("Comuna", persona.comite.comuna || persona.caracterizacion.comuna || "Sin dato")}
           ${kv("Parentesco", persona.caracterizacion.parentesco || "Sin dato")}
           ${kv("Tipo familia", persona.caracterizacion.tipoFamilia || "Sin dato")}
-          ${kv("Integrantes", persona.caracterizacion.integrantes ?? "Sin dato")}
           ${kv("MINVU Conecta", formatPercent(persona.postulacion.minvuConecta))}
         </div>
+      </div>
+    </section>
+
+    <section class="panel" style="margin-top: 18px;">
+      <h3>Grupo familiar</h3>
+      <div class="kv">
+        ${kv("Grupo familiar", persona.caracterizacion.grupoFamiliar || persona.caracterizacion.integrantes || "Sin dato")}
+        ${kv("Tipo familia", persona.caracterizacion.tipoFamilia || "Sin dato")}
+        ${kv("Parentesco", persona.caracterizacion.parentesco || "Sin dato")}
+        ${kv("Integrantes", persona.caracterizacion.integrantes ?? "Sin dato")}
       </div>
     </section>
 
@@ -721,7 +724,6 @@ function renderReportes() {
       ${stat("Personas", resumen.totalPersonas)}
       ${stat("Alertas criticas", resumen.alertasCriticas, "rose")}
       ${stat("Cedulas vencidas", resumen.cedulasVencidas, "rose")}
-      ${stat("Ahorro insuficiente", resumen.ahorroInsuficiente, "amber")}
     </section>
     <section class="grid two" style="margin-top: 18px;">
       <div class="panel">
@@ -875,6 +877,7 @@ function inferStateImpact(alerta) {
   if (text.includes("respaldodiscapacidad")) return false;
   if (text.includes("certificado") && text.includes("discapacidad")) return false;
   if (text.includes("ahorronoinformado")) return false;
+  if (text.includes("ahorroinsuficiente")) return false;
   if (text.includes("documentacionsecundaria")) return false;
   return true;
 }
@@ -1066,6 +1069,18 @@ function renderDocuments(documents) {
         .join("")}
     </div>
   `;
+}
+
+function personFlags(persona) {
+  const flags = [];
+  if (persona.personaMayor) {
+    flags.push('<span class="person-flag elder" title="Persona adulta mayor">60+</span>');
+  }
+  if (persona.discapacidad) {
+    flags.push('<span class="person-flag disability" title="Persona con discapacidad">DIS</span>');
+  }
+  if (!flags.length) return "";
+  return `<div class="person-flags">${flags.join("")}</div>`;
 }
 
 function reasonDetails(persona) {

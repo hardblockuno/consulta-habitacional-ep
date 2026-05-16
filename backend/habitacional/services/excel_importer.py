@@ -49,7 +49,8 @@ COLUMN_ALIASES = {
     "comuna": ["comuna"],
     "parentesco": ["parentesco", "parentezco"],
     "tipo_familia": ["tipofamilia", "familia"],
-    "integrantes": ["integrantes", "nintegrantes", "grupofamiliar"],
+    "grupo_familiar": ["grupofamiliar", "grupfam", "grupofam"],
+    "integrantes": ["integrantes", "nintegrantes", "cantidadintegrantes"],
     "ahorro": ["ahorro", "saldoahorro", "montoahorro", "ahorrodia", "ahorroal"],
     "cedula_vencimiento": [
         "vencimientocedula",
@@ -317,14 +318,16 @@ def actualizar_relaciones(persona, valor, ahorro_minimo):
     comuna = limpiar_string(valor("comuna"))
     parentesco = limpiar_string(valor("parentesco"))
     tipo_familia = limpiar_string(valor("tipo_familia"))
+    grupo_familiar = limpiar_string(valor("grupo_familiar"))
     integrantes = parse_entero(valor("integrantes"))
-    if comuna or parentesco or tipo_familia or integrantes is not None:
+    if comuna or parentesco or tipo_familia or grupo_familiar or integrantes is not None:
         CaracterizacionSocial.objects.update_or_create(
             persona=persona,
             defaults={
                 "comuna": comuna,
                 "parentesco": parentesco,
                 "tipo_familia": tipo_familia,
+                "grupo_familiar": grupo_familiar,
                 "integrantes": integrantes,
             },
         )
@@ -377,25 +380,6 @@ def actualizar_relaciones(persona, valor, ahorro_minimo):
 
 def generar_alertas(persona, valor, ahorro_minimo):
     Alerta.objects.filter(persona=persona, origen=ORIGEN_IMPORTACION).delete()
-
-    ahorro_monto = parse_decimal(valor("ahorro"))
-    if ahorro_monto is None:
-        crear_alerta(
-            persona,
-            Alerta.TIPO_FINANCIERA,
-            Alerta.SEVERIDAD_PREVENTIVA,
-            "Ahorro no informado",
-            "No se encontro monto de ahorro en la fila importada.",
-            impacta_estado=False,
-        )
-    elif ahorro_monto < ahorro_minimo:
-        crear_alerta(
-            persona,
-            Alerta.TIPO_FINANCIERA,
-            Alerta.SEVERIDAD_PREVENTIVA,
-            "Ahorro insuficiente",
-            f"Ahorro informado {ahorro_monto}; minimo requerido {ahorro_minimo}.",
-        )
 
     fecha_vencimiento = parse_fecha(valor("cedula_vencimiento"))
     if fecha_vencimiento:

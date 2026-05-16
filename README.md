@@ -123,7 +123,7 @@ El importador:
 - detecta la fila de encabezados con `NOMBRE` y `RUT`.
 - normaliza columnas frecuentes (`FEC NAC`, `FECH NAC`, `RSH`, `AHORRO`, `MINVU CONECTA`, etc.).
 - calcula edad y marca persona mayor desde `edad >= 60`.
-- registra el RSH como dato informativo, y genera alertas por ahorro insuficiente, cedula vencida o por vencer, y observaciones internas por datos secundarios.
+- registra RSH y ahorro como datos informativos, y genera alertas por cedula vencida o por vencer y observaciones internas por datos secundarios.
 - crea o actualiza personas por RUT.
 
 ## Reglas implementadas
@@ -131,9 +131,10 @@ El importador:
 - Persona mayor: `edad >= 60`.
 - RSH `<= 40`: preferente.
 - RSH: dato informativo; no genera alerta ni cambia el estado de postulacion.
+- Ahorro: dato informativo; no genera alerta ni cambia el estado de postulacion.
 - Cedula vencida: alerta critica.
 - Cedula por vencer en 30 dias: alerta preventiva.
 - Alerta critica activa: persona bloqueada.
 - Alertas preventivas que afectan aptitud: persona observada.
-- Observaciones internas, como ahorro no informado en la base o respaldo de discapacidad, no cambian el estado general.
+- Observaciones internas, como respaldo de discapacidad, no cambian el estado general.
 - Sin alertas activas: persona apta.

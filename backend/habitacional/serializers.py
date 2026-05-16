@@ -33,7 +33,14 @@ class ComiteSerializer(serializers.ModelSerializer):
 class CaracterizacionSocialSerializer(serializers.ModelSerializer):
     class Meta:
         model = CaracterizacionSocial
-        fields = ["comuna", "parentesco", "tipo_familia", "integrantes", "observaciones"]
+        fields = [
+            "comuna",
+            "parentesco",
+            "tipo_familia",
+            "grupo_familiar",
+            "integrantes",
+            "observaciones",
+        ]
 
 
 class RSHSerializer(serializers.ModelSerializer):

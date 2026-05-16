@@ -110,6 +110,7 @@ class CaracterizacionSocial(TimeStampedModel):
     comuna = models.CharField(max_length=120, blank=True)
     parentesco = models.CharField(max_length=120, blank=True)
     tipo_familia = models.CharField(max_length=120, blank=True)
+    grupo_familiar = models.CharField(max_length=120, blank=True)
     integrantes = models.PositiveSmallIntegerField(null=True, blank=True)
     observaciones = models.TextField(blank=True)
 

@@ -39,12 +39,12 @@ class ImportadorExcelTests(TestCase):
         persona = Persona.objects.get(nombre="Persona Prueba")
         self.assertEqual(persona.edad, 66)
         self.assertTrue(persona.persona_mayor)
-        self.assertEqual(persona.estado_general, Persona.ESTADO_OBSERVADA)
+        self.assertEqual(persona.estado_general, Persona.ESTADO_APTA)
         self.assertEqual(persona.rsh.porcentaje, Decimal("70.00"))
         self.assertTrue(persona.ahorro.insuficiente)
         self.assertEqual(
             Alerta.objects.filter(persona=persona, activa=True).count(),
-            2,
+            1,
         )
 
     def test_rsh_sobre_40_no_deja_persona_observada(self):
