@@ -19,6 +19,12 @@ Para abrirla localmente, usa el archivo:
 Start-Process .\docs\index.html
 ```
 
+Tambien puedes abrirla con doble clic en:
+
+```text
+Abrir Consulta Habitacional.bat
+```
+
 Esa version no necesita Django, PostgreSQL ni npm. Importa Excel directamente en el navegador y guarda los datos en `localStorage` del navegador. Tambien permite exportar/importar un respaldo JSON para mover datos entre equipos.
 
 Para publicarla despues en GitHub Pages:
