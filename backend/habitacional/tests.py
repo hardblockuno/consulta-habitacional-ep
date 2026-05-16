@@ -44,7 +44,7 @@ class ImportadorExcelTests(TestCase):
         self.assertTrue(persona.ahorro.insuficiente)
         self.assertEqual(
             Alerta.objects.filter(persona=persona, activa=True).count(),
-            3,
+            2,
         )
 
     def test_rsh_sobre_40_no_deja_persona_observada(self):
@@ -74,4 +74,4 @@ class ImportadorExcelTests(TestCase):
 
         persona = Persona.objects.get(nombre="Persona RSH Alto")
         self.assertEqual(persona.estado_general, Persona.ESTADO_APTA)
-        self.assertEqual(persona.alertas.filter(impacta_estado=False).count(), 1)
+        self.assertEqual(persona.alertas.count(), 0)

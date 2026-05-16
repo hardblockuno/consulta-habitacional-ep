@@ -85,7 +85,9 @@ function loadState() {
 
 function normalizeLoadedState(data) {
   const personas = (data.personas || []).map((persona) => {
-    const alertas = (persona.alertas || []).map(normalizeAlert);
+    const alertas = (persona.alertas || [])
+      .filter((alerta) => !isRshAlert(alerta))
+      .map(normalizeAlert);
     return {
       ...persona,
       alertas,
@@ -103,6 +105,11 @@ function normalizeAlert(alerta) {
     ...alerta,
     impactaEstado: inferStateImpact(alerta),
   };
+}
+
+function isRshAlert(alerta) {
+  const text = `${normalize(alerta.tipo)}${normalize(alerta.titulo)}${normalize(alerta.detalle)}`;
+  return text.includes("rsh") || text.includes("tramorshinformado");
 }
 
 function saveState() {
@@ -496,16 +503,6 @@ function buildAlerts(persona, cedulaVencimiento) {
       fecha: new Date().toISOString(),
     });
   };
-
-  if (persona.rsh.porcentaje !== null && persona.rsh.porcentaje > 40) {
-    add(
-      "rsh",
-      "preventiva",
-      "RSH sobre 40%",
-      `Tramo RSH informado: ${persona.rsh.porcentaje}.`,
-      false
-    );
-  }
 
   if (persona.ahorro.montoActual === null) {
     add(

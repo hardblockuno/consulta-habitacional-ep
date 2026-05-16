@@ -378,17 +378,6 @@ def actualizar_relaciones(persona, valor, ahorro_minimo):
 def generar_alertas(persona, valor, ahorro_minimo):
     Alerta.objects.filter(persona=persona, origen=ORIGEN_IMPORTACION).delete()
 
-    rsh_porcentaje = parse_decimal(valor("rsh"))
-    if rsh_porcentaje is not None and rsh_porcentaje > 40:
-        crear_alerta(
-            persona,
-            Alerta.TIPO_RSH,
-            Alerta.SEVERIDAD_PREVENTIVA,
-            "RSH sobre 40%",
-            f"Tramo RSH informado: {rsh_porcentaje}. Requiere revision social.",
-            impacta_estado=False,
-        )
-
     ahorro_monto = parse_decimal(valor("ahorro"))
     if ahorro_monto is None:
         crear_alerta(
