@@ -32,7 +32,8 @@ const COLUMN_ALIASES = {
   ],
 };
 
-let state = loadState();
+let state = normalizeLoadedState(loadState());
+localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 let currentView = "dashboard";
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -80,6 +81,28 @@ function loadState() {
   } catch {
     return { personas: [], importaciones: [] };
   }
+}
+
+function normalizeLoadedState(data) {
+  const personas = (data.personas || []).map((persona) => {
+    const alertas = (persona.alertas || []).map(normalizeAlert);
+    return {
+      ...persona,
+      alertas,
+      estadoGeneral: getGeneralStatus(alertas),
+    };
+  });
+  return { ...data, personas };
+}
+
+function normalizeAlert(alerta) {
+  if (Object.prototype.hasOwnProperty.call(alerta, "impactaEstado")) {
+    return alerta;
+  }
+  return {
+    ...alerta,
+    impactaEstado: inferStateImpact(alerta),
+  };
 }
 
 function saveState() {
@@ -461,7 +484,7 @@ function rowToPersona(row, headers, columnMap, options) {
 
 function buildAlerts(persona, cedulaVencimiento) {
   const alerts = [];
-  const add = (tipo, severidad, titulo, detalle) => {
+  const add = (tipo, severidad, titulo, detalle, impactaEstado = true) => {
     alerts.push({
       id: cryptoId(),
       tipo,
@@ -469,6 +492,7 @@ function buildAlerts(persona, cedulaVencimiento) {
       titulo,
       detalle,
       activa: true,
+      impactaEstado,
       fecha: new Date().toISOString(),
     });
   };
@@ -478,7 +502,13 @@ function buildAlerts(persona, cedulaVencimiento) {
   }
 
   if (persona.ahorro.montoActual === null) {
-    add("financiera", "preventiva", "Ahorro no informado", "No se encontro monto de ahorro en la fila importada.");
+    add(
+      "financiera",
+      "preventiva",
+      "Ahorro no informado",
+      "No se encontro monto de ahorro en la fila importada.",
+      false
+    );
   } else if (persona.ahorro.insuficiente) {
     add(
       "financiera",
@@ -503,7 +533,8 @@ function buildAlerts(persona, cedulaVencimiento) {
       "documental",
       "preventiva",
       "Revisar respaldo discapacidad",
-      "La persona registra discapacidad; validar certificado o antecedente."
+      "La persona registra discapacidad; validar certificado o antecedente.",
+      false
     );
   }
 
@@ -650,6 +681,7 @@ function renderAlertasResult(query = "", severity = "") {
               <div class="list-item-head">
                 <div>
                   ${badge(alerta.severidad)}
+                  ${alertAffectsStatus(alerta) ? "" : '<span class="badge interna">Interna</span>'}
                   <span class="muted small">${escapeHtml(alerta.tipo)}</span>
                   <h3 style="margin: 10px 0 4px;">${escapeHtml(alerta.titulo)}</h3>
                   <p class="muted" style="margin: 0;">${escapeHtml(alerta.detalle)}</p>
@@ -821,9 +853,25 @@ function detectDisplacement(row, headers, columnMap) {
 }
 
 function getGeneralStatus(alerts) {
-  if (alerts.some((alerta) => alerta.activa && alerta.severidad === "critica")) return "bloqueada";
-  if (alerts.some((alerta) => alerta.activa && alerta.severidad === "preventiva")) return "observada";
+  const statusAlerts = alerts.filter((alerta) => alerta.activa && alertAffectsStatus(alerta));
+  if (statusAlerts.some((alerta) => alerta.severidad === "critica")) return "bloqueada";
+  if (statusAlerts.some((alerta) => alerta.severidad === "preventiva")) return "observada";
   return "apta";
+}
+
+function alertAffectsStatus(alerta) {
+  return normalizeAlert(alerta).impactaEstado !== false;
+}
+
+function inferStateImpact(alerta) {
+  const title = normalize(alerta.titulo);
+  const detail = normalize(alerta.detalle);
+  const text = `${title}${detail}`;
+  if (text.includes("respaldodiscapacidad")) return false;
+  if (text.includes("certificado") && text.includes("discapacidad")) return false;
+  if (text.includes("ahorronoinformado")) return false;
+  if (text.includes("documentacionsecundaria")) return false;
+  return true;
 }
 
 function documentStatusByDate(dateValue) {
@@ -1016,33 +1064,58 @@ function renderDocuments(documents) {
 }
 
 function reasonDetails(persona) {
-  const alerts = activeAlerts(persona);
-  if (!alerts.length) {
-    return '<span class="muted small">Sin alertas activas</span>';
+  const statusAlerts = statusImpactAlerts(persona);
+  const internal = internalAlerts(persona);
+  if (!statusAlerts.length && !internal.length) {
+    return '<span class="muted small">Sin motivos activos</span>';
   }
 
-  const label = alerts.length === 1 ? "1 motivo" : `${alerts.length} motivos`;
+  if (!statusAlerts.length) {
+    return `
+      <details class="reason-details internal">
+        <summary>Solo obs. internas</summary>
+        ${reasonList(internal)}
+      </details>
+    `;
+  }
+
+  const label = statusAlerts.length === 1 ? "1 motivo" : `${statusAlerts.length} motivos`;
   return `
     <details class="reason-details">
       <summary>${escapeHtml(label)}</summary>
-      <ul>
-        ${alerts
-          .map(
-            (alerta) => `
-              <li>
-                <strong>${escapeHtml(alerta.titulo)}</strong>
-                <span>${escapeHtml(alerta.detalle || alerta.tipo)}</span>
-              </li>
-            `
-          )
-          .join("")}
-      </ul>
+      ${reasonList(statusAlerts)}
+      ${internal.length ? `<p class="internal-note">${internal.length} obs. interna${internal.length === 1 ? "" : "s"} adicional${internal.length === 1 ? "" : "es"}</p>` : ""}
     </details>
   `;
 }
 
 function activeAlerts(persona) {
   return (persona.alertas || []).filter((alerta) => alerta.activa);
+}
+
+function statusImpactAlerts(persona) {
+  return activeAlerts(persona).filter(alertAffectsStatus);
+}
+
+function internalAlerts(persona) {
+  return activeAlerts(persona).filter((alerta) => !alertAffectsStatus(alerta));
+}
+
+function reasonList(alerts) {
+  return `
+    <ul>
+      ${alerts
+        .map(
+          (alerta) => `
+            <li>
+              <strong>${escapeHtml(alerta.titulo)}</strong>
+              <span>${escapeHtml(alerta.detalle || alerta.tipo)}</span>
+            </li>
+          `
+        )
+        .join("")}
+    </ul>
+  `;
 }
 
 function renderAlertList(alerts) {
@@ -1055,7 +1128,7 @@ function renderAlertList(alerts) {
             <div class="list-item">
               <div class="list-item-head">
                 <strong>${escapeHtml(alerta.titulo)}</strong>
-                ${badge(alerta.severidad)}
+                ${alertAffectsStatus(alerta) ? badge(alerta.severidad) : '<span class="badge interna">Interna</span>'}
               </div>
               <p class="muted small">${escapeHtml(alerta.detalle)}</p>
             </div>

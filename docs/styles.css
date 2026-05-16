@@ -398,6 +398,12 @@ tbody tr:hover {
   background: #fef3c7;
 }
 
+.reason-details.internal summary {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+}
+
 .reason-details ul {
   display: grid;
   gap: 8px;
@@ -421,6 +427,12 @@ tbody tr:hover {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.35;
+}
+
+.internal-note {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .person-link {
@@ -478,6 +490,11 @@ tbody tr:hover {
 .badge.vigente {
   background: #e0f2fe;
   color: #075985;
+}
+
+.badge.interna {
+  background: #f1f5f9;
+  color: #475569;
 }
 
 .empty,
