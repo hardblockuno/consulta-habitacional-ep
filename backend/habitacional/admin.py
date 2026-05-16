@@ -17,7 +17,7 @@ from .models import (
 class AlertaInline(admin.TabularInline):
     model = Alerta
     extra = 0
-    fields = ("tipo", "severidad", "titulo", "activa", "origen")
+    fields = ("tipo", "severidad", "titulo", "activa", "impacta_estado", "origen")
     readonly_fields = ("origen",)
 
 

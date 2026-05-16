@@ -386,6 +386,7 @@ def generar_alertas(persona, valor, ahorro_minimo):
             Alerta.SEVERIDAD_PREVENTIVA,
             "RSH sobre 40%",
             f"Tramo RSH informado: {rsh_porcentaje}. Requiere revision social.",
+            impacta_estado=False,
         )
 
     ahorro_monto = parse_decimal(valor("ahorro"))
@@ -396,6 +397,7 @@ def generar_alertas(persona, valor, ahorro_minimo):
             Alerta.SEVERIDAD_PREVENTIVA,
             "Ahorro no informado",
             "No se encontro monto de ahorro en la fila importada.",
+            impacta_estado=False,
         )
     elif ahorro_monto < ahorro_minimo:
         crear_alerta(
@@ -434,16 +436,18 @@ def generar_alertas(persona, valor, ahorro_minimo):
             Alerta.SEVERIDAD_PREVENTIVA,
             "Revisar respaldo discapacidad",
             "La persona registra discapacidad; validar certificado o antecedente.",
+            impacta_estado=False,
         )
 
 
-def crear_alerta(persona, tipo, severidad, titulo, detalle):
+def crear_alerta(persona, tipo, severidad, titulo, detalle, impacta_estado=True):
     Alerta.objects.create(
         persona=persona,
         tipo=tipo,
         severidad=severidad,
         titulo=titulo,
         detalle=detalle,
+        impacta_estado=impacta_estado,
         origen=ORIGEN_IMPORTACION,
     )
 

@@ -109,6 +109,7 @@ class AlertaSerializer(serializers.ModelSerializer):
             "titulo",
             "detalle",
             "activa",
+            "impacta_estado",
             "origen",
             "creado_en",
         ]

@@ -498,7 +498,13 @@ function buildAlerts(persona, cedulaVencimiento) {
   };
 
   if (persona.rsh.porcentaje !== null && persona.rsh.porcentaje > 40) {
-    add("rsh", "preventiva", "RSH sobre 40%", `Tramo RSH informado: ${persona.rsh.porcentaje}.`);
+    add(
+      "rsh",
+      "preventiva",
+      "RSH sobre 40%",
+      `Tramo RSH informado: ${persona.rsh.porcentaje}.`,
+      false
+    );
   }
 
   if (persona.ahorro.montoActual === null) {
@@ -867,6 +873,8 @@ function inferStateImpact(alerta) {
   const title = normalize(alerta.titulo);
   const detail = normalize(alerta.detalle);
   const text = `${title}${detail}`;
+  if (text.includes("rshsobre40")) return false;
+  if (title === "rsh" || text.includes("tramorshinformado")) return false;
   if (text.includes("respaldodiscapacidad")) return false;
   if (text.includes("certificado") && text.includes("discapacidad")) return false;
   if (text.includes("ahorronoinformado")) return false;

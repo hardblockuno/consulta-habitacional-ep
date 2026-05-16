@@ -88,9 +88,10 @@ class Persona(TimeStampedModel):
 
     def actualizar_estado_general(self):
         alertas = self.alertas.filter(activa=True)
-        if alertas.filter(severidad=Alerta.SEVERIDAD_CRITICA).exists():
+        alertas_estado = alertas.filter(impacta_estado=True)
+        if alertas_estado.filter(severidad=Alerta.SEVERIDAD_CRITICA).exists():
             estado = self.ESTADO_BLOQUEADA
-        elif alertas.filter(severidad=Alerta.SEVERIDAD_PREVENTIVA).exists():
+        elif alertas_estado.filter(severidad=Alerta.SEVERIDAD_PREVENTIVA).exists():
             estado = self.ESTADO_OBSERVADA
         else:
             estado = self.ESTADO_APTA
@@ -241,6 +242,7 @@ class Alerta(TimeStampedModel):
     titulo = models.CharField(max_length=180)
     detalle = models.TextField(blank=True)
     activa = models.BooleanField(default=True)
+    impacta_estado = models.BooleanField(default=True)
     origen = models.CharField(max_length=80, blank=True, default="manual")
 
     class Meta:

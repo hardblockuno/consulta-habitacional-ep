@@ -46,3 +46,32 @@ class ImportadorExcelTests(TestCase):
             Alerta.objects.filter(persona=persona, activa=True).count(),
             3,
         )
+
+    def test_rsh_sobre_40_no_deja_persona_observada(self):
+        with TemporaryDirectory() as tmpdir:
+            archivo = Path(tmpdir) / "BASE COMITE RSH.xlsx"
+            df = pd.DataFrame(
+                [
+                    ["NOMBRE", "RUT", "FEC NAC", "RSH", "AHORRO"],
+                    ["Persona RSH Alto", "22222222", "1990-01-01", 80, 20],
+                ]
+            )
+            with pd.ExcelWriter(archivo, engine="openpyxl") as writer:
+                df.to_excel(writer, index=False, header=False, sheet_name="BASE")
+
+            importacion = ImportacionExcel.objects.create(
+                archivo=str(archivo),
+                nombre_archivo=archivo.name,
+            )
+
+            importar_excel(
+                importacion=importacion,
+                archivo_path=archivo,
+                comite_nombre="Comite RSH",
+                comuna="Temuco",
+                ahorro_minimo=Decimal("10"),
+            )
+
+        persona = Persona.objects.get(nombre="Persona RSH Alto")
+        self.assertEqual(persona.estado_general, Persona.ESTADO_APTA)
+        self.assertEqual(persona.alertas.filter(impacta_estado=False).count(), 1)
