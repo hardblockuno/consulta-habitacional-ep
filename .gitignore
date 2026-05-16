@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+db.sqlite3
+media/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Env
+.env
+*.local
+
+# Local source data with personal/sensitive records
+Bases datos Comites 2026/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: consulta_habitacional_postgres
+    environment:
+      POSTGRES_DB: consulta_habitacional
+      POSTGRES_USER: consulta_user
+      POSTGRES_PASSWORD: consulta_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U consulta_user -d consulta_habitacional"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

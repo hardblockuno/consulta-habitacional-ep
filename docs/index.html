@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Consulta Habitacional EP</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">EP</div>
+        <div>
+          <div class="eyebrow">Plataforma local</div>
+          <h1>Consulta Habitacional</h1>
+        </div>
+      </div>
+      <nav class="nav" aria-label="Principal">
+        <button class="nav-item active" data-view="dashboard" title="Dashboard">
+          <span class="icon">▦</span>
+          Dashboard
+        </button>
+        <button class="nav-item" data-view="personas" title="Personas">
+          <span class="icon">⌕</span>
+          Personas
+        </button>
+        <button class="nav-item" data-view="importar" title="Importar">
+          <span class="icon">⇧</span>
+          Importar
+        </button>
+        <button class="nav-item" data-view="alertas" title="Alertas">
+          <span class="icon">!</span>
+          Alertas
+        </button>
+        <button class="nav-item" data-view="reportes" title="Reportes">
+          <span class="icon">▤</span>
+          Reportes
+        </button>
+      </nav>
+      <div class="storage-card">
+        <p class="label">Datos locales</p>
+        <p id="storageSummary">0 personas guardadas</p>
+      </div>
+    </aside>
+
+    <div class="shell">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">Entidad patrocinante</div>
+          <p class="top-title">Consulta Habitacional EP</p>
+        </div>
+        <div class="top-actions">
+          <button id="exportJsonBtn" class="button secondary" type="button">Exportar JSON</button>
+          <label class="button secondary file-button">
+            Importar JSON
+            <input id="importJsonInput" type="file" accept=".json,application/json" />
+          </label>
+          <button id="clearDataBtn" class="button danger" type="button">Limpiar datos</button>
+        </div>
+      </header>
+
+      <main id="app" class="content"></main>
+    </div>
+
+    <template id="emptyTemplate">
+      <div class="empty">Sin datos para mostrar</div>
+    </template>
+
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
