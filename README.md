@@ -36,6 +36,24 @@ Para publicarla despues en GitHub Pages:
 
 Nota: GitHub Pages solo publica archivos estaticos. Si necesitas usuarios, permisos, base centralizada o datos compartidos entre equipos, usa el backend Django/PostgreSQL descrito mas abajo.
 
+## Continuar desde otro PC con Codex
+
+Este repositorio incluye `CONTEXTO_CODEX.md`, pensado para abrir el proyecto en otro computador y seguir trabajando aunque el chat original de Codex no aparezca ahi.
+
+En el otro PC:
+
+```powershell
+cd "$env:USERPROFILE\Desktop"
+git clone https://github.com/hardblockuno/consulta-habitacional-ep.git
+cd consulta-habitacional-ep
+```
+
+Luego abre la carpeta con Codex y escribe:
+
+```text
+Lee README.md y CONTEXTO_CODEX.md. Quiero seguir trabajando en este proyecto desde aqui.
+```
+
 ## Stack
 
 - Backend: Django, Django REST Framework, PostgreSQL, pandas, openpyxl.
