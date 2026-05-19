@@ -1,6 +1,6 @@
 import { Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { api, listFromResponse, money, percent } from "../api/client.js";
 import StatusBadge from "../components/StatusBadge.jsx";
@@ -8,8 +8,10 @@ import { EmptyState, ErrorState, LoadingState } from "../components/StateViews.j
 
 export default function Personas() {
   const searchInputRef = useRef(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState("");
   const [estado, setEstado] = useState("");
+  const [filtro, setFiltro] = useState(searchParams.get("filtro") || "");
   const [personas, setPersonas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -19,7 +21,7 @@ export default function Personas() {
     setLoading(true);
     api
       .get(query ? "/personas/buscar/" : "/personas/", {
-        params: { q: query || undefined, estado: estado || undefined },
+        params: { q: query || undefined, estado: estado || undefined, filtro: filtro || undefined },
         signal: controller.signal,
       })
       .then((response) => {
@@ -31,13 +33,17 @@ export default function Personas() {
       })
       .finally(() => setLoading(false));
     return () => controller.abort();
-  }, [query, estado]);
+  }, [query, estado, filtro]);
 
   useEffect(() => {
     if (window.matchMedia("(min-width: 700px)").matches) {
       searchInputRef.current?.focus();
     }
   }, []);
+
+  useEffect(() => {
+    setFiltro(searchParams.get("filtro") || "");
+  }, [searchParams]);
 
   return (
     <div className="space-y-5">
@@ -49,7 +55,7 @@ export default function Personas() {
       </div>
 
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="grid gap-3 md:grid-cols-[1fr_220px]">
+        <div className="grid gap-3 md:grid-cols-[1fr_220px_260px]">
           <label className="relative block">
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input
@@ -70,6 +76,20 @@ export default function Personas() {
             <option value="apta">Aptas</option>
             <option value="observada">Observadas</option>
             <option value="bloqueada">Bloqueadas</option>
+          </select>
+          <select
+            value={filtro}
+            onChange={(event) => {
+              const value = event.target.value;
+              setFiltro(value);
+              setSearchParams(value ? { filtro: value } : {});
+            }}
+            className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none ring-cyan-700 transition focus:border-cyan-700 focus:ring-2"
+          >
+            <option value="">Todos</option>
+            <option value="cedulas_revision">Cedulas vencidas o por vencer</option>
+            <option value="adultos_mayores">Adultos mayores</option>
+            <option value="discapacidad">Discapacidad</option>
           </select>
         </div>
       </section>

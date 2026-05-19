@@ -62,7 +62,7 @@ function navigate(view, params = {}) {
 
   const routes = {
     dashboard: renderDashboard,
-    personas: renderPersonas,
+    personas: () => renderPersonas(params),
     importar: renderImportar,
     alertas: renderAlertas,
     reportes: renderReportes,
@@ -92,11 +92,15 @@ function normalizeLoadedState(data) {
     caracterizacion.hijos = normalizeHijos(
       caracterizacion.hijos || extractHijosFromEntries(Object.entries(persona.original || {}))
     );
+    const documentos = (persona.documentos || []).map(normalizeDocument);
+    const cedula = documentos.find((doc) => doc.tipo === "cedula");
+    const cedulaVencimiento = parseDateValue(cedula?.fechaVencimiento);
     const alertasBase = (persona.alertas || [])
       .filter((alerta) => !isRshAlert(alerta))
       .filter((alerta) => !isAhorroAlert(alerta))
+      .filter((alerta) => !isCedulaAlert(alerta))
       .map(normalizeAlert);
-    const alertas = ensureChildAgeAlerts(alertasBase, caracterizacion.hijos);
+    const alertas = ensureChildAgeAlerts([...createCedulaAlerts(cedulaVencimiento), ...alertasBase], caracterizacion.hijos);
     if (
       !cleanString(caracterizacion.grupoFamiliar) &&
       caracterizacion.integrantes !== null &&
@@ -107,11 +111,22 @@ function normalizeLoadedState(data) {
     return {
       ...persona,
       caracterizacion,
+      documentos,
       alertas,
       estadoGeneral: getGeneralStatus(alertas),
     };
   });
   return { ...data, personas };
+}
+
+function normalizeDocument(doc) {
+  const fechaVencimiento = parseDateValue(doc.fechaVencimiento);
+  if (doc.tipo !== "cedula" || !fechaVencimiento) return doc;
+  return {
+    ...doc,
+    estado: documentStatusByDate(fechaVencimiento),
+    fechaVencimiento: fechaVencimiento.toISOString().slice(0, 10),
+  };
 }
 
 function normalizeAlert(alerta) {
@@ -134,6 +149,11 @@ function isAhorroAlert(alerta) {
   return text.includes("ahorro") || text.includes("financiera");
 }
 
+function isCedulaAlert(alerta) {
+  const text = `${normalize(alerta.tipo)}${normalize(alerta.titulo)}${normalize(alerta.detalle)}`;
+  return text.includes("cedula");
+}
+
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   updateStorageSummary();
@@ -147,10 +167,6 @@ function updateStorageSummary() {
 
 function renderDashboard() {
   const resumen = getResumen();
-  const topComites = topBy(state.personas, (persona) => persona.comite.nombre || "Sin comite");
-  const estadoRows = topBy(state.personas, (persona) => persona.estadoGeneral || "apta");
-  const maxComite = Math.max(...topComites.map((item) => item.total), 1);
-  const maxEstado = Math.max(...estadoRows.map((item) => item.total), 1);
 
   setApp(`
     <div class="page-head">
@@ -160,29 +176,20 @@ function renderDashboard() {
       </div>
     </div>
     <section class="grid stats">
-      ${stat("Total personas", resumen.totalPersonas)}
-      ${stat("Aptas", resumen.personasAptas, "emerald")}
-      ${stat("Observadas", resumen.observadas, "amber")}
-      ${stat("Bloqueadas", resumen.bloqueadas, "rose")}
-      ${stat("Personas mayores", resumen.personasMayores, "cyan")}
-      ${stat("Discapacidad", resumen.discapacidad, "indigo")}
-      ${stat("Hijos rev. 18", resumen.hijosRevision18, "amber")}
-      ${stat("RSH sobre 40%", resumen.rshSobre40, "amber")}
-    </section>
-    <section class="grid two" style="margin-top: 18px;">
-      <div class="panel">
-        <h3>Personas por estado</h3>
-        ${estadoRows.length ? estadoRows.map((item) => bar(item.label, item.total, maxEstado)).join("") : emptyHtml()}
-      </div>
-      <div class="panel">
-        <h3>Comites con mas personas</h3>
-        ${topComites.length ? topComites.slice(0, 10).map((item) => bar(item.label, item.total, maxComite)).join("") : emptyHtml()}
-      </div>
+      ${stat("Total personas", resumen.totalPersonas, "", "total")}
+      ${stat("Cedulas vencidas o por vencer", resumen.cedulasRevision, "rose", "cedulas_revision")}
+      ${stat("Adultos mayores", resumen.personasMayores, "cyan", "adultos_mayores")}
+      ${stat("Discapacidad", resumen.discapacidad, "indigo", "discapacidad")}
     </section>
   `);
+
+  document.querySelectorAll(".stat-action").forEach((card) => {
+    card.addEventListener("click", () => navigate("personas", { filtro: card.dataset.filter || "total" }));
+  });
 }
 
-function renderPersonas() {
+function renderPersonas(params = {}) {
+  const initialFilter = params.filtro || "";
   setApp(`
     <div class="page-head">
       <div>
@@ -191,7 +198,7 @@ function renderPersonas() {
       </div>
     </div>
     <section class="card">
-      <div class="field-row" style="grid-template-columns: minmax(260px, 1fr) 220px;">
+      <div class="field-row" style="grid-template-columns: minmax(260px, 1fr) 220px 260px;">
         <label class="field">
           <span>RUT o nombre</span>
           <input id="searchInput" class="input" placeholder="RUT o nombre" autocomplete="off" />
@@ -205,6 +212,15 @@ function renderPersonas() {
             <option value="bloqueada">Bloqueadas</option>
           </select>
         </label>
+        <label class="field">
+          <span>Filtro rapido</span>
+          <select id="quickFilter" class="select">
+            <option value="">Todos</option>
+            <option value="cedulas_revision">Cedulas vencidas o por vencer</option>
+            <option value="adultos_mayores">Adultos mayores</option>
+            <option value="discapacidad">Discapacidad</option>
+          </select>
+        </label>
       </div>
     </section>
     <section id="personasResult" style="margin-top: 18px;"></section>
@@ -212,16 +228,19 @@ function renderPersonas() {
 
   const searchInput = document.getElementById("searchInput");
   const statusFilter = document.getElementById("statusFilter");
-  const update = () => renderPersonasTable(searchInput.value, statusFilter.value);
+  const quickFilter = document.getElementById("quickFilter");
+  quickFilter.value = initialFilter === "total" ? "" : initialFilter;
+  const update = () => renderPersonasTable(searchInput.value, statusFilter.value, quickFilter.value);
   searchInput.addEventListener("input", update);
   statusFilter.addEventListener("change", update);
+  quickFilter.addEventListener("change", update);
   if (window.matchMedia("(min-width: 700px)").matches) {
     searchInput.focus();
   }
   update();
 }
 
-function renderPersonasTable(query = "", estado = "") {
+function renderPersonasTable(query = "", estado = "", filtroRapido = "") {
   const q = normalize(query);
   const rows = state.personas
     .filter((persona) => {
@@ -232,17 +251,19 @@ function renderPersonasTable(query = "", estado = "") {
         normalize(persona.telefono).includes(q) ||
         normalize(persona.comite.nombre).includes(q);
       const matchEstado = !estado || persona.estadoGeneral === estado;
-      return matchQuery && matchEstado;
+      const matchFiltro = personMatchesQuickFilter(persona, filtroRapido);
+      return matchQuery && matchEstado && matchFiltro;
     })
     .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 
   const container = document.getElementById("personasResult");
   if (!rows.length) {
-    container.innerHTML = emptyHtml("No hay personas para mostrar");
+    container.innerHTML = emptyHtml(`No hay personas para mostrar${filtroRapido ? ` en ${personFilterLabel(filtroRapido)}` : ""}`);
     return;
   }
 
   container.innerHTML = `
+    ${filtroRapido ? `<p class="muted small" style="margin: 0 0 10px;">Filtro: ${escapeHtml(personFilterLabel(filtroRapido))} - ${formatNumber(rows.length)} resultado${rows.length === 1 ? "" : "s"}</p>` : ""}
     <div class="table-wrap">
       <table>
         <thead>
@@ -514,40 +535,39 @@ function rowToPersona(row, headers, columnMap, options) {
 
 function buildAlerts(persona, cedulaVencimiento) {
   const alerts = [];
-  const add = (tipo, severidad, titulo, detalle, impactaEstado = true) => {
-    alerts.push({
-      id: cryptoId(),
-      tipo,
-      severidad,
-      titulo,
-      detalle,
-      activa: true,
-      impactaEstado,
-      fecha: new Date().toISOString(),
-    });
-  };
-
-  if (cedulaVencimiento) {
-    const today = atStartOfDay(new Date());
-    const days = Math.round((atStartOfDay(cedulaVencimiento) - today) / 86400000);
-    if (days < 0) {
-      add("documental", "critica", "Cedula vencida", `Cedula vencida el ${formatDate(cedulaVencimiento)}.`);
-    } else if (days <= 30) {
-      add("documental", "preventiva", "Cedula por vencer", `Cedula vence el ${formatDate(cedulaVencimiento)}.`);
-    }
-  }
+  alerts.push(...createCedulaAlerts(cedulaVencimiento));
 
   if (persona.discapacidad) {
-    add(
-      "documental",
-      "preventiva",
-      "Revisar respaldo discapacidad",
-      "La persona registra discapacidad; validar certificado o antecedente.",
-      false
-    );
+    alerts.push(createAlert("documental", "preventiva", "Revisar respaldo discapacidad", "La persona registra discapacidad; validar certificado o antecedente.", false));
   }
 
   return ensureChildAgeAlerts(alerts, persona.caracterizacion.hijos);
+}
+
+function createCedulaAlerts(cedulaVencimiento) {
+  if (!cedulaVencimiento) return [];
+  const today = atStartOfDay(new Date());
+  const days = Math.round((atStartOfDay(cedulaVencimiento) - today) / 86400000);
+  if (days < 0) {
+    return [createAlert("documental", "critica", "Cedula vencida", `Cedula vencida el ${formatDate(cedulaVencimiento)}.`)];
+  }
+  if (days <= 30) {
+    return [createAlert("documental", "preventiva", "Cedula por vencer", `Cedula vence el ${formatDate(cedulaVencimiento)}.`)];
+  }
+  return [];
+}
+
+function createAlert(tipo, severidad, titulo, detalle, impactaEstado = true) {
+  return {
+    id: cryptoId(),
+    tipo,
+    severidad,
+    titulo,
+    detalle,
+    activa: true,
+    impactaEstado,
+    fecha: new Date().toISOString(),
+  };
 }
 
 function renderFicha(rut) {
@@ -790,6 +810,7 @@ function getResumen() {
     hijosRevision18: state.personas.filter((p) => hijosConRevision(p).length).length,
     rshSobre40: state.personas.filter((p) => Number(p.rsh.porcentaje) > 40).length,
     ahorroInsuficiente: state.personas.filter((p) => p.ahorro.insuficiente).length,
+    cedulasRevision: state.personas.filter(hasCedulaRevision).length,
     cedulasVencidas: state.personas.filter((p) =>
       p.documentos.some((doc) => doc.tipo === "cedula" && doc.estado === "vencido")
     ).length,
@@ -1065,6 +1086,29 @@ function topBy(items, selector) {
   return [...counts.entries()]
     .map(([label, total]) => ({ label, total }))
     .sort((a, b) => b.total - a.total);
+}
+
+function personMatchesQuickFilter(persona, filter) {
+  if (!filter || filter === "total") return true;
+  if (filter === "cedulas_revision") return hasCedulaRevision(persona);
+  if (filter === "adultos_mayores") return Boolean(persona.personaMayor);
+  if (filter === "discapacidad") return Boolean(persona.discapacidad);
+  return true;
+}
+
+function personFilterLabel(filter) {
+  const labels = {
+    cedulas_revision: "cedulas vencidas o por vencer",
+    adultos_mayores: "adultos mayores",
+    discapacidad: "personas con discapacidad",
+  };
+  return labels[filter] || "todas las personas";
+}
+
+function hasCedulaRevision(persona) {
+  return (persona.documentos || []).some(
+    (doc) => doc.tipo === "cedula" && ["vencido", "por_vencer"].includes(doc.estado)
+  );
 }
 
 function extractHijosFromEntries(entries) {
@@ -1414,11 +1458,22 @@ function simpleTable(columns, rows) {
   `;
 }
 
-function stat(label, value, tone = "") {
+function stat(label, value, tone = "", filter = "") {
+  const content = `
+    <p class="label">${escapeHtml(label)}</p>
+    <p class="value">${formatNumber(value)}</p>
+    <p class="stat-hint">Ver lista</p>
+  `;
+  if (filter) {
+    return `
+      <button class="stat stat-action ${tone}" type="button" data-filter="${escapeAttr(filter)}">
+        ${content}
+      </button>
+    `;
+  }
   return `
     <article class="stat ${tone}">
-      <p class="label">${escapeHtml(label)}</p>
-      <p class="value">${formatNumber(value)}</p>
+      ${content}
     </article>
   `;
 }

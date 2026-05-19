@@ -40,6 +40,7 @@ class PersonaViewSet(viewsets.ReadOnlyModelViewSet):
         q = self.request.query_params.get("q", "").strip()
         estado = self.request.query_params.get("estado", "").strip()
         comite = self.request.query_params.get("comite", "").strip()
+        filtro = self.request.query_params.get("filtro", "").strip()
         if q:
             queryset = queryset.filter(
                 Q(rut__icontains=q)
@@ -51,6 +52,18 @@ class PersonaViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(estado_general=estado)
         if comite:
             queryset = queryset.filter(comite__nombre__icontains=comite)
+        if filtro == "cedulas_revision":
+            queryset = queryset.filter(
+                documentos__tipo=Documento.TIPO_CEDULA,
+                documentos__estado__in=[
+                    Documento.ESTADO_VENCIDO,
+                    Documento.ESTADO_POR_VENCER,
+                ],
+            ).distinct()
+        elif filtro == "adultos_mayores":
+            queryset = queryset.filter(persona_mayor=True)
+        elif filtro == "discapacidad":
+            queryset = queryset.filter(discapacidad=True)
         return queryset
 
     @action(detail=False, methods=["get"], url_path="buscar")
@@ -171,6 +184,10 @@ def dashboard_resumen_data():
         "personas_mayores": personas.filter(persona_mayor=True).count(),
         "discapacidad": personas.filter(discapacidad=True).count(),
         "hijos_revision_18": count_personas_con_hijos_revision(personas),
+        "cedulas_revision": Documento.objects.filter(
+            tipo=Documento.TIPO_CEDULA,
+            estado__in=[Documento.ESTADO_VENCIDO, Documento.ESTADO_POR_VENCER],
+        ).count(),
         "rsh_sobre_40": personas.filter(rsh__porcentaje__gt=40).count(),
         "ahorro_insuficiente": Ahorro.objects.filter(insuficiente=True).count(),
         "cedulas_vencidas": Documento.objects.filter(

@@ -239,11 +239,31 @@ textarea {
   padding: 18px;
 }
 
+.stat-action {
+  width: 100%;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.stat-action:hover {
+  border-color: var(--cyan);
+  box-shadow: 0 10px 24px rgba(14, 116, 144, 0.12);
+  transform: translateY(-1px);
+}
+
 .stat .value {
   margin: 10px 0 0;
   font-size: 32px;
   font-weight: 800;
   line-height: 1;
+}
+
+.stat-hint {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .stat.emerald {
