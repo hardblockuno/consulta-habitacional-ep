@@ -128,6 +128,18 @@ textarea {
   background: rgba(255, 255, 255, 0.16);
 }
 
+.nav-item.secondary-action {
+  border: 1px solid #a5f3fc;
+  background: #ecfeff;
+  color: var(--cyan-dark);
+  text-transform: uppercase;
+}
+
+.nav-item.secondary-action:hover {
+  background: #cffafe;
+  color: #164e63;
+}
+
 .nav-item.active {
   background: #111827;
   color: #fff;

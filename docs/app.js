@@ -313,7 +313,7 @@ function renderImportar() {
     <div class="page-head">
       <div>
         <div class="eyebrow">Carga de datos</div>
-        <h2>Importar Excel</h2>
+        <h2>Cargar base</h2>
       </div>
     </div>
     <section class="card">
@@ -334,7 +334,7 @@ function renderImportar() {
         </div>
         <div id="importMessage"></div>
         <div>
-          <button class="button primary" type="submit">Importar Excel</button>
+          <button class="button primary" type="submit">Cargar base Excel</button>
         </div>
       </form>
     </section>
@@ -378,7 +378,7 @@ async function handleExcelImport(event) {
     });
     saveState();
     message.innerHTML = notice(
-      `Importacion completada: ${formatNumber(result.creados)} creados, ${formatNumber(result.actualizados)} actualizados, ${formatNumber(result.omitidos)} omitidos.`,
+      `Base cargada: ${formatNumber(result.creados)} creados, ${formatNumber(result.actualizados)} actualizados, ${formatNumber(result.omitidos)} omitidos.`,
       "success"
     );
     renderImportHistory();

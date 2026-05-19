@@ -45,7 +45,7 @@ export default function Importar() {
     <div className="space-y-5">
       <div>
         <p className="text-sm font-semibold uppercase text-cyan-700">Carga de datos</p>
-        <h1 className="mt-1 text-2xl font-semibold text-slate-950">Importar Excel</h1>
+        <h1 className="mt-1 text-2xl font-semibold text-slate-950">Cargar base</h1>
       </div>
 
       <Section title="Archivo Excel">
@@ -97,7 +97,7 @@ export default function Importar() {
             className="inline-flex h-11 items-center gap-2 rounded-lg bg-cyan-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:bg-slate-400"
           >
             <Upload size={18} />
-            {loading ? "Importando" : "Importar"}
+            {loading ? "Cargando" : "Cargar base"}
           </button>
         </form>
       </Section>
@@ -106,7 +106,7 @@ export default function Importar() {
         <Section title="Resultado">
           <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-emerald-800">
             <CheckCircle2 size={18} />
-            Importacion {resultado.estado}
+            Base {resultado.estado}
           </div>
           <div className="grid gap-3 sm:grid-cols-4">
             <Metric label="Filas" value={resultado.total_filas} />

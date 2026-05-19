@@ -11,7 +11,7 @@ import { NavLink } from "react-router-dom";
 const navItems = [
   { to: "/personas", label: "Buscar persona", icon: Search, primary: true },
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/importar", label: "Importar", icon: Upload },
+  { to: "/importar", label: "Cargar base", icon: Upload, secondary: true },
   { to: "/alertas", label: "Alertas", icon: Bell },
   { to: "/reportes", label: "Reportes", icon: BarChart3 },
 ];
@@ -70,13 +70,18 @@ function NavItem({ item, compact = false }) {
           "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition",
           compact ? "shrink-0" : "",
           item.primary && !isActive ? "bg-cyan-700 text-white shadow-sm hover:bg-cyan-800" : "",
+          item.secondary && !isActive ? "bg-cyan-50 text-cyan-900 ring-1 ring-cyan-100 hover:bg-cyan-100" : "",
           isActive
             ? item.primary
               ? "bg-cyan-800 text-white"
-              : "bg-slate-950 text-white"
+              : item.secondary
+                ? "bg-cyan-900 text-white"
+                : "bg-slate-950 text-white"
             : item.primary
               ? ""
-              : "text-slate-600 hover:bg-slate-100 hover:text-slate-950",
+              : item.secondary
+                ? ""
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-950",
         ].join(" ")
       }
     >
