@@ -39,6 +39,7 @@ class CaracterizacionSocialSerializer(serializers.ModelSerializer):
             "tipo_familia",
             "grupo_familiar",
             "integrantes",
+            "hijos",
             "observaciones",
         ]
 

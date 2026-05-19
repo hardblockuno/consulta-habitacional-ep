@@ -75,6 +75,15 @@ export default function PersonaDetail() {
             <Info label="Comuna" value={persona.caracterizacion_social?.comuna || "Sin dato"} />
             <Info label="Parentesco" value={persona.caracterizacion_social?.parentesco || "Sin dato"} />
             <Info label="Tipo familia" value={persona.caracterizacion_social?.tipo_familia || "Sin dato"} />
+            <Info
+              label="Grupo familiar"
+              value={
+                persona.caracterizacion_social?.grupo_familiar ||
+                persona.caracterizacion_social?.integrantes ||
+                "Sin dato"
+              }
+            />
+            <Info label="Integrantes" value={persona.caracterizacion_social?.integrantes ?? "Sin dato"} />
           </div>
         </Section>
       </div>
@@ -90,7 +99,7 @@ export default function PersonaDetail() {
         <Section title="Ahorro">
           <div className="space-y-3 text-sm">
             <Info label="Monto" value={money(persona.ahorro?.monto_actual)} />
-            <Info label="Minimo" value={money(persona.ahorro?.ahorro_minimo)} />
+            <Info label="Referencia" value={money(persona.ahorro?.ahorro_minimo)} />
             <Info label="Banco" value={persona.ahorro?.banco || "Sin dato"} />
             <Info label="Cuenta" value={persona.ahorro?.numero_cuenta || "Sin dato"} />
           </div>
@@ -134,6 +143,34 @@ export default function PersonaDetail() {
         </Section>
       </div>
 
+      <Section title="Hijos y mayoria de edad">
+        {persona.caracterizacion_social?.hijos?.length ? (
+          <div className="space-y-3">
+            {persona.caracterizacion_social.hijos.map((hijo) => (
+              <Row
+                key={hijo.id}
+                title={hijo.nombre || hijo.descripcion || "Hijo/a o carga familiar"}
+                aside={
+                  <StatusBadge
+                    value={hijo.requiere_revision_documental ? "preventiva" : "vigente"}
+                  />
+                }
+              >
+                {[
+                  hijo.rut ? `RUT ${hijo.rut}` : "",
+                  hijo.edad !== null && hijo.edad !== undefined ? `${hijo.edad} anos` : "",
+                  hijo.fecha_nacimiento ? `nac. ${hijo.fecha_nacimiento}` : "",
+                  hijo.fecha_cumple_18 ? `18 anos: ${hijo.fecha_cumple_18}` : "",
+                  childStatusLabel(hijo),
+                ].filter(Boolean).join(" - ")}
+              </Row>
+            ))}
+          </div>
+        ) : (
+          <EmptyState label="Sin hijos o cargas familiares informadas" />
+        )}
+      </Section>
+
       <Section title="Observaciones">
         {persona.observaciones?.length ? (
           <div className="space-y-3">
@@ -149,6 +186,14 @@ export default function PersonaDetail() {
       </Section>
     </div>
   );
+}
+
+function childStatusLabel(hijo) {
+  if (hijo.estado_mayoria_edad === "cumple_hoy") return "Cumple 18 hoy";
+  if (hijo.estado_mayoria_edad === "proximo_18") return `Cumple 18 en ${hijo.dias_para_18} dias`;
+  if (hijo.estado_mayoria_edad === "proximo_sin_fecha") return "17 anos, revisar fecha";
+  if (hijo.estado_mayoria_edad === "cumplio_18") return "18 anos o mas";
+  return "Sin revision";
 }
 
 function Info({ label, value, icon: Icon }) {

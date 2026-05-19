@@ -70,7 +70,7 @@ export default function Importar() {
               />
             </label>
             <label className="block">
-              <span className="text-sm font-semibold text-slate-700">Ahorro minimo UF</span>
+              <span className="text-sm font-semibold text-slate-700">Ahorro referencia UF</span>
               <input
                 value={ahorroMinimo}
                 onChange={(event) => setAhorroMinimo(event.target.value)}

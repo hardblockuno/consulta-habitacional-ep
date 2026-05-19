@@ -33,7 +33,8 @@ export default function Reportes() {
         <StatCard label="Personas" value={data.total_personas} icon={Users} tone="slate" />
         <StatCard label="Alertas criticas" value={data.alertas_criticas} icon={AlertTriangle} tone="rose" />
         <StatCard label="Cedulas vencidas" value={data.cedulas_vencidas} icon={FileText} tone="rose" />
-        <StatCard label="Ahorro insuficiente" value={data.ahorro_insuficiente} icon={ClipboardList} tone="amber" />
+        <StatCard label="Hijos rev. 18" value={data.hijos_revision_18} icon={ClipboardList} tone="amber" />
+        <StatCard label="Ahorro bajo referencia" value={data.ahorro_insuficiente} icon={ClipboardList} tone="amber" />
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">

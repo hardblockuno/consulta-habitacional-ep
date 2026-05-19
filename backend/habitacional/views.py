@@ -170,6 +170,7 @@ def dashboard_resumen_data():
         "bloqueadas": personas.filter(estado_general=Persona.ESTADO_BLOQUEADA).count(),
         "personas_mayores": personas.filter(persona_mayor=True).count(),
         "discapacidad": personas.filter(discapacidad=True).count(),
+        "hijos_revision_18": count_personas_con_hijos_revision(personas),
         "rsh_sobre_40": personas.filter(rsh__porcentaje__gt=40).count(),
         "ahorro_insuficiente": Ahorro.objects.filter(insuficiente=True).count(),
         "cedulas_vencidas": Documento.objects.filter(
@@ -193,3 +194,13 @@ def dashboard_resumen_data():
             .order_by("estado_general")
         ),
     }
+
+
+def count_personas_con_hijos_revision(personas):
+    total = 0
+    for persona in personas.select_related("caracterizacion_social"):
+        caracterizacion = getattr(persona, "caracterizacion_social", None)
+        hijos = getattr(caracterizacion, "hijos", []) or []
+        if any(hijo.get("requiere_revision_documental") for hijo in hijos):
+            total += 1
+    return total

@@ -27,6 +27,8 @@ class ImportacionError(Exception):
 
 
 ORIGEN_IMPORTACION = "importacion_excel"
+MAYORIA_EDAD = 18
+HIJO_PROXIMO_18_DIAS = 90
 
 COLUMN_ALIASES = {
     "nombre": ["nombre", "nombrecompleto", "postulante", "socio"],
@@ -284,8 +286,9 @@ def procesar_fila(*, fila, columnas, mapa, comite, ahorro_minimo):
         defaults=datos,
     )
 
-    actualizar_relaciones(persona, valor, ahorro_minimo)
-    generar_alertas(persona, valor, ahorro_minimo)
+    hijos = extraer_hijos(fila)
+    actualizar_relaciones(persona, valor, ahorro_minimo, hijos)
+    generar_alertas(persona, valor, hijos)
     persona.actualizar_estado_general()
 
     return "creado" if creado else "actualizado"
@@ -314,13 +317,13 @@ def valor_columna(fila, columnas, columna, desplazamiento):
     return fila.get(columnas[indice])
 
 
-def actualizar_relaciones(persona, valor, ahorro_minimo):
+def actualizar_relaciones(persona, valor, ahorro_minimo, hijos):
     comuna = limpiar_string(valor("comuna"))
     parentesco = limpiar_string(valor("parentesco"))
     tipo_familia = limpiar_string(valor("tipo_familia"))
     grupo_familiar = limpiar_string(valor("grupo_familiar"))
     integrantes = parse_entero(valor("integrantes"))
-    if comuna or parentesco or tipo_familia or grupo_familiar or integrantes is not None:
+    if comuna or parentesco or tipo_familia or grupo_familiar or integrantes is not None or hijos:
         CaracterizacionSocial.objects.update_or_create(
             persona=persona,
             defaults={
@@ -329,6 +332,7 @@ def actualizar_relaciones(persona, valor, ahorro_minimo):
                 "tipo_familia": tipo_familia,
                 "grupo_familiar": grupo_familiar,
                 "integrantes": integrantes,
+                "hijos": hijos,
             },
         )
 
@@ -378,7 +382,7 @@ def actualizar_relaciones(persona, valor, ahorro_minimo):
         )
 
 
-def generar_alertas(persona, valor, ahorro_minimo):
+def generar_alertas(persona, valor, hijos=None):
     Alerta.objects.filter(persona=persona, origen=ORIGEN_IMPORTACION).delete()
 
     fecha_vencimiento = parse_fecha(valor("cedula_vencimiento"))
@@ -412,6 +416,18 @@ def generar_alertas(persona, valor, ahorro_minimo):
             impacta_estado=False,
         )
 
+    for hijo in hijos or []:
+        if not hijo.get("requiere_revision_documental"):
+            continue
+        crear_alerta(
+            persona,
+            Alerta.TIPO_DOCUMENTAL,
+            Alerta.SEVERIDAD_PREVENTIVA,
+            "Revisar hijo/a por mayoria de edad",
+            detalle_revision_hijo(hijo),
+            impacta_estado=False,
+        )
+
 
 def crear_alerta(persona, tipo, severidad, titulo, detalle, impacta_estado=True):
     Alerta.objects.create(
@@ -432,6 +448,148 @@ def estado_documento_por_fecha(fecha_vencimiento):
     if fecha_vencimiento <= hoy + timedelta(days=30):
         return Documento.ESTADO_POR_VENCER
     return Documento.ESTADO_VIGENTE
+
+
+def extraer_hijos(fila):
+    hijos_por_indice = {}
+    for columna, raw_value in fila.to_dict().items():
+        valor = limpiar_string(raw_value)
+        if not valor:
+            continue
+        normalized = normalizar_texto(columna)
+        if not es_columna_hijo(normalized):
+            continue
+        campo = campo_columna_hijo(normalized)
+        if not campo:
+            continue
+        indice = indice_columna_hijo(normalized)
+        hijos_por_indice.setdefault(indice, {})[campo] = valor
+    return [
+        hijo
+        for hijo in (
+            normalizar_hijo(datos, index)
+            for index, datos in enumerate(hijos_por_indice.values(), start=1)
+        )
+        if hijo
+    ]
+
+
+def normalizar_hijo(datos, index):
+    nombre = limpiar_string(datos.get("nombre"))
+    rut = normalizar_rut(datos.get("rut")) or limpiar_string(datos.get("rut"))
+    descripcion = limpiar_string(datos.get("descripcion"))
+    fecha_nacimiento = parse_fecha(datos.get("fecha_nacimiento"))
+    edad = calcular_edad(fecha_nacimiento) if fecha_nacimiento else parse_entero(datos.get("edad"))
+    fecha_cumple_18 = sumar_anios(fecha_nacimiento, MAYORIA_EDAD) if fecha_nacimiento else None
+    dias_para_18 = (fecha_cumple_18 - timezone.localdate()).days if fecha_cumple_18 else None
+    estado_mayoria_edad = estado_mayoria_edad_hijo(
+        edad=edad,
+        dias_para_18=dias_para_18,
+        fecha_cumple_18=fecha_cumple_18,
+    )
+
+    if (
+        not nombre
+        and not rut
+        and (not descripcion or descripcion_hijo_generica(descripcion))
+        and edad is None
+        and not fecha_nacimiento
+    ):
+        return None
+
+    return {
+        "id": f"hijo-{index}",
+        "nombre": nombre,
+        "rut": rut,
+        "descripcion": descripcion,
+        "fecha_nacimiento": fecha_nacimiento.isoformat() if fecha_nacimiento else "",
+        "edad": edad,
+        "fecha_cumple_18": fecha_cumple_18.isoformat() if fecha_cumple_18 else "",
+        "dias_para_18": dias_para_18,
+        "estado_mayoria_edad": estado_mayoria_edad,
+        "requiere_revision_documental": requiere_revision_documental_hijo(estado_mayoria_edad),
+    }
+
+
+def es_columna_hijo(normalized):
+    return any(term in normalized for term in ["hijo", "hija", "carga", "dependiente"])
+
+
+def campo_columna_hijo(normalized):
+    if "rut" in normalized or "run" in normalized:
+        return "rut"
+    if "nombre" in normalized:
+        return "nombre"
+    if (
+        "fecnac" in normalized
+        or "fechnac" in normalized
+        or "fechanacimiento" in normalized
+        or "nacimiento" in normalized
+        or ("fecha" in normalized and "nac" in normalized)
+    ):
+        return "fecha_nacimiento"
+    if "edad" in normalized:
+        return "edad"
+    if normalized in {"hijo", "hija", "hijos", "hijas"}:
+        return "descripcion"
+    return None
+
+
+def indice_columna_hijo(normalized):
+    match = re.search(r"\d+", normalized)
+    return match.group(0) if match else "1"
+
+
+def descripcion_hijo_generica(valor):
+    texto = normalizar_texto(valor)
+    return texto in {"si", "no", "s", "n", "true", "false"} or parse_decimal(valor) is not None
+
+
+def estado_mayoria_edad_hijo(*, edad, dias_para_18, fecha_cumple_18):
+    if fecha_cumple_18 and dias_para_18 is not None:
+        if dias_para_18 < 0:
+            return "cumplio_18"
+        if dias_para_18 == 0:
+            return "cumple_hoy"
+        if dias_para_18 <= HIJO_PROXIMO_18_DIAS:
+            return "proximo_18"
+        return "sin_revision"
+    if edad is not None and edad >= MAYORIA_EDAD:
+        return "cumplio_18"
+    if edad == MAYORIA_EDAD - 1:
+        return "proximo_sin_fecha"
+    return "sin_revision"
+
+
+def requiere_revision_documental_hijo(estado_mayoria_edad):
+    return estado_mayoria_edad in {
+        "cumplio_18",
+        "cumple_hoy",
+        "proximo_18",
+        "proximo_sin_fecha",
+    }
+
+
+def sumar_anios(fecha, anios):
+    try:
+        return fecha.replace(year=fecha.year + anios)
+    except ValueError:
+        return fecha.replace(year=fecha.year + anios, day=28)
+
+
+def detalle_revision_hijo(hijo):
+    nombre = hijo.get("nombre") or hijo.get("descripcion") or "Hijo/a o carga familiar"
+    estado = hijo.get("estado_mayoria_edad")
+    if estado == "cumple_hoy":
+        return f"{nombre} cumple 18 anos hoy; revisar actualizacion documental de la postulacion."
+    if estado == "proximo_18":
+        return (
+            f"{nombre} cumple 18 anos el {hijo.get('fecha_cumple_18')}; "
+            "revisar documentacion antes del cambio."
+        )
+    if estado == "proximo_sin_fecha":
+        return f"{nombre} registra 17 anos sin fecha exacta; revisar fecha de nacimiento y documentacion."
+    return f"{nombre} ya registra 18 anos o mas; revisar actualizacion documental de la postulacion."
 
 
 def deducir_nombre_comite(nombre_archivo, hoja):
@@ -562,6 +720,12 @@ def parse_fecha(valor):
     texto = limpiar_string(valor)
     if not texto:
         return None
+    iso = re.match(r"^(\d{4})-(\d{1,2})-(\d{1,2})$", texto)
+    if iso:
+        try:
+            return date(int(iso.group(1)), int(iso.group(2)), int(iso.group(3)))
+        except ValueError:
+            return None
     fecha = pd.to_datetime(texto, dayfirst=True, errors="coerce")
     if pd.isna(fecha):
         return None

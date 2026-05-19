@@ -1,4 +1,6 @@
 const STORAGE_KEY = "consultaHabitacionalEP:v1";
+const MAYORIA_EDAD = 18;
+const HIJO_PROXIMO_18_DIAS = 90;
 
 const COLUMN_ALIASES = {
   nombre: ["nombre", "nombrecompleto", "postulante", "socio"],
@@ -39,7 +41,7 @@ let currentView = "dashboard";
 
 document.addEventListener("DOMContentLoaded", () => {
   bindGlobalEvents();
-  navigate("dashboard");
+  navigate("personas");
 });
 
 function bindGlobalEvents() {
@@ -86,11 +88,15 @@ function loadState() {
 
 function normalizeLoadedState(data) {
   const personas = (data.personas || []).map((persona) => {
-    const alertas = (persona.alertas || [])
+    const caracterizacion = { ...(persona.caracterizacion || {}) };
+    caracterizacion.hijos = normalizeHijos(
+      caracterizacion.hijos || extractHijosFromEntries(Object.entries(persona.original || {}))
+    );
+    const alertasBase = (persona.alertas || [])
       .filter((alerta) => !isRshAlert(alerta))
       .filter((alerta) => !isAhorroAlert(alerta))
       .map(normalizeAlert);
-    const caracterizacion = { ...(persona.caracterizacion || {}) };
+    const alertas = ensureChildAgeAlerts(alertasBase, caracterizacion.hijos);
     if (
       !cleanString(caracterizacion.grupoFamiliar) &&
       caracterizacion.integrantes !== null &&
@@ -160,6 +166,7 @@ function renderDashboard() {
       ${stat("Bloqueadas", resumen.bloqueadas, "rose")}
       ${stat("Personas mayores", resumen.personasMayores, "cyan")}
       ${stat("Discapacidad", resumen.discapacidad, "indigo")}
+      ${stat("Hijos rev. 18", resumen.hijosRevision18, "amber")}
       ${stat("RSH sobre 40%", resumen.rshSobre40, "amber")}
     </section>
     <section class="grid two" style="margin-top: 18px;">
@@ -179,15 +186,15 @@ function renderPersonas() {
   setApp(`
     <div class="page-head">
       <div>
-        <div class="eyebrow">Consulta</div>
-        <h2>Personas</h2>
+        <div class="eyebrow">Consulta rapida</div>
+        <h2>Buscar persona</h2>
       </div>
     </div>
     <section class="card">
-      <div class="field-row" style="grid-template-columns: 1fr 220px;">
+      <div class="field-row" style="grid-template-columns: minmax(260px, 1fr) 220px;">
         <label class="field">
-          <span>Buscar</span>
-          <input id="searchInput" class="input" placeholder="RUT, nombre, comite o telefono" />
+          <span>RUT o nombre</span>
+          <input id="searchInput" class="input" placeholder="RUT o nombre" autocomplete="off" />
         </label>
         <label class="field">
           <span>Estado</span>
@@ -208,6 +215,9 @@ function renderPersonas() {
   const update = () => renderPersonasTable(searchInput.value, statusFilter.value);
   searchInput.addEventListener("input", update);
   statusFilter.addEventListener("change", update);
+  if (window.matchMedia("(min-width: 700px)").matches) {
+    searchInput.focus();
+  }
   update();
 }
 
@@ -433,6 +443,7 @@ function rowToPersona(row, headers, columnMap, options) {
   const cedulaVencimiento = parseDateValue(value("cedulaVencimiento"));
   const discapacidad = parseBoolean(value("discapacidad"));
   const neurodivergencia = parseBoolean(value("neurodivergencia"));
+  const hijos = extractHijosFromEntries(headers.map((header, index) => [header, row[index]]));
 
   const persona = {
     id: rut,
@@ -460,6 +471,7 @@ function rowToPersona(row, headers, columnMap, options) {
       tipoFamilia: cleanString(value("tipoFamilia")),
       grupoFamiliar: cleanString(value("grupoFamiliar")),
       integrantes: parseInteger(value("integrantes")),
+      hijos,
     },
     rsh: {
       porcentaje: rshValue,
@@ -535,7 +547,7 @@ function buildAlerts(persona, cedulaVencimiento) {
     );
   }
 
-  return alerts;
+  return ensureChildAgeAlerts(alerts, persona.caracterizacion.hijos);
 }
 
 function renderFicha(rut) {
@@ -562,6 +574,8 @@ function renderFicha(rut) {
           ${kv("Edad", persona.edad !== null ? `${persona.edad} anos` : "Sin dato")}
           ${kv("RSH", formatPercent(persona.rsh.porcentaje))}
           ${kv("Ahorro", formatUf(persona.ahorro.montoActual))}
+          ${kv("Cedula", cedulaSummary(persona))}
+          ${kv("Hijos rev. 18", childReviewSummary(persona))}
           ${kv("Persona mayor", persona.personaMayor ? "Si" : "No")}
           ${kv("Discapacidad", persona.discapacidad ? "Si" : "No")}
         </div>
@@ -603,6 +617,7 @@ function renderFicha(rut) {
         ${kv("Parentesco", persona.caracterizacion.parentesco || "Sin dato")}
         ${kv("Integrantes", persona.caracterizacion.integrantes ?? "Sin dato")}
       </div>
+      ${renderHijosMayoriaEdad(persona.caracterizacion.hijos)}
     </section>
 
     <section class="grid two" style="margin-top: 18px;">
@@ -724,6 +739,7 @@ function renderReportes() {
       ${stat("Personas", resumen.totalPersonas)}
       ${stat("Alertas criticas", resumen.alertasCriticas, "rose")}
       ${stat("Cedulas vencidas", resumen.cedulasVencidas, "rose")}
+      ${stat("Hijos rev. 18", resumen.hijosRevision18, "amber")}
     </section>
     <section class="grid two" style="margin-top: 18px;">
       <div class="panel">
@@ -771,6 +787,7 @@ function getResumen() {
     bloqueadas: state.personas.filter((p) => p.estadoGeneral === "bloqueada").length,
     personasMayores: state.personas.filter((p) => p.personaMayor).length,
     discapacidad: state.personas.filter((p) => p.discapacidad).length,
+    hijosRevision18: state.personas.filter((p) => hijosConRevision(p).length).length,
     rshSobre40: state.personas.filter((p) => Number(p.rsh.porcentaje) > 40).length,
     ahorroInsuficiente: state.personas.filter((p) => p.ahorro.insuficiente).length,
     cedulasVencidas: state.personas.filter((p) =>
@@ -1048,6 +1065,222 @@ function topBy(items, selector) {
   return [...counts.entries()]
     .map(([label, total]) => ({ label, total }))
     .sort((a, b) => b.total - a.total);
+}
+
+function extractHijosFromEntries(entries) {
+  const hijosPorIndice = new Map();
+  entries.forEach(([header, rawValue]) => {
+    const headerText = cleanString(header);
+    const valueText = cleanString(rawValue);
+    if (!headerText || !valueText) return;
+
+    const normalized = normalize(headerText);
+    if (!isChildColumn(normalized)) return;
+
+    const field = childColumnField(normalized);
+    if (!field) return;
+
+    const index = childColumnIndex(normalized);
+    const current = hijosPorIndice.get(index) || {};
+    current[field] = valueText;
+    hijosPorIndice.set(index, current);
+  });
+
+  return normalizeHijos([...hijosPorIndice.values()]);
+}
+
+function normalizeHijos(hijos) {
+  return (Array.isArray(hijos) ? hijos : [])
+    .map((hijo, index) => normalizeHijo(hijo, index))
+    .filter(Boolean);
+}
+
+function normalizeHijo(hijo, index) {
+  const nombre = cleanString(hijo.nombre);
+  const rut = normalizeRut(hijo.rut) || cleanString(hijo.rut);
+  const descripcion = cleanString(hijo.descripcion);
+  const fechaNacimiento = parseDateValue(hijo.fechaNacimiento || hijo.fechaNacimientoRaw);
+  const edad = fechaNacimiento ? calculateAge(fechaNacimiento) : parseInteger(hijo.edad);
+  const fechaCumple18 = fechaNacimiento ? addYears(fechaNacimiento, MAYORIA_EDAD) : null;
+  const diasPara18 = fechaCumple18
+    ? Math.round((atStartOfDay(fechaCumple18) - atStartOfDay(new Date())) / 86400000)
+    : null;
+  const estadoMayoriaEdad = childAdultStatus({ edad, diasPara18, fechaCumple18 });
+
+  if (
+    !nombre &&
+    !rut &&
+    (!descripcion || isGenericChildDescription(descripcion)) &&
+    edad === null &&
+    !fechaNacimiento
+  ) {
+    return null;
+  }
+
+  return {
+    id: cleanString(hijo.id) || `hijo-${index + 1}`,
+    nombre,
+    rut,
+    descripcion,
+    fechaNacimiento: fechaNacimiento ? fechaNacimiento.toISOString().slice(0, 10) : "",
+    edad,
+    fechaCumple18: fechaCumple18 ? fechaCumple18.toISOString().slice(0, 10) : "",
+    diasPara18,
+    estadoMayoriaEdad,
+    requiereRevisionDocumental: childNeedsDocumentReview(estadoMayoriaEdad),
+  };
+}
+
+function isChildColumn(normalized) {
+  return ["hijo", "hija", "carga", "dependiente"].some((term) => normalized.includes(term));
+}
+
+function childColumnField(normalized) {
+  if (normalized.includes("rut") || normalized.includes("run")) return "rut";
+  if (normalized.includes("nombre")) return "nombre";
+  if (
+    normalized.includes("fecnac") ||
+    normalized.includes("fechnac") ||
+    normalized.includes("fechanacimiento") ||
+    normalized.includes("nacimiento") ||
+    (normalized.includes("fecha") && normalized.includes("nac"))
+  ) {
+    return "fechaNacimiento";
+  }
+  if (normalized.includes("edad")) return "edad";
+  if (normalized === "hijo" || normalized === "hija" || normalized === "hijos" || normalized === "hijas") {
+    return "descripcion";
+  }
+  return null;
+}
+
+function childColumnIndex(normalized) {
+  const number = normalized.match(/\d+/);
+  return number ? number[0] : "1";
+}
+
+function isGenericChildDescription(value) {
+  const text = normalize(value);
+  return ["si", "no", "s", "n", "true", "false"].includes(text) || parseDecimal(value) !== null;
+}
+
+function childAdultStatus({ edad, diasPara18, fechaCumple18 }) {
+  if (fechaCumple18 && diasPara18 !== null) {
+    if (diasPara18 < 0) return "cumplio_18";
+    if (diasPara18 === 0) return "cumple_hoy";
+    if (diasPara18 <= HIJO_PROXIMO_18_DIAS) return "proximo_18";
+    return "sin_revision";
+  }
+  if (edad !== null && edad >= MAYORIA_EDAD) return "cumplio_18";
+  if (edad === MAYORIA_EDAD - 1) return "proximo_sin_fecha";
+  return "sin_revision";
+}
+
+function childNeedsDocumentReview(status) {
+  return ["cumplio_18", "cumple_hoy", "proximo_18", "proximo_sin_fecha"].includes(status);
+}
+
+function addYears(dateValue, years) {
+  const date = new Date(dateValue);
+  const result = new Date(date.getFullYear() + years, date.getMonth(), date.getDate());
+  if (date.getMonth() === 1 && date.getDate() === 29 && result.getMonth() !== 1) {
+    return new Date(date.getFullYear() + years, 1, 28);
+  }
+  return result;
+}
+
+function hijosConRevision(persona) {
+  return (persona.caracterizacion?.hijos || []).filter((hijo) => hijo.requiereRevisionDocumental);
+}
+
+function ensureChildAgeAlerts(alerts, hijos = []) {
+  const existing = alerts.some((alerta) => normalize(alerta.titulo).includes("hij") && normalize(alerta.detalle).includes("18"));
+  if (existing) return alerts;
+
+  const childAlerts = (hijos || [])
+    .filter((hijo) => hijo.requiereRevisionDocumental)
+    .map((hijo) => ({
+      id: cryptoId(),
+      tipo: "documental",
+      severidad: "preventiva",
+      titulo: "Revisar hijo/a por mayoria de edad",
+      detalle: childReviewDetail(hijo),
+      activa: true,
+      impactaEstado: false,
+      fecha: new Date().toISOString(),
+    }));
+
+  return [...alerts, ...childAlerts];
+}
+
+function childReviewDetail(hijo) {
+  const nombre = hijo.nombre || hijo.descripcion || "Hijo/a o carga familiar";
+  if (hijo.estadoMayoriaEdad === "cumple_hoy") {
+    return `${nombre} cumple 18 anos hoy; revisar actualizacion documental de la postulacion.`;
+  }
+  if (hijo.estadoMayoriaEdad === "proximo_18") {
+    return `${nombre} cumple 18 anos el ${hijo.fechaCumple18}; revisar documentacion antes del cambio.`;
+  }
+  if (hijo.estadoMayoriaEdad === "proximo_sin_fecha") {
+    return `${nombre} registra 17 anos sin fecha exacta; revisar fecha de nacimiento y documentacion.`;
+  }
+  return `${nombre} ya registra 18 anos o mas; revisar actualizacion documental de la postulacion.`;
+}
+
+function childStatusLabel(hijo) {
+  if (hijo.estadoMayoriaEdad === "cumple_hoy") return "Cumple 18 hoy";
+  if (hijo.estadoMayoriaEdad === "proximo_18") return `Cumple 18 en ${hijo.diasPara18} dias`;
+  if (hijo.estadoMayoriaEdad === "proximo_sin_fecha") return "17 anos, revisar fecha";
+  if (hijo.estadoMayoriaEdad === "cumplio_18") return "18 anos o mas";
+  return "Sin revision";
+}
+
+function childReviewSummary(persona) {
+  const total = hijosConRevision(persona).length;
+  if (!total) return "Sin revision";
+  return total === 1 ? "1 caso" : `${total} casos`;
+}
+
+function cedulaSummary(persona) {
+  const cedula = (persona.documentos || []).find((doc) => doc.tipo === "cedula");
+  if (!cedula) return "Sin dato";
+  const estado = cleanString(cedula.estado).replace("_", " ");
+  return `${estado}${cedula.fechaVencimiento ? ` - ${cedula.fechaVencimiento}` : ""}`;
+}
+
+function renderHijosMayoriaEdad(hijos = []) {
+  if (!hijos.length) {
+    return `<div style="margin-top: 14px;">${emptyHtml("Sin hijos o cargas familiares informadas")}</div>`;
+  }
+
+  return `
+    <div style="margin-top: 16px;">
+      <h3>Hijos y mayoria de edad</h3>
+      <div class="list">
+        ${hijos
+          .map(
+            (hijo) => `
+              <div class="list-item">
+                <div class="list-item-head">
+                  <strong>${escapeHtml(hijo.nombre || hijo.descripcion || "Hijo/a o carga familiar")}</strong>
+                  ${hijo.requiereRevisionDocumental ? '<span class="badge preventiva">Revision doc.</span>' : '<span class="badge vigente">Sin revision</span>'}
+                </div>
+                <p class="muted small">
+                  ${escapeHtml([
+                    hijo.rut ? `RUT ${hijo.rut}` : "",
+                    hijo.edad !== null ? `${hijo.edad} anos` : "",
+                    hijo.fechaNacimiento ? `nac. ${hijo.fechaNacimiento}` : "",
+                    hijo.fechaCumple18 ? `18 anos: ${hijo.fechaCumple18}` : "",
+                    childStatusLabel(hijo),
+                  ].filter(Boolean).join(" - "))}
+                </p>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
 }
 
 function renderDocuments(documents) {

@@ -27,6 +27,27 @@ Abrir Consulta Habitacional.bat
 
 Esa version no necesita Django, PostgreSQL ni npm. Importa Excel directamente en el navegador y guarda los datos en `localStorage` del navegador. Tambien permite exportar/importar un respaldo JSON para mover datos entre equipos.
 
+### Accesos rapidos para trabajar entre PCs
+
+Para evitar repetir comandos manualmente, hay dos archivos de doble clic:
+
+```text
+Iniciar Trabajo.bat
+Guardar Cambios.bat
+```
+
+Usa `Iniciar Trabajo.bat` antes de empezar. Este archivo ejecuta `git pull` y luego abre la version estatica en `docs/index.html`.
+
+Usa `Guardar Cambios.bat` al terminar. Este archivo muestra el estado, pide un mensaje de commit y ejecuta:
+
+```powershell
+git add .
+git commit -m "mensaje escrito"
+git push
+```
+
+Si hay datos sensibles o archivos personales, revisa antes de guardar. La carpeta `Bases datos Comites 2026/` esta ignorada por Git.
+
 Para publicarla despues en GitHub Pages:
 
 1. Sube el proyecto a GitHub.
@@ -133,7 +154,7 @@ El endpoint `POST /api/importar/excel/` espera `multipart/form-data`:
 - `archivo`: `.xlsx` o `.xls`.
 - `comite_nombre`: opcional; si falta se deduce desde el nombre del archivo.
 - `comuna`: opcional.
-- `ahorro_minimo`: opcional, por defecto `10`.
+- `ahorro_minimo`: opcional y referencial, por defecto `10`; no genera alerta ni cambia el estado.
 
 El importador:
 
@@ -142,6 +163,8 @@ El importador:
 - normaliza columnas frecuentes (`FEC NAC`, `FECH NAC`, `RSH`, `AHORRO`, `MINVU CONECTA`, etc.).
 - calcula edad y marca persona mayor desde `edad >= 60`.
 - registra RSH y ahorro como datos informativos, y genera alertas por cedula vencida o por vencer y observaciones internas por datos secundarios.
+- detecta hijos/cargas familiares cuando existen columnas como `NOMBRE HIJO 1`, `FEC NAC HIJO 1`, `EDAD HIJO 1`, `CARGA`, `DEPENDIENTE`, etc.
+- marca revision documental interna si un hijo/carga ya cumplio 18 anos o cumple 18 dentro de los proximos 90 dias.
 - crea o actualiza personas por RUT.
 
 ## Reglas implementadas
@@ -155,4 +178,5 @@ El importador:
 - Alerta critica activa: persona bloqueada.
 - Alertas preventivas que afectan aptitud: persona observada.
 - Observaciones internas, como respaldo de discapacidad, no cambian el estado general.
+- Hijos o cargas que cumplen 18 anos generan revision documental interna; no cambian el estado general por si solos.
 - Sin alertas activas: persona apta.

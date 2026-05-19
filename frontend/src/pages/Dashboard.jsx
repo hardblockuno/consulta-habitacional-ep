@@ -38,8 +38,9 @@ export default function Dashboard() {
     { label: "Bloqueadas", value: data.bloqueadas, icon: ShieldAlert, tone: "rose" },
     { label: "Personas mayores", value: data.personas_mayores, icon: UserRoundCheck, tone: "cyan" },
     { label: "Discapacidad", value: data.discapacidad, icon: Accessibility, tone: "indigo" },
+    { label: "Hijos rev. 18", value: data.hijos_revision_18, icon: FileWarning, tone: "amber" },
     { label: "RSH sobre 40%", value: data.rsh_sobre_40, icon: FileWarning, tone: "violet" },
-    { label: "Ahorro insuficiente", value: data.ahorro_insuficiente, icon: Banknote, tone: "amber" },
+    { label: "Ahorro bajo referencia", value: data.ahorro_insuficiente, icon: Banknote, tone: "amber" },
   ];
 
   const maxComite = Math.max(...(data.por_comite || []).map((item) => item.total), 1);

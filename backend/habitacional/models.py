@@ -112,6 +112,7 @@ class CaracterizacionSocial(TimeStampedModel):
     tipo_familia = models.CharField(max_length=120, blank=True)
     grupo_familiar = models.CharField(max_length=120, blank=True)
     integrantes = models.PositiveSmallIntegerField(null=True, blank=True)
+    hijos = models.JSONField(default=list, blank=True)
     observaciones = models.TextField(blank=True)
 
     def __str__(self):

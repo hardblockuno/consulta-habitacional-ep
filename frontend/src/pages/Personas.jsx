@@ -1,5 +1,5 @@
 import { Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api, listFromResponse, money, percent } from "../api/client.js";
@@ -7,6 +7,7 @@ import StatusBadge from "../components/StatusBadge.jsx";
 import { EmptyState, ErrorState, LoadingState } from "../components/StateViews.jsx";
 
 export default function Personas() {
+  const searchInputRef = useRef(null);
   const [query, setQuery] = useState("");
   const [estado, setEstado] = useState("");
   const [personas, setPersonas] = useState([]);
@@ -32,12 +33,18 @@ export default function Personas() {
     return () => controller.abort();
   }, [query, estado]);
 
+  useEffect(() => {
+    if (window.matchMedia("(min-width: 700px)").matches) {
+      searchInputRef.current?.focus();
+    }
+  }, []);
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm font-semibold uppercase text-cyan-700">Consulta</p>
-          <h1 className="mt-1 text-2xl font-semibold text-slate-950">Personas</h1>
+          <h1 className="mt-1 text-2xl font-semibold text-slate-950">Buscar persona</h1>
         </div>
       </div>
 
@@ -46,9 +53,11 @@ export default function Personas() {
           <label className="relative block">
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input
+              ref={searchInputRef}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar por RUT, nombre, comite o telefono"
+              placeholder="RUT o nombre"
+              autoComplete="off"
               className="h-11 w-full rounded-lg border border-slate-300 bg-white pl-10 pr-3 text-sm outline-none ring-cyan-700 transition focus:border-cyan-700 focus:ring-2"
             />
           </label>
@@ -89,8 +98,9 @@ export default function Personas() {
                       <Link to={`/personas/${persona.id}`} className="font-semibold text-cyan-800 hover:text-cyan-950">
                         {persona.nombre}
                       </Link>
+                      <PersonFlags persona={persona} />
                       <div className="mt-1 text-xs text-slate-500">
-                        {persona.rut} · {persona.telefono || "Sin telefono"}
+                        {persona.rut} - {persona.telefono || "Sin telefono"}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-slate-700">
@@ -110,6 +120,27 @@ export default function Personas() {
           </div>
         </section>
       ) : null}
+    </div>
+  );
+}
+
+function PersonFlags({ persona }) {
+  const flags = [];
+  if (persona.persona_mayor) flags.push({ label: "60+", title: "Persona mayor" });
+  if (persona.discapacidad) flags.push({ label: "DIS", title: "Persona con discapacidad" });
+  if (!flags.length) return null;
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {flags.map((flag) => (
+        <span
+          key={flag.label}
+          title={flag.title}
+          className="inline-flex rounded-md bg-cyan-50 px-2 py-0.5 text-[11px] font-semibold text-cyan-900 ring-1 ring-cyan-100"
+        >
+          {flag.label}
+        </span>
+      ))}
     </div>
   );
 }

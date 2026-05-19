@@ -6,133 +6,132 @@ Construir un MVP de plataforma interna para Entidades Patrocinantes en Chile.
 
 La plataforma debe permitir:
 
-- importar bases Excel de comités habitacionales.
-- buscar personas por RUT, nombre o comité.
+- importar bases Excel de comites habitacionales.
+- buscar personas por RUT, nombre, comite o telefono.
 - visualizar fichas individuales.
-- generar alertas documentales y sociales.
-- mostrar dashboards y reportes.
+- registrar datos habitacionales y sociales relevantes.
+- generar alertas documentales que afecten la aptitud cuando corresponda.
+- mostrar dashboards y reportes informativos.
 
-## Stack requerido
+## Estado actual del proyecto
 
-### Backend
-- Python
-- Django
-- Django REST Framework
-- PostgreSQL
-- pandas
-- openpyxl
+El repositorio tiene tres capas:
 
-### Frontend
-- React
-- Vite
-- Tailwind CSS
-- Axios
-- React Router DOM
+- `docs/`: version estatica principal para uso simple y publicacion en GitHub Pages.
+- `backend/`: API Django + Django REST Framework.
+- `frontend/`: interfaz React + Vite + Tailwind para consumir la API.
+
+La version recomendada para uso inmediato es `docs/`, porque no requiere Django, PostgreSQL ni npm.
 
 ## Funcionalidades principales
 
-### 1. Dashboard
-Debe mostrar:
-- total personas
-- personas aptas
-- observadas
-- bloqueadas
-- personas mayores
-- discapacidad
-- RSH sobre 40%
-- ahorro insuficiente
-- cédulas vencidas
+### Dashboard
 
-### 2. Buscador
+Debe mostrar:
+
+- total personas.
+- personas aptas.
+- observadas.
+- bloqueadas.
+- personas mayores.
+- discapacidad.
+- RSH sobre 40% como dato informativo.
+- cedulas vencidas.
+- alertas criticas y preventivas.
+
+### Buscador
+
 Debe permitir buscar por:
-- RUT
-- nombre
-- comité
-- teléfono
 
-### 3. Ficha persona
+- RUT.
+- nombre.
+- comite.
+- telefono.
+
+La lista de personas debe mostrar identificadores visuales para:
+
+- persona mayor.
+- discapacidad.
+
+### Ficha persona
+
 Debe mostrar:
-- identificación
-- comité
-- RSH
-- ahorro
-- postulación
-- documentos
-- alertas
-- observaciones
 
-### 4. Importador Excel
+- identificacion.
+- comite.
+- RSH.
+- ahorro.
+- postulacion.
+- documentos.
+- alertas.
+- observaciones.
+- grupo familiar y su valor.
+- hijos/cargas familiares y revision por mayoria de edad.
+
+### Importador Excel
+
 Debe:
-- leer Excel con pandas
-- leer hoja BASE
-- validar columnas
-- calcular edad
-- detectar personas mayores
-- detectar cédulas vencidas
-- detectar ahorro insuficiente
-- generar alertas
-- crear o actualizar personas
 
-### 5. Backend API
+- leer Excel.
+- detectar hoja `BASE` o similar.
+- detectar encabezados con `NOMBRE` y `RUT`.
+- normalizar columnas frecuentes.
+- calcular edad.
+- detectar personas mayores.
+- registrar RSH como dato informativo.
+- registrar ahorro como dato informativo.
+- detectar cedulas vencidas o por vencer.
+- detectar hijos/cargas que ya cumplieron 18 anos o estan proximos a cumplirlos.
+- crear o actualizar personas por RUT.
 
-Endpoints mínimos:
-
-GET /api/personas/
-GET /api/personas/{id}/
-GET /api/personas/buscar/?q=
-POST /api/importar/excel/
-GET /api/dashboard/resumen/
-
-## Modelos requeridos
-
-- Comite
-- Persona
-- CaracterizacionSocial
-- RSH
-- Ahorro
-- Postulacion
-- Documento
-- Observacion
-- Alerta
-- ImportacionExcel
-
-## Reglas importantes
+## Reglas funcionales vigentes
 
 ### Persona mayor
-edad >= 60
+
+`edad >= 60`.
 
 ### RSH
-- <= 40: preferente
-- > 40: observación
 
-### Cédula
-- vencida: alerta crítica
-- por vencer 30 días: alerta preventiva
+- `<= 40`: preferente.
+- `> 40`: dato informativo.
+- No genera alerta.
+- No genera motivo.
+- No cambia el estado general.
+
+### Ahorro
+
+- Es dato informativo.
+- Puede compararse contra una referencia para reportes.
+- No genera alerta.
+- No genera motivo.
+- No cambia el estado general.
+
+### Cedula
+
+- Vencida: alerta critica y persona bloqueada.
+- Por vencer dentro de 30 dias: alerta preventiva y persona observada.
+
+### Discapacidad
+
+- Debe mostrarse como identificador visual.
+- Puede generar observacion o alerta interna de respaldo.
+- No cambia el estado general por si sola.
+
+### Hijos/cargas familiares y mayoria de edad
+
+- Se detectan desde columnas como `NOMBRE HIJO 1`, `FEC NAC HIJO 1`, `EDAD HIJO 1`, `CARGA` o `DEPENDIENTE`.
+- Si un hijo/carga ya cumplio 18 anos, requiere revision documental interna.
+- Si un hijo/carga cumple 18 dentro de los proximos 90 dias, requiere revision documental interna.
+- La revision de hijos/cargas no cambia el estado general por si sola.
 
 ### Estado general
-- alerta crítica → bloqueada
-- alertas preventivas → observada
-- sin alertas → apta
 
-## Frontend requerido
+- Alerta critica activa que impacta estado: persona bloqueada.
+- Alerta preventiva activa que impacta estado: persona observada.
+- Sin alertas activas que impacten estado: persona apta.
 
-Rutas:
+## Datos sensibles
 
-/dashboard
-/personas
-/personas/:id
-/importar
-/alertas
-/reportes
+No subir bases Excel reales ni datos personales al repositorio.
 
-## Resultado esperado
-
-El proyecto debe quedar funcionando con:
-
-- backend Django operativo
-- frontend React operativo
-- PostgreSQL configurado
-- importador Excel funcional
-- dashboard funcional
-- buscador funcional
-- ficha individual funcional
+La carpeta `Bases datos Comites 2026/` debe mantenerse ignorada por Git.

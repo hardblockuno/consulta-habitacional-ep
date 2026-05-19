@@ -22,6 +22,7 @@ El proyecto es una plataforma de consulta habitacional para una Entidad Patrocin
 - Frontend React + Vite + Tailwind en `frontend/`.
 - Version estatica directa para GitHub Pages en `docs/`.
 - Archivo de apertura rapida `Abrir Consulta Habitacional.bat`.
+- Accesos de trabajo entre PCs: `Iniciar Trabajo.bat` y `Guardar Cambios.bat`.
 
 La version que se usa de forma mas simple hoy es la estatica en `docs/`. Importa archivos Excel en el navegador y guarda datos en `localStorage`.
 
@@ -63,6 +64,14 @@ Opcion de doble clic:
 Abrir Consulta Habitacional.bat
 ```
 
+Opcion recomendada cuando se trabaja entre PCs:
+
+```text
+Iniciar Trabajo.bat
+```
+
+Este acceso ejecuta `git pull` y luego abre la version estatica.
+
 Opcion por terminal:
 
 ```powershell
@@ -78,13 +87,19 @@ http://localhost:8765
 
 ## Flujo para trabajar entre dos PCs
 
-Antes de empezar en un PC:
+Opcion practica:
+
+1. Antes de empezar, doble clic en `Iniciar Trabajo.bat`.
+2. Al terminar, doble clic en `Guardar Cambios.bat`.
+3. Escribir un mensaje corto para el commit cuando lo pida.
+
+Opcion manual antes de empezar en un PC:
 
 ```powershell
 git pull
 ```
 
-Despues de hacer cambios:
+Opcion manual despues de hacer cambios:
 
 ```powershell
 git add .
@@ -109,6 +124,8 @@ git pull
 - Observaciones internas de documentacion secundaria no cambian la aptitud de postulacion.
 - Discapacidad y adulto mayor deben mostrarse como identificadores visuales en la lista de personas.
 - La ficha de persona debe mostrar grupo familiar y su valor.
+- La ficha debe mostrar hijos/cargas familiares cuando el Excel los informe.
+- Hijos/cargas que ya cumplieron 18 anos o cumplen 18 dentro de 90 dias generan revision documental interna sin cambiar aptitud por si solos.
 
 ## Archivos principales
 
