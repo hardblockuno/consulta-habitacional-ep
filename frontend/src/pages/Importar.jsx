@@ -1,4 +1,4 @@
-import { CheckCircle2, Upload } from "lucide-react";
+import { CheckCircle2, FileText, Upload } from "lucide-react";
 import { useState } from "react";
 
 import { api } from "../api/client.js";
@@ -13,6 +13,11 @@ export default function Importar() {
   const [loading, setLoading] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [error, setError] = useState("");
+  const [archivoObservaciones, setArchivoObservaciones] = useState(null);
+  const [comiteObservaciones, setComiteObservaciones] = useState("");
+  const [loadingObservaciones, setLoadingObservaciones] = useState(false);
+  const [resultadoObservaciones, setResultadoObservaciones] = useState(null);
+  const [errorObservaciones, setErrorObservaciones] = useState("");
 
   async function onSubmit(event) {
     event.preventDefault();
@@ -38,6 +43,31 @@ export default function Importar() {
       setError(err.response?.data?.detail || "No se pudo importar el archivo.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function onSubmitObservaciones(event) {
+    event.preventDefault();
+    if (!archivoObservaciones) {
+      setErrorObservaciones("Selecciona un archivo Excel con observaciones o correcciones.");
+      return;
+    }
+    const formData = new FormData();
+    formData.append("archivo", archivoObservaciones);
+    formData.append("comite_nombre", comiteObservaciones);
+
+    setLoadingObservaciones(true);
+    setErrorObservaciones("");
+    setResultadoObservaciones(null);
+    try {
+      const response = await api.post("/importar/observaciones/", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setResultadoObservaciones(response.data);
+    } catch (err) {
+      setErrorObservaciones(err.response?.data?.detail || "No se pudieron cargar las observaciones.");
+    } finally {
+      setLoadingObservaciones(false);
     }
   }
 
@@ -102,6 +132,40 @@ export default function Importar() {
         </form>
       </Section>
 
+      <Section title="Observaciones y correcciones">
+        <form onSubmit={onSubmitObservaciones} className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="block">
+              <span className="text-sm font-semibold text-slate-700">Archivo Excel</span>
+              <input
+                onChange={(event) => setArchivoObservaciones(event.target.files?.[0] || null)}
+                type="file"
+                accept=".xlsx,.xls"
+                className="mt-1 block h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-slate-950 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-semibold text-slate-700">Comité</span>
+              <input
+                value={comiteObservaciones}
+                onChange={(event) => setComiteObservaciones(event.target.value)}
+                className="mt-1 h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none ring-cyan-700 transition focus:border-cyan-700 focus:ring-2"
+                placeholder="Opcional"
+              />
+            </label>
+          </div>
+          {errorObservaciones ? <ErrorState message={errorObservaciones} /> : null}
+          <button
+            type="submit"
+            disabled={loadingObservaciones}
+            className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+          >
+            <FileText size={18} />
+            {loadingObservaciones ? "Cargando" : "Cargar observaciones"}
+          </button>
+        </form>
+      </Section>
+
       {resultado ? (
         <Section title="Resultado">
           <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-emerald-800">
@@ -117,6 +181,28 @@ export default function Importar() {
           {resultado.errores?.length ? (
             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
               {resultado.errores.slice(0, 5).map((item) => (
+                <p key={`${item.fila}-${item.error}`}>Fila {item.fila || "-"}: {item.error}</p>
+              ))}
+            </div>
+          ) : null}
+        </Section>
+      ) : null}
+
+      {resultadoObservaciones ? (
+        <Section title="Resultado observaciones">
+          <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-emerald-800">
+            <CheckCircle2 size={18} />
+            Observaciones {resultadoObservaciones.estado}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-4">
+            <Metric label="Filas" value={resultadoObservaciones.total_filas} />
+            <Metric label="Creados" value={resultadoObservaciones.creados} />
+            <Metric label="Actualizados" value={resultadoObservaciones.actualizados} />
+            <Metric label="Omitidos" value={resultadoObservaciones.omitidos} />
+          </div>
+          {resultadoObservaciones.errores?.length ? (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+              {resultadoObservaciones.errores.slice(0, 5).map((item) => (
                 <p key={`${item.fila}-${item.error}`}>Fila {item.fila || "-"}: {item.error}</p>
               ))}
             </div>

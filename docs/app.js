@@ -214,9 +214,8 @@ function normalizeLoadedState(data) {
     const alertasBase = (persona.alertas || [])
       .filter((alerta) => !isRshAlert(alerta))
       .filter((alerta) => !isAhorroAlert(alerta))
-      .filter((alerta) => !isCedulaAlert(alerta))
+      .filter((alerta) => !isRuleManagedAlert(alerta))
       .map(normalizeAlert);
-    const alertas = ensureChildAgeAlerts([...createCedulaAlerts(cedulaVencimiento), ...alertasBase], caracterizacion.hijos);
     if (
       !cleanString(caracterizacion.grupoFamiliar) &&
       caracterizacion.integrantes !== null &&
@@ -224,10 +223,14 @@ function normalizeLoadedState(data) {
     ) {
       caracterizacion.grupoFamiliar = cleanString(caracterizacion.integrantes);
     }
-    return {
+    const normalizedPersona = {
       ...persona,
       caracterizacion,
       documentos,
+    };
+    const alertas = [...buildAlerts(normalizedPersona, cedulaVencimiento), ...alertasBase];
+    return {
+      ...normalizedPersona,
       alertas,
       estadoGeneral: getGeneralStatus(alertas),
     };
@@ -268,6 +271,36 @@ function isAhorroAlert(alerta) {
 function isCedulaAlert(alerta) {
   const text = `${normalize(alerta.tipo)}${normalize(alerta.titulo)}${normalize(alerta.detalle)}`;
   return text.includes("cedula");
+}
+
+function isDisabilitySupportAlert(alerta) {
+  const text = `${normalize(alerta.titulo)}${normalize(alerta.detalle)}`;
+  return text.includes("respaldodiscapacidad") || (text.includes("certificado") && text.includes("discapacidad"));
+}
+
+function isIndigenousCertificateAlert(alerta) {
+  const text = `${normalize(alerta.titulo)}${normalize(alerta.detalle)}`;
+  return text.includes("acreditacionindigena") || text.includes("certificadoindigena");
+}
+
+function isUnipersonalExceptionAlert(alerta) {
+  const text = `${normalize(alerta.titulo)}${normalize(alerta.detalle)}`;
+  return text.includes("criteriodeexcepcionunipersonal") || text.includes("excepcionunipersonal");
+}
+
+function isChildAgeAlert(alerta) {
+  const text = `${normalize(alerta.titulo)}${normalize(alerta.detalle)}`;
+  return text.includes("hijo") && text.includes("18");
+}
+
+function isRuleManagedAlert(alerta) {
+  return (
+    isCedulaAlert(alerta) ||
+    isDisabilitySupportAlert(alerta) ||
+    isIndigenousCertificateAlert(alerta) ||
+    isUnipersonalExceptionAlert(alerta) ||
+    isChildAgeAlert(alerta)
+  );
 }
 
 function saveState() {
@@ -460,12 +493,32 @@ function renderImportar() {
     </section>
     <section id="manualImportPanel" class="panel manual-mapping hidden" style="margin-top: 18px;"></section>
     <section class="panel" style="margin-top: 18px;">
+      <h3>Cargar observaciones y correcciones</h3>
+      <form id="observationsForm" class="grid">
+        <div class="field-row" style="grid-template-columns: minmax(260px, 1fr) 220px;">
+          <label class="field">
+            <span>Archivo Excel</span>
+            <input id="observationsFile" class="input" type="file" accept=".xlsx,.xls" />
+          </label>
+          <label class="field">
+            <span>Comité</span>
+            <input id="observationsComite" class="input" placeholder="Opcional" />
+          </label>
+        </div>
+        <div id="observationsMessage"></div>
+        <div>
+          <button class="button secondary" type="submit">Cargar observaciones</button>
+        </div>
+      </form>
+    </section>
+    <section class="panel" style="margin-top: 18px;">
       <h3>Últimas importaciones</h3>
       <div id="importHistory"></div>
     </section>
   `);
 
   document.getElementById("excelForm").addEventListener("submit", handleExcelImport);
+  document.getElementById("observationsForm").addEventListener("submit", handleObservationsImport);
   renderImportHistory();
 }
 
@@ -512,6 +565,45 @@ async function handleExcelImport(event) {
     completeImport(result, message);
   } catch (error) {
     message.innerHTML = notice(error.message || "No fue posible importar el archivo.", "error");
+  }
+}
+
+async function handleObservationsImport(event) {
+  event.preventDefault();
+  const message = document.getElementById("observationsMessage");
+  const file = document.getElementById("observationsFile").files[0];
+  const comiteNombre = document.getElementById("observationsComite").value.trim();
+
+  if (!window.XLSX) {
+    message.innerHTML = notice("No se pudo cargar el lector Excel. Revisa tu conexión a internet.", "error");
+    return;
+  }
+  if (!state.personas.length) {
+    message.innerHTML = notice("Primero carga la base principal del comité.", "error");
+    return;
+  }
+  if (!file) {
+    message.innerHTML = notice("Selecciona un archivo Excel con observaciones o correcciones.", "error");
+    return;
+  }
+
+  message.innerHTML = notice("Procesando observaciones...");
+
+  try {
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+    const result = importObservationsWorkbook(workbook, {
+      fileName: file.name,
+      comiteNombre,
+    });
+    saveState();
+    message.innerHTML = notice(
+      `Observaciones cargadas: ${formatNumber(result.actualizados)} personas actualizadas, ${formatNumber(result.observaciones)} observaciones, ${formatNumber(result.correcciones)} correcciones, ${formatNumber(result.omitidos)} omitidos.`,
+      "success"
+    );
+    renderImportHistory();
+  } catch (error) {
+    message.innerHTML = notice(error.message || "No fue posible cargar las observaciones.", "error");
   }
 }
 
@@ -579,7 +671,7 @@ function commitPreparedImport(prepared) {
         continue;
       }
       if (existing.has(persona.rut)) {
-        Object.assign(existing.get(persona.rut), persona);
+        mergeImportedPersona(existing.get(persona.rut), persona);
         stats.actualizados += 1;
       } else {
         state.personas.push(persona);
@@ -618,6 +710,378 @@ function completeImport(result, message) {
   }
   pendingManualImport = null;
   renderImportHistory();
+}
+
+function importObservationsWorkbook(workbook, options) {
+  const sheetName = selectBaseSheet(workbook.SheetNames);
+  const sheet = workbook.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: true });
+  const headerIndex = detectObservationHeaderRow(rows);
+  if (headerIndex < 0) {
+    throw new Error("No se encontró una fila de encabezados con RUT/RUN para asociar observaciones.");
+  }
+
+  const headers = uniqueHeaders(rows[headerIndex]);
+  const map = buildObservationColumnMap(rows, headerIndex, headers);
+  if (!map.rut) {
+    throw new Error("El archivo de observaciones debe incluir una columna RUT/RUN o equivalente.");
+  }
+
+  const personasPorRut = new Map(state.personas.map((persona) => [persona.rut, persona]));
+  const stats = { actualizados: 0, observaciones: 0, correcciones: 0, omitidos: 0, errores: [] };
+
+  for (let i = headerIndex + 1; i < rows.length; i += 1) {
+    const row = rows[i] || [];
+    if (!row.some((value) => cleanString(value))) {
+      stats.omitidos += 1;
+      continue;
+    }
+
+    const rut = normalizeRut(row[headers.indexOf(map.rut)]);
+    const persona = personasPorRut.get(rut);
+    if (!rut || !persona) {
+      stats.omitidos += 1;
+      stats.errores.push({ fila: i + 1, error: rut ? `RUT ${rut} no existe en la base cargada.` : "Fila sin RUT/RUN." });
+      continue;
+    }
+    if (options.comiteNombre && normalize(persona.comite?.nombre) !== normalize(options.comiteNombre)) {
+      stats.omitidos += 1;
+      stats.errores.push({ fila: i + 1, error: `RUT ${rut} pertenece a otro comité.` });
+      continue;
+    }
+
+    const beforeObservations = (persona.observaciones || []).length;
+    const correctionCount = applyObservationCorrections(persona, row, headers, map.corrections);
+    const observationCount = addRowObservations(persona, row, headers, map.observationColumns, options.fileName);
+    if (correctionCount || observationCount) {
+      recalculatePersonaAfterChanges(persona);
+      stats.actualizados += 1;
+      stats.correcciones += correctionCount;
+      stats.observaciones += (persona.observaciones || []).length - beforeObservations;
+    } else {
+      stats.omitidos += 1;
+    }
+  }
+
+  state.importaciones.unshift({
+    id: cryptoId(),
+    archivo: options.fileName,
+    hoja: sheetName,
+    fecha: new Date().toISOString(),
+    filas: Math.max(rows.length - headerIndex - 1, 0),
+    modo: "observaciones_correcciones",
+    creados: 0,
+    actualizados: stats.actualizados,
+    omitidos: stats.omitidos,
+    errores: stats.errores.slice(0, 30),
+  });
+  state.importaciones = state.importaciones.slice(0, 20);
+  return stats;
+}
+
+function detectObservationHeaderRow(rows) {
+  let best = { index: -1, score: 0 };
+  rows.slice(0, 35).forEach((row, index) => {
+    const headers = uniqueHeaders(row || []);
+    const map = buildObservationColumnMap(rows, index, headers);
+    let score = 0;
+    if (map.rut) {
+      score = 5;
+      score += Math.min(map.observationColumns.length, 4) * 2;
+      score += Object.keys(map.corrections).length;
+    }
+    if (score > best.score) best = { index, score };
+  });
+  return best.score >= 5 ? best.index : -1;
+}
+
+function buildObservationColumnMap(rows, headerIndex, headers) {
+  const baseMap = buildColumnMap(headers);
+  const inferred = inferColumnMapFromData(rows, headerIndex, headers, baseMap);
+  const rut = inferred.rut || findColumn(headers, COLUMN_ALIASES.rut, COLUMN_EXCLUDES.rut || []);
+  const correctionFields = [
+    "correo",
+    "telefono",
+    "direccion",
+    "sexo",
+    "estadoCivil",
+    "nacionalidad",
+    "etnia",
+    "fechaNacimiento",
+    "edad",
+    "discapacidad",
+    "neurodivergencia",
+    "comuna",
+    "parentesco",
+    "tipoFamilia",
+    "grupoFamiliar",
+    "integrantes",
+    "rsh",
+    "minvuConecta",
+    "cedulaVencimiento",
+  ];
+  const corrections = {};
+  correctionFields.forEach((field) => {
+    if (inferred[field] && isUsableCorrectionColumn(inferred[field], field)) {
+      corrections[field] = inferred[field];
+    }
+  });
+
+  const reserved = new Set([rut, ...Object.values(corrections)].filter(Boolean));
+  let observationColumns = headers.filter((header) => isObservationColumn(header) && !reserved.has(header));
+  if (!observationColumns.length) {
+    observationColumns = headers.filter(
+      (header) =>
+        cleanString(header) &&
+        !reserved.has(header) &&
+        !normalize(header).startsWith("sinnombre") &&
+        !isReservedObservationHeader(header)
+    );
+  }
+  return { rut, corrections, observationColumns };
+}
+
+function isUsableCorrectionColumn(header, field) {
+  const text = normalize(header);
+  if (!text) return false;
+  const correctionTokens = ["correccion", "correg", "nuevo", "actualizado", "actualizada", "rectific", "reemplazo", "final"];
+  const hasCorrectionToken = correctionTokens.some((token) => text.includes(token));
+  if (isObservationColumn(header) && !hasCorrectionToken) return false;
+  if (["rsh", "minvuConecta"].includes(field)) return true;
+  return true;
+}
+
+function isObservationColumn(header) {
+  const text = normalize(header);
+  return [
+    "observacion",
+    "obs",
+    "comentario",
+    "correccion",
+    "corregir",
+    "revision",
+    "revisar",
+    "nota",
+    "motivo",
+    "detalle",
+    "situacion",
+    "estado",
+    "respuesta",
+  ].some((token) => text.includes(token));
+}
+
+function isReservedObservationHeader(header) {
+  const text = normalize(header);
+  return [
+    "nombre",
+    "nombres",
+    "apellido",
+    "apellidos",
+    "rut",
+    "run",
+    "comite",
+    "comuna",
+    "nro",
+    "numero",
+    "orden",
+    "id",
+    "fecha",
+    "base",
+  ].some((token) => text === token || text.startsWith(token));
+}
+
+function applyObservationCorrections(persona, row, headers, corrections) {
+  let total = 0;
+  Object.entries(corrections).forEach(([field, header]) => {
+    const value = row[headers.indexOf(header)];
+    if (!cleanString(value)) return;
+    const applied = applyCorrection(persona, field, value);
+    if (applied) total += 1;
+  });
+  return total;
+}
+
+function addRowObservations(persona, row, headers, observationColumns, fileName) {
+  let total = 0;
+  observationColumns.forEach((header) => {
+    const value = cleanString(row[headers.indexOf(header)]);
+    if (!value) return;
+    const label = cleanString(header);
+    const text = isGenericObservationHeader(label) ? value : `${label}: ${value}`;
+    if (addObservation(persona, text, "Importación observaciones", fileName)) total += 1;
+  });
+  return total;
+}
+
+function isGenericObservationHeader(header) {
+  const text = normalize(header);
+  return ["observacion", "observaciones", "obs", "comentario", "comentarios", "nota", "notas"].includes(text);
+}
+
+function addObservation(persona, texto, autor = "Sistema", origen = "") {
+  const cleanText = cleanString(texto);
+  if (!cleanText) return false;
+  persona.observaciones = Array.isArray(persona.observaciones) ? persona.observaciones : [];
+  const exists = persona.observaciones.some((item) => normalize(item.texto) === normalize(cleanText));
+  if (exists) return false;
+  persona.observaciones.push({
+    id: cryptoId(),
+    texto: cleanText,
+    autor,
+    origen,
+    creadoEn: new Date().toISOString(),
+  });
+  return true;
+}
+
+function mergeImportedPersona(target, imported) {
+  const observaciones = Array.isArray(target.observaciones) ? target.observaciones : [];
+  Object.assign(target, imported);
+  target.observaciones = mergeObservaciones(observaciones, imported.observaciones || []);
+  recalculatePersonaAfterChanges(target);
+}
+
+function mergeObservaciones(current, incoming) {
+  const merged = [...current];
+  incoming.forEach((item) => {
+    if (!merged.some((existing) => normalize(existing.texto) === normalize(item.texto))) {
+      merged.push(item);
+    }
+  });
+  return merged;
+}
+
+function applyCorrection(persona, field, rawValue) {
+  const value = cleanString(rawValue);
+  if (!value) return false;
+
+  const setValue = (container, key, next, label) => {
+    const current = cleanString(container[key]);
+    const nextText = cleanString(next);
+    if (!nextText || normalize(current) === normalize(nextText)) return false;
+    container[key] = next;
+    addObservation(persona, `Corrección aplicada - ${label}: ${current || "Sin dato"} -> ${nextText}`, "Importación observaciones");
+    return true;
+  };
+
+  if (["correo", "telefono", "direccion", "sexo", "estadoCivil", "nacionalidad", "etnia"].includes(field)) {
+    return setValue(persona, field, value, correctionLabel(field));
+  }
+  if (field === "fechaNacimiento") {
+    const dateValue = parseDateValue(rawValue);
+    if (!dateValue) return false;
+    const next = dateValue.toISOString().slice(0, 10);
+    const applied = setValue(persona, "fechaNacimiento", next, correctionLabel(field));
+    if (applied) {
+      persona.edad = calculateAge(dateValue);
+      persona.personaMayor = persona.edad >= 60;
+    }
+    return applied;
+  }
+  if (field === "edad") {
+    const next = parseInteger(rawValue);
+    if (next === null || persona.edad === next) return false;
+    addObservation(persona, `Corrección aplicada - Edad: ${persona.edad ?? "Sin dato"} -> ${next}`, "Importación observaciones");
+    persona.edad = next;
+    persona.personaMayor = next >= 60;
+    return true;
+  }
+  if (["discapacidad", "neurodivergencia"].includes(field)) {
+    const next = parseBoolean(rawValue);
+    if (persona[field] === next) return false;
+    addObservation(persona, `Corrección aplicada - ${correctionLabel(field)}: ${persona[field] ? "Sí" : "No"} -> ${next ? "Sí" : "No"}`, "Importación observaciones");
+    persona[field] = next;
+    return true;
+  }
+  if (["comuna", "parentesco", "tipoFamilia", "grupoFamiliar"].includes(field)) {
+    persona.caracterizacion = persona.caracterizacion || {};
+    return setValue(persona.caracterizacion, field, value, correctionLabel(field));
+  }
+  if (field === "integrantes") {
+    persona.caracterizacion = persona.caracterizacion || {};
+    const next = parseInteger(rawValue);
+    if (next === null || persona.caracterizacion.integrantes === next) return false;
+    addObservation(persona, `Corrección aplicada - Integrantes: ${persona.caracterizacion.integrantes ?? "Sin dato"} -> ${next}`, "Importación observaciones");
+    persona.caracterizacion.integrantes = next;
+    return true;
+  }
+  if (field === "rsh") {
+    const next = parseDecimal(rawValue);
+    if (next === null || Number(persona.rsh?.porcentaje) === Number(next)) return false;
+    addObservation(persona, `Corrección aplicada - RSH: ${formatPercent(persona.rsh?.porcentaje)} -> ${formatPercent(next)}`, "Importación observaciones");
+    persona.rsh = {
+      ...(persona.rsh || {}),
+      porcentaje: next,
+      tramo: value,
+      preferente: next <= 40,
+    };
+    return true;
+  }
+  if (field === "minvuConecta") {
+    const next = parseDecimal(rawValue);
+    if (next === null || Number(persona.postulacion?.minvuConecta) === Number(next)) return false;
+    addObservation(persona, `Corrección aplicada - MINVU Conecta: ${formatPercent(persona.postulacion?.minvuConecta)} -> ${formatPercent(next)}`, "Importación observaciones");
+    persona.postulacion = { ...(persona.postulacion || {}), minvuConecta: next };
+    return true;
+  }
+  if (field === "cedulaVencimiento") {
+    const dateValue = parseDateValue(rawValue);
+    if (!dateValue) return false;
+    const next = dateValue.toISOString().slice(0, 10);
+    const documentos = Array.isArray(persona.documentos) ? persona.documentos : [];
+    let cedula = documentos.find((doc) => doc.tipo === "cedula");
+    if (!cedula) {
+      cedula = { id: cryptoId(), tipo: "cedula" };
+      documentos.push(cedula);
+    }
+    if (cedula.fechaVencimiento === next) return false;
+    addObservation(persona, `Corrección aplicada - Vencimiento cédula: ${cedula.fechaVencimiento || "Sin dato"} -> ${next}`, "Importación observaciones");
+    cedula.fechaVencimiento = next;
+    cedula.estado = documentStatusByDate(dateValue);
+    cedula.observaciones = "Actualizado desde archivo de observaciones.";
+    persona.documentos = documentos;
+    return true;
+  }
+  return false;
+}
+
+function correctionLabel(field) {
+  const labels = {
+    correo: "Correo",
+    telefono: "Teléfono",
+    direccion: "Dirección",
+    sexo: "Sexo",
+    estadoCivil: "Estado civil",
+    nacionalidad: "Nacionalidad",
+    etnia: "Etnia / pueblo originario",
+    fechaNacimiento: "Fecha de nacimiento",
+    discapacidad: "Discapacidad",
+    neurodivergencia: "Neurodivergencia",
+    comuna: "Comuna",
+    parentesco: "Parentesco",
+    tipoFamilia: "Tipo familia",
+    grupoFamiliar: "Grupo familiar",
+  };
+  return labels[field] || field;
+}
+
+function recalculatePersonaAfterChanges(persona) {
+  const cedula = (persona.documentos || []).find((doc) => doc.tipo === "cedula");
+  const cedulaVencimiento = parseDateValue(cedula?.fechaVencimiento);
+  if (cedula && cedulaVencimiento) {
+    cedula.estado = documentStatusByDate(cedulaVencimiento);
+    cedula.fechaVencimiento = cedulaVencimiento.toISOString().slice(0, 10);
+  }
+  persona.caracterizacion = persona.caracterizacion || {};
+  persona.caracterizacion.hijos = normalizeHijos(persona.caracterizacion.hijos || []);
+  const alertasBase = (persona.alertas || [])
+    .filter((alerta) => !isRshAlert(alerta))
+    .filter((alerta) => !isAhorroAlert(alerta))
+    .filter((alerta) => !isRuleManagedAlert(alerta))
+    .map(normalizeAlert);
+  persona.alertas = [...buildAlerts(persona, cedulaVencimiento), ...alertasBase];
+  persona.estadoGeneral = getGeneralStatus(persona.alertas);
+  persona.actualizadoEn = new Date().toISOString();
 }
 
 function renderManualImportPanel(prepared) {
@@ -932,6 +1396,24 @@ function buildAlerts(persona, cedulaVencimiento) {
   if (persona.discapacidad) {
     alerts.push(createAlert("documental", "preventiva", "Revisar respaldo discapacidad", "La persona registra discapacidad; validar certificado o antecedente.", false));
   }
+  if (hasEtnia(persona)) {
+    alerts.push(createAlert(
+      "documental",
+      "preventiva",
+      "Revisar certificado de acreditación indígena",
+      "La persona registra etnia o pueblo originario; revisar y confirmar certificado de acreditación indígena para el proceso documental interno.",
+      false
+    ));
+  }
+  if (isUnipersonal(persona) && exceptionCriteria(persona).length) {
+    alerts.push(createAlert(
+      "social",
+      "preventiva",
+      "Criterio de excepción unipersonal",
+      `Postulación unipersonal con criterio de excepción: ${exceptionCriteriaLabel(persona)}.`,
+      false
+    ));
+  }
 
   return ensureChildAgeAlerts(alerts, persona.caracterizacion.hijos);
 }
@@ -992,6 +1474,7 @@ function renderFicha(rut) {
           ${kv("Discapacidad", persona.discapacidad ? "Sí" : "No")}
           ${kv("Etnia / pueblo originario", hasEtnia(persona) ? persona.etnia : "Sin dato")}
           ${kv("Postulación", isUnipersonal(persona) ? "Unipersonal" : "Grupo familiar")}
+          ${kv("Criterios excepción", exceptionCriteriaLabel(persona))}
         </div>
       </div>
     </section>
@@ -1019,6 +1502,7 @@ function renderFicha(rut) {
           ${kv("Parentesco", persona.caracterizacion.parentesco || "Sin dato")}
           ${kv("Tipo familia", persona.caracterizacion.tipoFamilia || "Sin dato")}
           ${kv("Postulación", isUnipersonal(persona) ? "Unipersonal" : "Grupo familiar")}
+          ${kv("Criterios excepción", exceptionCriteriaLabel(persona))}
           ${kv("MINVU Conecta", formatPercent(persona.postulacion.minvuConecta))}
         </div>
       </div>
@@ -1183,9 +1667,10 @@ function renderImportHistory() {
     return;
   }
   container.innerHTML = simpleTable(
-    ["Archivo", "Hoja", "Fecha", "Creados", "Actualizados", "Omitidos"],
+    ["Archivo", "Tipo", "Hoja", "Fecha", "Creados", "Actualizados", "Omitidos"],
     state.importaciones.map((item) => [
       item.archivo,
+      importModeLabel(item.modo),
       item.hoja,
       new Date(item.fecha).toLocaleString("es-CL"),
       item.creados,
@@ -1193,6 +1678,15 @@ function renderImportHistory() {
       item.omitidos,
     ])
   );
+}
+
+function importModeLabel(mode) {
+  const labels = {
+    automatico: "Base automática",
+    mapeo_manual: "Base con mapeo",
+    observaciones_correcciones: "Observaciones",
+  };
+  return labels[mode] || "Base";
 }
 
 function getResumen() {
@@ -1758,6 +2252,18 @@ function isUnipersonal(persona) {
     text.includes("sola") ||
     text.includes("solo")
   );
+}
+
+function exceptionCriteria(persona) {
+  const criterios = [];
+  if (persona?.personaMayor) criterios.push("Adulto mayor");
+  if (hasEtnia(persona)) criterios.push("Etnia / pueblo originario");
+  return criterios;
+}
+
+function exceptionCriteriaLabel(persona) {
+  const criterios = exceptionCriteria(persona);
+  return criterios.length ? criterios.join(", ") : "Sin criterio informado";
 }
 
 function hasCedulaRevision(persona) {

@@ -50,6 +50,7 @@ export default function PersonaDetail() {
           <Info label="RSH" value={percent(persona.rsh?.porcentaje)} />
           <Info label="Ahorro" value={money(persona.ahorro?.monto_actual)} />
           <Info label="Alertas" value={(persona.alertas || []).filter((item) => item.activa).length} />
+          <Info label="Criterios excepción" value={exceptionCriteriaLabel(persona)} />
         </div>
       </section>
 
@@ -73,6 +74,7 @@ export default function PersonaDetail() {
             <Info label="Discapacidad" value={persona.discapacidad ? "Sí" : "No"} />
             <Info label="Neurodivergencia" value={persona.neurodivergencia ? "Sí" : "No"} />
             <Info label="Postulación" value={persona.postulacion_unipersonal ? "Unipersonal" : "Grupo familiar"} />
+            <Info label="Criterios excepción" value={exceptionCriteriaLabel(persona)} />
             <Info label="Comuna" value={persona.caracterizacion_social?.comuna || "Sin dato"} />
             <Info label="Parentesco" value={persona.caracterizacion_social?.parentesco || "Sin dato"} />
             <Info label="Tipo familia" value={persona.caracterizacion_social?.tipo_familia || "Sin dato"} />
@@ -220,6 +222,13 @@ function hasEtnia(persona) {
         "noinformada",
       ].includes(text)
   );
+}
+
+function exceptionCriteriaLabel(persona) {
+  const criterios = [];
+  if (persona.persona_mayor) criterios.push("Adulto mayor");
+  if (hasEtnia(persona)) criterios.push("Etnia / pueblo originario");
+  return criterios.length ? criterios.join(", ") : "Sin criterio informado";
 }
 
 function Info({ label, value, icon: Icon }) {

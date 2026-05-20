@@ -27,6 +27,11 @@ Abrir Consulta Habitacional.bat
 
 Esa version no necesita Django, PostgreSQL ni npm. Importa Excel directamente en el navegador y guarda los datos en `localStorage` del navegador. Tambien permite exportar/importar un respaldo JSON para mover datos entre equipos.
 
+La pantalla de carga permite dos tipos de archivo:
+
+- Base principal del comite: crea o actualiza personas por RUT/RUN.
+- Observaciones y correcciones: se carga despues de la base principal, cruza por RUT/RUN y agrega observaciones internas o actualiza datos como telefono, direccion, etnia, integrantes, RSH, MINVU Conecta o vencimiento de cedula cuando el Excel trae esas columnas.
+
 ### Accesos rapidos para trabajar entre PCs
 
 Para evitar repetir comandos manualmente, hay dos archivos de doble clic:
@@ -143,6 +148,7 @@ La app queda en `http://localhost:5173` y consume `http://localhost:8000/api`.
 - `GET /api/personas/{id}/`
 - `GET /api/personas/buscar/?q=`
 - `POST /api/importar/excel/`
+- `POST /api/importar/observaciones/`
 - `GET /api/dashboard/resumen/`
 - `GET /api/alertas/`
 - `GET /api/reportes/resumen/`
@@ -168,11 +174,26 @@ El importador:
 - marca revision documental interna si un hijo/carga ya cumplio 18 anos o cumple 18 dentro de los proximos 90 dias.
 - crea o actualiza personas por RUT.
 
+El endpoint `POST /api/importar/observaciones/` espera `multipart/form-data`:
+
+- `archivo`: `.xlsx` o `.xls`.
+- `comite_nombre`: opcional; si se informa, solo aplica filas de personas que pertenecen a ese comite.
+
+Este segundo importador:
+
+- busca una columna `RUT/RUN` para asociar cada fila con una persona ya cargada.
+- reconoce columnas de observaciones como `OBS`, `OBSERVACION`, `COMENTARIO`, `NOTA`, `MOTIVO`, `REVISION` o `DETALLE`.
+- reconoce columnas de correccion frecuentes como telefono, correo, direccion, etnia, integrantes, RSH, MINVU Conecta y vencimiento de cedula.
+- conserva las observaciones existentes y evita duplicar textos identicos.
+- recalcula las alertas internas y el estado de la persona despues de aplicar correcciones.
+
 ## Reglas implementadas
 
 - Persona mayor: `edad >= 60`.
 - Etnia o pueblo originario: se identifica cuando el campo de etnia/pueblo originario contiene un valor informado distinto de `No`, `Ninguna`, `Sin dato` o equivalentes.
 - Postulacion unipersonal: se identifica cuando el grupo familiar registra `1` integrante o cuando el tipo/grupo familiar indica `unipersonal` o `persona sola`.
+- Adulto mayor y etnia/pueblo originario son criterios de excepcion relevantes para postulaciones unipersonales.
+- Cuando una persona registra etnia/pueblo originario, el sistema agrega una observacion interna para revisar y confirmar el certificado de acreditacion indigena. Esta observacion no cambia la aptitud.
 - RSH `<= 40`: preferente.
 - RSH: dato informativo; no genera alerta ni cambia el estado de postulacion.
 - Ahorro: dato informativo; no genera alerta ni cambia el estado de postulacion.

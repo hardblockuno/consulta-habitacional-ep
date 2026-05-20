@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from .models import Alerta, Documento, ImportacionExcel, Persona
-from .services.excel_importer import importar_excel
+from .services.excel_importer import importar_excel, importar_observaciones_excel
 
 
 class ImportadorExcelTests(TestCase):
@@ -164,6 +164,64 @@ class ImportadorExcelTests(TestCase):
         self.assertEqual(persona.rsh.porcentaje, Decimal("40.00"))
         self.assertEqual(persona.caracterizacion_social.integrantes, 1)
         self.assertEqual(persona.estado_general, Persona.ESTADO_APTA)
+        titulos = set(persona.alertas.values_list("titulo", flat=True))
+        self.assertIn("Revisar certificado de acreditación indígena", titulos)
+        self.assertIn("Criterio de excepción unipersonal", titulos)
+        self.assertFalse(persona.alertas.filter(impacta_estado=True).exists())
+
+    def test_importa_observaciones_y_correcciones_por_rut(self):
+        with TemporaryDirectory() as tmpdir:
+            base = Path(tmpdir) / "BASE COMITE OBS.xlsx"
+            df_base = pd.DataFrame(
+                [
+                    ["NOMBRE", "RUT", "FEC NAC", "TELEFONO", "TOTAL INTEGRANTES"],
+                    ["Persona Observada", "66666666", "1995-01-01", "111", 2],
+                ]
+            )
+            observaciones = Path(tmpdir) / "OBSERVACIONES COMITE OBS.xlsx"
+            df_observaciones = pd.DataFrame(
+                [
+                    ["RUN", "OBSERVACION", "TELEFONO NUEVO", "PUEBLO ORIGINARIO", "TOTAL INTEGRANTES"],
+                    ["66666666", "Actualizar respaldo interno", "999", "Mapuche", 1],
+                ]
+            )
+            with pd.ExcelWriter(base, engine="openpyxl") as writer:
+                df_base.to_excel(writer, index=False, header=False, sheet_name="BASE")
+            with pd.ExcelWriter(observaciones, engine="openpyxl") as writer:
+                df_observaciones.to_excel(writer, index=False, header=False, sheet_name="OBS")
+
+            importacion_base = ImportacionExcel.objects.create(
+                archivo=str(base),
+                nombre_archivo=base.name,
+            )
+            importar_excel(
+                importacion=importacion_base,
+                archivo_path=base,
+                comite_nombre="Comite Obs",
+                comuna="Temuco",
+                ahorro_minimo=Decimal("10"),
+            )
+
+            importacion_obs = ImportacionExcel.objects.create(
+                archivo=str(observaciones),
+                nombre_archivo=observaciones.name,
+            )
+            importar_observaciones_excel(
+                importacion=importacion_obs,
+                archivo_path=observaciones,
+                comite_nombre="Comite Obs",
+            )
+            self.assertEqual(importacion_obs.errores, [])
+            self.assertEqual(importacion_obs.actualizados, 1)
+
+        persona = Persona.objects.get(nombre="Persona Observada")
+        persona.refresh_from_db()
+        self.assertEqual(persona.telefono, "999")
+        self.assertEqual(persona.etnia, "Mapuche")
+        self.assertEqual(persona.caracterizacion_social.integrantes, 1)
+        self.assertEqual(persona.estado_general, Persona.ESTADO_APTA)
+        self.assertTrue(persona.observaciones.filter(texto__icontains="Actualizar respaldo interno").exists())
+        self.assertTrue(persona.alertas.filter(titulo="Revisar certificado de acreditación indígena").exists())
 
     def test_cedula_vencida_bloquea_persona(self):
         fecha_vencida = timezone.localdate() - timedelta(days=1)

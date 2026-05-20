@@ -16,6 +16,7 @@ from habitacional.models import (
     Comite,
     Documento,
     ImportacionExcel,
+    Observacion,
     Persona,
     Postulacion,
     RSH,
@@ -257,6 +258,74 @@ def importar_excel(
     return importacion
 
 
+def importar_observaciones_excel(
+    *,
+    importacion,
+    archivo_path,
+    comite_nombre="",
+):
+    try:
+        excel = pd.ExcelFile(archivo_path)
+        sheet_names = excel.sheet_names
+        excel.close()
+    except Exception as exc:
+        raise ImportacionError(f"No se pudo leer el archivo Excel: {exc}") from exc
+
+    hoja = seleccionar_hoja_base(sheet_names)
+    header_index = detectar_fila_encabezados_observaciones(archivo_path, hoja)
+    if header_index is None:
+        raise ImportacionError(
+            "No se encontró una fila de encabezados con RUT/RUN para asociar observaciones."
+        )
+
+    df = pd.read_excel(archivo_path, sheet_name=hoja, header=header_index)
+    df = limpiar_dataframe(df)
+    columnas = list(df.columns)
+    mapa = construir_mapa_observaciones(columnas)
+    if not mapa.get("rut"):
+        raise ImportacionError("El archivo de observaciones debe incluir una columna RUT/RUN.")
+
+    importacion.hoja = hoja
+    importacion.total_filas = len(df)
+    importacion.save(update_fields=["hoja", "total_filas", "actualizado_en"])
+
+    actualizados = 0
+    omitidos = 0
+    errores = []
+
+    for posicion, (_, fila) in enumerate(df.iterrows(), start=header_index + 2):
+        try:
+            with transaction.atomic():
+                resultado = procesar_fila_observaciones(
+                    fila=fila,
+                    columnas=columnas,
+                    mapa=mapa,
+                    comite_nombre=comite_nombre,
+                )
+        except Exception as exc:
+            errores.append({"fila": posicion, "error": str(exc)})
+            omitidos += 1
+            continue
+
+        if resultado == "actualizado":
+            actualizados += 1
+        else:
+            omitidos += 1
+
+    importacion.creados = 0
+    importacion.actualizados = actualizados
+    importacion.omitidos = omitidos
+    importacion.errores = errores[:100]
+    importacion.estado = (
+        ImportacionExcel.ESTADO_COMPLETADA
+        if len(errores) < max(len(df), 1)
+        else ImportacionExcel.ESTADO_ERROR
+    )
+    importacion.finalizado_en = timezone.now()
+    importacion.save()
+    return importacion
+
+
 def seleccionar_hoja_base(sheet_names):
     normalizadas = [(sheet, normalizar_texto(sheet)) for sheet in sheet_names]
     for sheet, normalized in normalizadas:
@@ -283,6 +352,24 @@ def detectar_fila_encabezados(archivo_path, hoja):
             mejor_indice = int(indice)
             mejor_score = score
     return mejor_indice if mejor_score >= 8 else None
+
+
+def detectar_fila_encabezados_observaciones(archivo_path, hoja):
+    muestra = pd.read_excel(archivo_path, sheet_name=hoja, header=None, nrows=35)
+    mejor_indice = None
+    mejor_score = 0
+    for indice, fila in muestra.iterrows():
+        columnas = encabezados_unicos(fila.tolist())
+        mapa = construir_mapa_observaciones(columnas)
+        if mapa.get("rut"):
+            score = 5 + min(len(mapa.get("observaciones", [])), 4) * 2
+            score += len(mapa.get("correcciones", {}))
+        else:
+            score = 0
+        if score > mejor_score:
+            mejor_indice = int(indice)
+            mejor_score = score
+    return mejor_indice if mejor_score >= 5 else None
 
 
 def encabezados_unicos(valores):
@@ -360,6 +447,123 @@ def construir_mapa_columnas(columnas):
         if columna:
             mapa[clave] = columna
     return mapa
+
+
+def construir_mapa_observaciones(columnas):
+    mapa_base = construir_mapa_columnas(columnas)
+    correcciones = {}
+    campos_correccion = [
+        "correo",
+        "telefono",
+        "direccion",
+        "sexo",
+        "estado_civil",
+        "nacionalidad",
+        "etnia",
+        "fecha_nacimiento",
+        "edad",
+        "discapacidad",
+        "neurodivergencia",
+        "comuna",
+        "parentesco",
+        "tipo_familia",
+        "grupo_familiar",
+        "integrantes",
+        "rsh",
+        "minvu_conecta",
+        "cedula_vencimiento",
+    ]
+    for campo in campos_correccion:
+        columna = mapa_base.get(campo)
+        if columna and columna_correccion_util(columna):
+            correcciones[campo] = columna
+
+    rut = mapa_base.get("rut") or encontrar_columna(columnas, COLUMN_ALIASES["rut"], COLUMN_EXCLUDES.get("rut", []))
+    reservadas = {rut, *correcciones.values()}
+    observaciones = [
+        columna
+        for columna in columnas
+        if columna
+        and columna not in reservadas
+        and es_columna_observacion(columna)
+    ]
+    if not observaciones:
+        observaciones = [
+            columna
+            for columna in columnas
+            if columna
+            and columna not in reservadas
+            and not normalizar_texto(columna).startswith("sinnombre")
+            and not columna_observacion_reservada(columna)
+        ]
+    resultado = {"correcciones": correcciones, "observaciones": observaciones}
+    if rut:
+        resultado["rut"] = rut
+    return resultado
+
+
+def columna_correccion_util(columna):
+    texto = normalizar_texto(columna)
+    if not texto:
+        return False
+    tokens_correccion = [
+        "correccion",
+        "correg",
+        "nuevo",
+        "actualizado",
+        "actualizada",
+        "rectific",
+        "reemplazo",
+        "final",
+    ]
+    if es_columna_observacion(columna) and not any(token in texto for token in tokens_correccion):
+        return False
+    return True
+
+
+def es_columna_observacion(columna):
+    texto = normalizar_texto(columna)
+    return any(
+        token in texto
+        for token in [
+            "observacion",
+            "obs",
+            "comentario",
+            "correccion",
+            "corregir",
+            "revision",
+            "revisar",
+            "nota",
+            "motivo",
+            "detalle",
+            "situacion",
+            "estado",
+            "respuesta",
+        ]
+    )
+
+
+def columna_observacion_reservada(columna):
+    texto = normalizar_texto(columna)
+    return any(
+        texto == token or texto.startswith(token)
+        for token in [
+            "nombre",
+            "nombres",
+            "apellido",
+            "apellidos",
+            "rut",
+            "run",
+            "comite",
+            "comuna",
+            "nro",
+            "numero",
+            "orden",
+            "id",
+            "fecha",
+            "base",
+        ]
+    )
 
 
 def validar_columnas_minimas(mapa):
@@ -459,6 +663,235 @@ def procesar_fila(*, fila, columnas, mapa, comite, ahorro_minimo):
     persona.actualizar_estado_general()
 
     return "creado" if creado else "actualizado"
+
+
+def procesar_fila_observaciones(*, fila, columnas, mapa, comite_nombre):
+    def valor_columna_mapa(columna):
+        if not columna:
+            return None
+        return fila.get(columna)
+
+    rut = normalizar_rut(valor_columna_mapa(mapa.get("rut")))
+    if not rut:
+        return "omitido"
+
+    persona = Persona.objects.select_related("comite").filter(rut=rut).first()
+    if not persona:
+        raise ImportacionError(f"RUT {rut} no existe en la base cargada.")
+    if comite_nombre and normalizar_texto(persona.comite.nombre) != normalizar_texto(comite_nombre):
+        raise ImportacionError(f"RUT {rut} pertenece a otro comité.")
+
+    correcciones = 0
+    for campo, columna in mapa.get("correcciones", {}).items():
+        if aplicar_correccion_observacion(persona, campo, valor_columna_mapa(columna)):
+            correcciones += 1
+
+    observaciones = 0
+    for columna in mapa.get("observaciones", []):
+        valor = limpiar_string(valor_columna_mapa(columna))
+        if not valor:
+            continue
+        etiqueta = limpiar_string(columna)
+        texto = valor if es_encabezado_observacion_generico(etiqueta) else f"{etiqueta}: {valor}"
+        if agregar_observacion(persona, texto):
+            observaciones += 1
+
+    if correcciones or observaciones:
+        regenerar_alertas_persona(persona)
+        return "actualizado"
+    return "omitido"
+
+
+def aplicar_correccion_observacion(persona, campo, raw_value):
+    valor = limpiar_string(raw_value)
+    if not valor:
+        return False
+
+    def set_persona(attr, siguiente, etiqueta):
+        actual = limpiar_string(getattr(persona, attr, ""))
+        siguiente_texto = limpiar_string(siguiente)
+        if not siguiente_texto or normalizar_texto(actual) == normalizar_texto(siguiente_texto):
+            return False
+        setattr(persona, attr, siguiente)
+        persona.save(update_fields=[attr, "actualizado_en"])
+        agregar_observacion(
+            persona,
+            f"Corrección aplicada - {etiqueta}: {actual or 'Sin dato'} -> {siguiente_texto}",
+        )
+        return True
+
+    if campo in {"correo", "telefono", "direccion", "sexo", "estado_civil", "nacionalidad", "etnia"}:
+        return set_persona(campo, valor, etiqueta_correccion(campo))
+    if campo == "fecha_nacimiento":
+        fecha = parse_fecha(raw_value)
+        if not fecha:
+            return False
+        edad = calcular_edad(fecha)
+        actual = persona.fecha_nacimiento.isoformat() if persona.fecha_nacimiento else ""
+        if actual == fecha.isoformat():
+            return False
+        persona.fecha_nacimiento = fecha
+        persona.edad = edad
+        persona.persona_mayor = edad >= 60
+        persona.save(update_fields=["fecha_nacimiento", "edad", "persona_mayor", "actualizado_en"])
+        agregar_observacion(
+            persona,
+            f"Corrección aplicada - Fecha de nacimiento: {actual or 'Sin dato'} -> {fecha.isoformat()}",
+        )
+        return True
+    if campo == "edad":
+        edad = parse_entero(raw_value)
+        if edad is None or persona.edad == edad:
+            return False
+        actual = persona.edad
+        persona.edad = edad
+        persona.persona_mayor = edad >= 60
+        persona.save(update_fields=["edad", "persona_mayor", "actualizado_en"])
+        agregar_observacion(
+            persona,
+            f"Corrección aplicada - Edad: {actual if actual is not None else 'Sin dato'} -> {edad}",
+        )
+        return True
+    if campo in {"discapacidad", "neurodivergencia"}:
+        siguiente = parse_booleano(raw_value)
+        if getattr(persona, campo) == siguiente:
+            return False
+        actual = getattr(persona, campo)
+        setattr(persona, campo, siguiente)
+        persona.save(update_fields=[campo, "actualizado_en"])
+        agregar_observacion(
+            persona,
+            f"Corrección aplicada - {etiqueta_correccion(campo)}: {'Sí' if actual else 'No'} -> {'Sí' if siguiente else 'No'}",
+        )
+        return True
+    if campo in {"comuna", "parentesco", "tipo_familia", "grupo_familiar"}:
+        caracterizacion, _ = CaracterizacionSocial.objects.get_or_create(persona=persona)
+        actual = limpiar_string(getattr(caracterizacion, campo, ""))
+        if normalizar_texto(actual) == normalizar_texto(valor):
+            return False
+        setattr(caracterizacion, campo, valor)
+        caracterizacion.save(update_fields=[campo, "actualizado_en"])
+        agregar_observacion(
+            persona,
+            f"Corrección aplicada - {etiqueta_correccion(campo)}: {actual or 'Sin dato'} -> {valor}",
+        )
+        return True
+    if campo == "integrantes":
+        integrantes = parse_entero(raw_value)
+        if integrantes is None:
+            return False
+        caracterizacion, _ = CaracterizacionSocial.objects.get_or_create(persona=persona)
+        if caracterizacion.integrantes == integrantes:
+            return False
+        actual = caracterizacion.integrantes
+        caracterizacion.integrantes = integrantes
+        caracterizacion.save(update_fields=["integrantes", "actualizado_en"])
+        agregar_observacion(
+            persona,
+            f"Corrección aplicada - Integrantes: {actual if actual is not None else 'Sin dato'} -> {integrantes}",
+        )
+        return True
+    if campo == "rsh":
+        porcentaje = parse_decimal(raw_value)
+        if porcentaje is None:
+            return False
+        rsh, _ = RSH.objects.get_or_create(persona=persona)
+        if rsh.porcentaje == porcentaje:
+            return False
+        actual = rsh.porcentaje
+        rsh.porcentaje = porcentaje
+        rsh.tramo = valor
+        rsh.es_preferente = porcentaje <= Decimal("40")
+        rsh.save(update_fields=["porcentaje", "tramo", "es_preferente", "actualizado_en"])
+        agregar_observacion(
+            persona,
+            f"Corrección aplicada - RSH: {actual if actual is not None else 'Sin dato'} -> {porcentaje}",
+        )
+        return True
+    if campo == "minvu_conecta":
+        minvu = parse_decimal(raw_value)
+        if minvu is None:
+            return False
+        postulacion, _ = Postulacion.objects.get_or_create(persona=persona)
+        if postulacion.minvu_conecta == minvu:
+            return False
+        actual = postulacion.minvu_conecta
+        postulacion.minvu_conecta = minvu
+        postulacion.save(update_fields=["minvu_conecta", "actualizado_en"])
+        agregar_observacion(
+            persona,
+            f"Corrección aplicada - MINVU Conecta: {actual if actual is not None else 'Sin dato'} -> {minvu}",
+        )
+        return True
+    if campo == "cedula_vencimiento":
+        fecha = parse_fecha(raw_value)
+        if not fecha:
+            return False
+        documento, _ = Documento.objects.get_or_create(
+            persona=persona,
+            tipo=Documento.TIPO_CEDULA,
+            defaults={"estado": estado_documento_por_fecha(fecha)},
+        )
+        if documento.fecha_vencimiento == fecha:
+            return False
+        actual = documento.fecha_vencimiento.isoformat() if documento.fecha_vencimiento else ""
+        documento.fecha_vencimiento = fecha
+        documento.estado = estado_documento_por_fecha(fecha)
+        documento.observaciones = "Actualizado desde archivo de observaciones."
+        documento.save(update_fields=["fecha_vencimiento", "estado", "observaciones", "actualizado_en"])
+        agregar_observacion(
+            persona,
+            f"Corrección aplicada - Vencimiento cédula: {actual or 'Sin dato'} -> {fecha.isoformat()}",
+        )
+        return True
+    return False
+
+
+def agregar_observacion(persona, texto, autor="Importación observaciones"):
+    texto = limpiar_string(texto)
+    if not texto:
+        return False
+    normalizado = normalizar_texto(texto)
+    existe = any(
+        normalizar_texto(item.texto) == normalizado
+        for item in Observacion.objects.filter(persona=persona)
+    )
+    if existe:
+        return False
+    Observacion.objects.create(persona=persona, texto=texto, autor=autor)
+    return True
+
+
+def es_encabezado_observacion_generico(columna):
+    return normalizar_texto(columna) in {
+        "observacion",
+        "observaciones",
+        "obs",
+        "comentario",
+        "comentarios",
+        "nota",
+        "notas",
+    }
+
+
+def etiqueta_correccion(campo):
+    etiquetas = {
+        "correo": "Correo",
+        "telefono": "Teléfono",
+        "direccion": "Dirección",
+        "sexo": "Sexo",
+        "estado_civil": "Estado civil",
+        "nacionalidad": "Nacionalidad",
+        "etnia": "Etnia / pueblo originario",
+        "fecha_nacimiento": "Fecha de nacimiento",
+        "discapacidad": "Discapacidad",
+        "neurodivergencia": "Neurodivergencia",
+        "comuna": "Comuna",
+        "parentesco": "Parentesco",
+        "tipo_familia": "Tipo familia",
+        "grupo_familiar": "Grupo familiar",
+    }
+    return etiquetas.get(campo, campo)
 
 
 def detectar_desplazamiento(fila, columnas, mapa):
@@ -592,6 +1025,27 @@ def generar_alertas(persona, valor, hijos=None):
     Alerta.objects.filter(persona=persona, origen=ORIGEN_IMPORTACION).delete()
 
     fecha_vencimiento = parse_fecha(valor("cedula_vencimiento"))
+    crear_alertas_persona(persona, fecha_vencimiento, hijos or [])
+    persona.actualizar_estado_general()
+
+
+def regenerar_alertas_persona(persona):
+    Alerta.objects.filter(persona=persona, origen=ORIGEN_IMPORTACION).delete()
+    documento = (
+        Documento.objects.filter(persona=persona, tipo=Documento.TIPO_CEDULA)
+        .order_by("-fecha_vencimiento")
+        .first()
+    )
+    caracterizacion = CaracterizacionSocial.objects.filter(persona=persona).first()
+    crear_alertas_persona(
+        persona,
+        documento.fecha_vencimiento if documento else None,
+        getattr(caracterizacion, "hijos", []) or [],
+    )
+    persona.actualizar_estado_general()
+
+
+def crear_alertas_persona(persona, fecha_vencimiento, hijos=None):
     if fecha_vencimiento:
         hoy = timezone.localdate()
         dias = (fecha_vencimiento - hoy).days
@@ -622,6 +1076,30 @@ def generar_alertas(persona, valor, hijos=None):
             impacta_estado=False,
         )
 
+    if persona_tiene_etnia(persona):
+        crear_alerta(
+            persona,
+            Alerta.TIPO_DOCUMENTAL,
+            Alerta.SEVERIDAD_PREVENTIVA,
+            "Revisar certificado de acreditación indígena",
+            (
+                "La persona registra etnia o pueblo originario; revisar y confirmar "
+                "certificado de acreditación indígena para el proceso documental interno."
+            ),
+            impacta_estado=False,
+        )
+
+    criterios = criterios_excepcion_unipersonal(persona)
+    if postulacion_es_unipersonal(persona) and criterios:
+        crear_alerta(
+            persona,
+            Alerta.TIPO_SOCIAL,
+            Alerta.SEVERIDAD_PREVENTIVA,
+            "Criterio de excepción unipersonal",
+            f"Postulación unipersonal con criterio de excepción: {', '.join(criterios)}.",
+            impacta_estado=False,
+        )
+
     for hijo in hijos or []:
         if not hijo.get("requiere_revision_documental"):
             continue
@@ -633,6 +1111,63 @@ def generar_alertas(persona, valor, hijos=None):
             detalle_revision_hijo(hijo),
             impacta_estado=False,
         )
+
+
+def persona_tiene_etnia(persona):
+    texto = normalizar_texto(getattr(persona, "etnia", ""))
+    return bool(
+        texto
+        and texto
+        not in {
+            "no",
+            "n",
+            "ninguna",
+            "ninguno",
+            "sin",
+            "sindato",
+            "noaplica",
+            "noaplicable",
+            "nodeclara",
+            "noinforma",
+            "noinformado",
+            "noinformada",
+            "none",
+            "0",
+        }
+    )
+
+
+def postulacion_es_unipersonal(persona):
+    caracterizacion = CaracterizacionSocial.objects.filter(persona=persona).first()
+    if not caracterizacion:
+        return False
+    if caracterizacion.integrantes == 1:
+        return True
+    texto = normalizar_texto(
+        " ".join(
+            filter(
+                None,
+                [
+                    caracterizacion.grupo_familiar,
+                    caracterizacion.tipo_familia,
+                    caracterizacion.parentesco,
+                ],
+            )
+        )
+    )
+    return any(
+        token in texto
+        for token in ["unipersonal", "personasola", "solopostulante", "sola", "solo"]
+    )
+
+
+def criterios_excepcion_unipersonal(persona):
+    criterios = []
+    if persona.persona_mayor:
+        criterios.append("Adulto mayor")
+    if persona_tiene_etnia(persona):
+        criterios.append("Etnia / pueblo originario")
+    return criterios
 
 
 def crear_alerta(persona, tipo, severidad, titulo, detalle, impacta_estado=True):

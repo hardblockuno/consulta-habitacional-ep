@@ -14,7 +14,11 @@ from .serializers import (
     PersonaDetailSerializer,
     PersonaListSerializer,
 )
-from .services.excel_importer import ImportacionError, importar_excel
+from .services.excel_importer import (
+    ImportacionError,
+    importar_excel,
+    importar_observaciones_excel,
+)
 
 
 class PersonaViewSet(viewsets.ReadOnlyModelViewSet):
@@ -112,6 +116,44 @@ class ImportarExcelAPIView(APIView):
                 comite_nombre=request.data.get("comite_nombre", "").strip(),
                 comuna=request.data.get("comuna", "").strip(),
                 ahorro_minimo=ahorro_minimo,
+            )
+        except ImportacionError as exc:
+            importacion.estado = ImportacionExcel.ESTADO_ERROR
+            importacion.errores = [{"fila": None, "error": str(exc)}]
+            importacion.finalizado_en = timezone.now()
+            importacion.save(
+                update_fields=["estado", "errores", "finalizado_en", "actualizado_en"]
+            )
+            return Response(
+                ImportacionExcelSerializer(importacion).data,
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = ImportacionExcelSerializer(resultado)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class ImportarObservacionesExcelAPIView(APIView):
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser]
+
+    def post(self, request):
+        archivo = request.FILES.get("archivo")
+        if not archivo:
+            return Response(
+                {"detail": "Debes adjuntar un archivo Excel en el campo 'archivo'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        importacion = ImportacionExcel.objects.create(
+            archivo=archivo,
+            nombre_archivo=archivo.name,
+        )
+
+        try:
+            resultado = importar_observaciones_excel(
+                importacion=importacion,
+                archivo_path=importacion.archivo.path,
+                comite_nombre=request.data.get("comite_nombre", "").strip(),
             )
         except ImportacionError as exc:
             importacion.estado = ImportacionExcel.ESTADO_ERROR
