@@ -141,6 +141,7 @@ const COLUMN_EXCLUDES = {
 let state = normalizeLoadedState(loadState());
 localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 let currentView = "dashboard";
+let pendingManualImport = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   bindGlobalEvents();
@@ -441,6 +442,7 @@ function renderImportar() {
         </div>
       </form>
     </section>
+    <section id="manualImportPanel" class="panel manual-mapping hidden" style="margin-top: 18px;"></section>
     <section class="panel" style="margin-top: 18px;">
       <h3>Ultimas importaciones</h3>
       <div id="importHistory"></div>
@@ -473,38 +475,77 @@ async function handleExcelImport(event) {
   try {
     const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
-    const result = importWorkbook(workbook, {
+    const options = {
       fileName: file.name,
       comiteNombre,
       comuna,
       ahorroMinimo,
-    });
-    saveState();
-    message.innerHTML = notice(
-      `Base cargada: ${formatNumber(result.creados)} creados, ${formatNumber(result.actualizados)} actualizados, ${formatNumber(result.omitidos)} omitidos.`,
-      "success"
-    );
-    renderImportHistory();
+    };
+    const prepared = prepareWorkbookImport(workbook, options);
+    if (!prepared.ready) {
+      pendingManualImport = { workbook, options };
+      message.innerHTML = notice(
+        "No pude reconocer todas las columnas automaticamente. Ajusta el mapeo de columnas abajo y vuelve a cargar.",
+        "error"
+      );
+      renderManualImportPanel(prepared);
+      return;
+    }
+
+    const result = commitPreparedImport(prepared);
+    completeImport(result, message);
   } catch (error) {
     message.innerHTML = notice(error.message || "No fue posible importar el archivo.", "error");
   }
 }
 
 function importWorkbook(workbook, options) {
-  const sheetName = selectBaseSheet(workbook.SheetNames);
+  const prepared = prepareWorkbookImport(workbook, options);
+  if (!prepared.ready) {
+    throw new Error(prepared.error || "No fue posible reconocer las columnas de la base.");
+  }
+  return commitPreparedImport(prepared);
+}
+
+function prepareWorkbookImport(workbook, options) {
+  const sheetName = options.sheetName || selectBaseSheet(workbook.SheetNames);
   const sheet = workbook.Sheets[sheetName];
   const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: true });
-  const headerIndex = detectHeaderRow(rows);
+  const headerIndex = Number.isInteger(options.headerIndex) ? options.headerIndex : detectHeaderRow(rows);
   if (headerIndex < 0) {
-    throw new Error("No se encontro una fila de encabezados compatible. La base debe incluir RUT/RUN y nombre completo o nombres/apellidos.");
+    return {
+      workbook,
+      options,
+      sheetName,
+      rows,
+      headerIndex,
+      headers: [],
+      columnMap: {},
+      ready: false,
+      error: "No se encontro una fila de encabezados compatible.",
+    };
   }
 
   const headers = uniqueHeaders(rows[headerIndex]);
-  const columnMap = buildColumnMap(headers);
-  if (!hasRequiredIdentityColumns(columnMap)) {
-    throw new Error(missingColumnsMessage(columnMap, headers));
-  }
+  const automaticMap = buildColumnMap(headers);
+  const inferredMap = inferColumnMapFromData(rows, headerIndex, headers, automaticMap);
+  const columnMap = cleanColumnMap({ ...inferredMap, ...(options.columnMap || {}) });
+  const ready = hasRequiredIdentityColumns(columnMap);
+  return {
+    workbook,
+    options,
+    sheetName,
+    rows,
+    headerIndex,
+    headers,
+    columnMap,
+    ready,
+    error: ready ? "" : missingColumnsMessage(columnMap, headers),
+  };
+}
 
+function commitPreparedImport(prepared) {
+  const { rows, headers, columnMap, options, sheetName, headerIndex } = prepared;
   const stats = { creados: 0, actualizados: 0, omitidos: 0, errores: [] };
   const existing = new Map(state.personas.map((persona) => [persona.rut, persona]));
 
@@ -540,11 +581,242 @@ function importWorkbook(workbook, options) {
     archivo: options.fileName,
     hoja: sheetName,
     fecha: new Date().toISOString(),
-    filas: rows.length - headerIndex - 1,
+    filas: Math.max(rows.length - headerIndex - 1, 0),
+    modo: options.columnMap ? "mapeo_manual" : "automatico",
     ...stats,
   });
   state.importaciones = state.importaciones.slice(0, 20);
   return stats;
+}
+
+function completeImport(result, message) {
+  saveState();
+  message.innerHTML = notice(
+    `Base cargada: ${formatNumber(result.creados)} creados, ${formatNumber(result.actualizados)} actualizados, ${formatNumber(result.omitidos)} omitidos.`,
+    "success"
+  );
+  const panel = document.getElementById("manualImportPanel");
+  if (panel) {
+    panel.classList.add("hidden");
+    panel.innerHTML = "";
+  }
+  pendingManualImport = null;
+  renderImportHistory();
+}
+
+function renderManualImportPanel(prepared) {
+  const panel = document.getElementById("manualImportPanel");
+  if (!panel || !pendingManualImport) return;
+
+  const normalizedPrepared = ensureManualPrepared(prepared);
+  const headerOptions = candidateHeaderRows(normalizedPrepared.rows, normalizedPrepared.headerIndex);
+  const fieldDefs = manualMappingFields();
+  const preview = renderMappingPreview(normalizedPrepared.rows, normalizedPrepared.headerIndex, normalizedPrepared.headers);
+
+  panel.classList.remove("hidden");
+  panel.innerHTML = `
+    <div class="manual-head">
+      <div>
+        <h3>Mapeo manual de columnas</h3>
+        <p>Selecciona que columna corresponde a cada dato. Con RUT/RUN y nombre ya se puede cargar la base.</p>
+      </div>
+      <button id="cancelManualImport" class="button secondary" type="button">Cancelar</button>
+    </div>
+    <div class="field-row manual-source">
+      <label class="field">
+        <span>Hoja</span>
+        <select id="manualSheetSelect" class="select">
+          ${pendingManualImport.workbook.SheetNames.map(
+            (sheet) => `<option value="${escapeHtml(sheet)}" ${sheet === normalizedPrepared.sheetName ? "selected" : ""}>${escapeHtml(sheet)}</option>`
+          ).join("")}
+        </select>
+      </label>
+      <label class="field">
+        <span>Fila de encabezados</span>
+        <select id="manualHeaderSelect" class="select">
+          ${headerOptions
+            .map(
+              (option) =>
+                `<option value="${option.index}" ${option.index === normalizedPrepared.headerIndex ? "selected" : ""}>${escapeHtml(option.label)}</option>`
+            )
+            .join("")}
+        </select>
+      </label>
+    </div>
+    <div class="mapping-grid">
+      ${fieldDefs
+        .map((field) => manualSelectHtml(field, normalizedPrepared.headers, normalizedPrepared.columnMap[field.key]))
+        .join("")}
+    </div>
+    <div class="manual-actions">
+      <button id="runManualImport" class="button primary" type="button">Cargar con este mapeo</button>
+    </div>
+    ${preview}
+  `;
+
+  document.getElementById("cancelManualImport").addEventListener("click", () => {
+    panel.classList.add("hidden");
+    panel.innerHTML = "";
+    pendingManualImport = null;
+  });
+  document.getElementById("manualSheetSelect").addEventListener("change", (event) => {
+    const nextPrepared = prepareWorkbookImport(pendingManualImport.workbook, {
+      ...pendingManualImport.options,
+      sheetName: event.target.value,
+    });
+    renderManualImportPanel(nextPrepared);
+  });
+  document.getElementById("manualHeaderSelect").addEventListener("change", (event) => {
+    const nextPrepared = prepareWorkbookImport(pendingManualImport.workbook, {
+      ...pendingManualImport.options,
+      sheetName: normalizedPrepared.sheetName,
+      headerIndex: Number(event.target.value),
+    });
+    renderManualImportPanel(nextPrepared);
+  });
+  document.getElementById("runManualImport").addEventListener("click", runManualImport);
+}
+
+function ensureManualPrepared(prepared) {
+  if (prepared.headerIndex >= 0 && prepared.headers.length) return prepared;
+  const candidates = candidateHeaderRows(prepared.rows, prepared.headerIndex);
+  const headerIndex = candidates[0]?.index ?? 0;
+  return prepareWorkbookImport(prepared.workbook, {
+    ...prepared.options,
+    sheetName: prepared.sheetName,
+    headerIndex,
+  });
+}
+
+function manualMappingFields() {
+  return [
+    { key: "rut", label: "RUT/RUN", required: true },
+    { key: "nombre", label: "Nombre completo" },
+    { key: "nombres", label: "Nombres" },
+    { key: "apellidoPaterno", label: "Apellido paterno" },
+    { key: "apellidoMaterno", label: "Apellido materno" },
+    { key: "apellidos", label: "Apellidos" },
+    { key: "fechaNacimiento", label: "Fecha nacimiento" },
+    { key: "edad", label: "Edad" },
+    { key: "telefono", label: "Telefono" },
+    { key: "correo", label: "Correo" },
+    { key: "direccion", label: "Direccion" },
+    { key: "comuna", label: "Comuna" },
+    { key: "rsh", label: "RSH" },
+    { key: "cedulaVencimiento", label: "Vencimiento cedula" },
+    { key: "discapacidad", label: "Discapacidad" },
+    { key: "neurodivergencia", label: "Neurodivergencia" },
+    { key: "grupoFamiliar", label: "Grupo familiar" },
+    { key: "integrantes", label: "Integrantes" },
+    { key: "parentesco", label: "Parentesco" },
+    { key: "tipoFamilia", label: "Tipo familia" },
+    { key: "minvuConecta", label: "Minvu Conecta" },
+  ];
+}
+
+function manualSelectHtml(field, headers, selected) {
+  return `
+    <label class="field">
+      <span>${escapeHtml(field.label)}${field.required ? " *" : ""}</span>
+      <select class="select manual-map-select" data-field="${field.key}">
+        <option value="">No usar</option>
+        ${headers
+          .map(
+            (header) =>
+              `<option value="${escapeHtml(header)}" ${header === selected ? "selected" : ""}>${escapeHtml(header)}</option>`
+          )
+          .join("")}
+      </select>
+    </label>
+  `;
+}
+
+function runManualImport() {
+  const message = document.getElementById("importMessage");
+  if (!pendingManualImport) {
+    message.innerHTML = notice("No hay una base pendiente para cargar.", "error");
+    return;
+  }
+
+  const sheetName = document.getElementById("manualSheetSelect").value;
+  const headerIndex = Number(document.getElementById("manualHeaderSelect").value);
+  const columnMap = {};
+  document.querySelectorAll(".manual-map-select").forEach((select) => {
+    if (select.value) columnMap[select.dataset.field] = select.value;
+  });
+
+  try {
+    const prepared = prepareWorkbookImport(pendingManualImport.workbook, {
+      ...pendingManualImport.options,
+      sheetName,
+      headerIndex,
+      columnMap,
+    });
+    if (!prepared.ready) {
+      message.innerHTML = notice(prepared.error || "Falta mapear RUT/RUN y nombre.", "error");
+      renderManualImportPanel(prepared);
+      return;
+    }
+    const result = commitPreparedImport(prepared);
+    completeImport(result, message);
+  } catch (error) {
+    message.innerHTML = notice(error.message || "No fue posible importar con el mapeo seleccionado.", "error");
+  }
+}
+
+function candidateHeaderRows(rows, preferredIndex) {
+  const candidates = [];
+  const addCandidate = (index) => {
+    if (index < 0 || index >= rows.length || candidates.some((item) => item.index === index)) return;
+    const row = rows[index] || [];
+    const values = row.map(cleanString).filter(Boolean);
+    if (!values.length) return;
+    candidates.push({
+      index,
+      label: `Fila ${index + 1}: ${values.slice(0, 6).join(" | ")}`,
+    });
+  };
+
+  if (preferredIndex >= 0) addCandidate(preferredIndex);
+  rows.slice(0, 35).forEach((row, index) => {
+    const values = (row || []).map(cleanString).filter(Boolean);
+    if (values.length >= 2 && !values.some(looksLikeRut)) addCandidate(index);
+  });
+  if (!candidates.length) addCandidate(0);
+  return candidates.slice(0, 18);
+}
+
+function renderMappingPreview(rows, headerIndex, headers) {
+  if (headerIndex < 0 || !headers.length) return "";
+  const previewRows = rows
+    .slice(headerIndex + 1)
+    .filter((row) => (row || []).some((value) => cleanString(value)))
+    .slice(0, 5);
+  if (!previewRows.length) return "";
+
+  const visibleHeaders = headers.slice(0, 8);
+  return `
+    <div class="mapping-preview">
+      <h4>Vista previa</h4>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>${visibleHeaders.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr>
+          </thead>
+          <tbody>
+            ${previewRows
+              .map(
+                (row) =>
+                  `<tr>${visibleHeaders
+                    .map((_, index) => `<td>${escapeHtml(row[index] instanceof Date ? row[index].toISOString().slice(0, 10) : cleanString(row[index]))}</td>`)
+                    .join("")}</tr>`
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
 }
 
 function rowToPersona(row, headers, columnMap, options) {
@@ -943,7 +1215,25 @@ function detectHeaderRow(rows) {
       bestIndex = index;
     }
   });
-  return bestScore >= 8 ? bestIndex : -1;
+  if (bestScore >= 8) return bestIndex;
+  return detectHeaderRowByData(rows);
+}
+
+function detectHeaderRowByData(rows) {
+  let best = { index: -1, score: 0 };
+  rows.slice(0, 35).forEach((row, index) => {
+    const values = (row || []).map(cleanString).filter(Boolean);
+    if (values.length < 2 || values.some(looksLikeRut)) return;
+    const headers = uniqueHeaders(row);
+    const inferred = inferColumnMapFromData(rows, index, headers, buildColumnMap(headers));
+    let score = 0;
+    if (inferred.rut) score += 5;
+    if (inferred.nombre || hasSplitNameColumns(inferred)) score += 4;
+    if (inferred.fechaNacimiento) score += 1;
+    if (inferred.cedulaVencimiento) score += 1;
+    if (score > best.score) best = { index, score };
+  });
+  return best.score >= 7 ? best.index : -1;
 }
 
 function uniqueHeaders(row) {
@@ -964,6 +1254,125 @@ function buildColumnMap(headers) {
     if (column) map[field] = column;
   });
   return map;
+}
+
+function cleanColumnMap(map) {
+  return Object.fromEntries(
+    Object.entries(map || {}).filter(([, value]) => cleanString(value))
+  );
+}
+
+function inferColumnMapFromData(rows, headerIndex, headers, baseMap = {}) {
+  const map = { ...baseMap };
+  if (headerIndex < 0 || !headers.length) return cleanColumnMap(map);
+
+  const samples = rows
+    .slice(headerIndex + 1, headerIndex + 36)
+    .filter((row) => (row || []).some((value) => cleanString(value)));
+  if (!samples.length) return cleanColumnMap(map);
+
+  const analysis = headers.map((header, index) => analyzeColumnForImport(header, index, samples));
+
+  if (!map.rut) {
+    const rutCandidate = bestColumnCandidate(
+      analysis.filter((item) => !hasAnyToken(item.normalized, COLUMN_EXCLUDES.rut || [])),
+      (item) => item.rutCount * 5 + tokenBonus(item.normalized, ["rut", "run", "cedula", "documento", "dni"])
+    );
+    if (rutCandidate && rutCandidate.rutCount > 0) map.rut = rutCandidate.header;
+  }
+
+  if (!map.fechaNacimiento) {
+    const birthCandidate = bestColumnCandidate(
+      analysis.filter((item) => item.dateCount > 0 && !hasAnyToken(item.normalized, COLUMN_EXCLUDES.fechaNacimiento || [])),
+      (item) => item.dateCount * 3 + tokenBonus(item.normalized, ["nac", "nacimiento", "fnac"])
+    );
+    if (birthCandidate && (birthCandidate.dateCount >= 2 || tokenBonus(birthCandidate.normalized, ["nac", "nacimiento", "fnac"]))) {
+      map.fechaNacimiento = birthCandidate.header;
+    }
+  }
+
+  if (!map.cedulaVencimiento) {
+    const expiryCandidate = bestColumnCandidate(
+      analysis.filter((item) => item.dateCount > 0 && !hasAnyToken(item.normalized, COLUMN_EXCLUDES.cedulaVencimiento || [])),
+      (item) => item.dateCount * 3 + tokenBonus(item.normalized, ["venc", "vence", "vigencia", "caducidad", "expiracion", "cedula", "ci"])
+    );
+    if (expiryCandidate && tokenBonus(expiryCandidate.normalized, ["venc", "vence", "vigencia", "caducidad", "expiracion"])) {
+      map.cedulaVencimiento = expiryCandidate.header;
+    }
+  }
+
+  inferNameColumns(analysis, map);
+  return cleanColumnMap(map);
+}
+
+function analyzeColumnForImport(header, index, rows) {
+  const values = rows.map((row) => row[index]).filter((value) => cleanString(value));
+  return {
+    header,
+    index,
+    normalized: normalize(header),
+    values,
+    rutCount: values.filter(looksLikeRut).length,
+    dateCount: values.filter((value) => parseDateValue(value)).length,
+    numericCount: values.filter((value) => parseDecimal(value) !== null).length,
+    booleanCount: values.filter((value) => ["si", "no", "s", "n", "true", "false", "0", "1"].includes(normalize(value))).length,
+    emailCount: values.filter((value) => cleanString(value).includes("@")).length,
+    textCount: values.filter((value) => isNameLikeValue(value)).length,
+  };
+}
+
+function inferNameColumns(analysis, map) {
+  if (map.nombre || hasSplitNameColumns(map)) return;
+  const usable = analysis.filter(
+    (item) =>
+      item.textCount > 0 &&
+      item.rutCount === 0 &&
+      item.emailCount === 0 &&
+      item.dateCount <= 1 &&
+      item.booleanCount <= 1 &&
+      !hasAnyToken(item.normalized, COLUMN_EXCLUDES.nombre || []) &&
+      !hasAnyToken(item.normalized, ["direccion", "domicilio", "comuna", "region", "correo", "email", "mail", "telefono", "fono", "banco"])
+  );
+
+  usable.forEach((item) => {
+    if (!map.apellidoPaterno && hasAnyToken(item.normalized, ["paterno", "primerapellido"])) map.apellidoPaterno = item.header;
+    else if (!map.apellidoMaterno && hasAnyToken(item.normalized, ["materno", "segundoapellido"])) map.apellidoMaterno = item.header;
+    else if (!map.apellidos && hasAnyToken(item.normalized, ["apellidos", "apellido"])) map.apellidos = item.header;
+    else if (!map.nombres && hasAnyToken(item.normalized, ["nombres", "primernombre", "segundonombre"])) map.nombres = item.header;
+  });
+
+  if (hasSplitNameColumns(map)) return;
+
+  const rutIndex = analysis.find((item) => item.header === map.rut)?.index ?? -1;
+  const candidate = bestColumnCandidate(usable, (item) => {
+    const headerBonus = tokenBonus(item.normalized, ["nombre", "postulante", "socio", "titular", "beneficiario"]);
+    const distanceBonus = rutIndex >= 0 ? Math.max(0, 4 - Math.abs(item.index - rutIndex)) : 0;
+    return item.textCount * 3 + headerBonus + distanceBonus;
+  });
+  if (candidate) map.nombre = candidate.header;
+}
+
+function bestColumnCandidate(items, scoreFn) {
+  return items
+    .map((item) => ({ item, score: scoreFn(item) }))
+    .sort((a, b) => b.score - a.score)[0]?.item || null;
+}
+
+function hasAnyToken(text, tokens) {
+  return (tokens || []).some((token) => text.includes(normalize(token)));
+}
+
+function tokenBonus(text, tokens) {
+  return (tokens || []).reduce((score, token) => score + (text.includes(normalize(token)) ? 2 : 0), 0);
+}
+
+function isNameLikeValue(value) {
+  const text = cleanString(value);
+  if (!text || text.includes("@") || looksLikeRut(text)) return false;
+  if (parseDateValue(value)) return false;
+  const normalized = normalize(text);
+  if (!/[a-z]/i.test(text) || ["si", "no", "s", "n", "true", "false"].includes(normalized)) return false;
+  return text.length >= 3;
 }
 
 function scoreHeaderCandidate(headers, columnMap) {

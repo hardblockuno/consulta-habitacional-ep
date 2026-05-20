@@ -146,6 +146,8 @@ El importador debe ser flexible porque las bases no siempre vienen con los mismo
 - `RSH`, `TRAMO RSH`, `REGISTRO SOCIAL DE HOGARES`.
 - `FECHA VENC. CI`, `VENCIMIENTO CEDULA`, `CADUCIDAD CI`, `VIGENCIA CI`.
 
+La version estatica en `docs/` incluye mapeo manual de columnas: si la deteccion automatica falla, el usuario puede elegir la hoja, la fila de encabezados y que columna corresponde a cada campo. Esto es clave para bases con formatos no estandar.
+
 ## Datos sensibles
 
 No subir bases Excel reales ni datos personales al repositorio. La carpeta `Bases datos Comites 2026/` esta ignorada por Git.

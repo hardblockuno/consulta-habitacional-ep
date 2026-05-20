@@ -161,6 +161,7 @@ El importador:
 - busca una hoja `BASE` o similar.
 - detecta la fila de encabezados con `RUT/RUN` y nombre completo o nombres/apellidos separados.
 - normaliza columnas frecuentes y variantes (`NOMBRE`, `NOMBRES`, `APELLIDO PATERNO`, `RUN POSTULANTE`, `FECHA NACIMIENTO`, `TRAMO RSH`, `FECHA VENC. CI`, `MINVU CONECTA`, etc.).
+- si no reconoce automaticamente el formato, muestra un mapeo manual para indicar que columna corresponde a `RUT/RUN`, nombre, apellidos y datos opcionales.
 - calcula edad y marca persona mayor desde `edad >= 60`.
 - registra RSH y ahorro como datos informativos, y genera alertas por cedula vencida o por vencer y observaciones internas por datos secundarios.
 - detecta hijos/cargas familiares cuando existen columnas como `NOMBRE HIJO 1`, `FEC NAC HIJO 1`, `EDAD HIJO 1`, `CARGA`, `DEPENDIENTE`, etc.

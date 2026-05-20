@@ -313,6 +313,10 @@ textarea {
   font-size: 17px;
 }
 
+.hidden {
+  display: none !important;
+}
+
 .field-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -395,6 +399,53 @@ textarea {
 
 .file-button input {
   display: none;
+}
+
+.manual-mapping {
+  border-color: #bae6fd;
+  background: #f8fcff;
+}
+
+.manual-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.manual-head h3 {
+  margin-bottom: 6px;
+}
+
+.manual-head p {
+  max-width: 720px;
+  margin: 0;
+  color: var(--muted);
+}
+
+.manual-source {
+  grid-template-columns: minmax(220px, 320px) minmax(260px, 1fr);
+  margin-bottom: 16px;
+}
+
+.mapping-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.manual-actions {
+  margin-top: 16px;
+}
+
+.mapping-preview {
+  margin-top: 18px;
+}
+
+.mapping-preview h4 {
+  margin: 0 0 10px;
+  font-size: 14px;
 }
 
 .table-wrap {
@@ -717,7 +768,13 @@ tbody tr:hover {
   .grid.two,
   .grid.three,
   .field-row,
+  .manual-source,
+  .mapping-grid,
   .kv {
     grid-template-columns: 1fr;
+  }
+
+  .manual-head {
+    flex-direction: column;
   }
 }
