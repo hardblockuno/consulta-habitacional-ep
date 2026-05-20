@@ -126,6 +126,7 @@ class AlertaSerializer(serializers.ModelSerializer):
 class PersonaListSerializer(serializers.ModelSerializer):
     comite_nombre = serializers.CharField(source="comite.nombre", read_only=True)
     comite_comuna = serializers.CharField(source="comite.comuna", read_only=True)
+    postulacion_unipersonal = serializers.SerializerMethodField()
     rsh_porcentaje = serializers.DecimalField(
         source="rsh.porcentaje",
         max_digits=5,
@@ -148,16 +149,32 @@ class PersonaListSerializer(serializers.ModelSerializer):
             "nombre",
             "telefono",
             "correo",
+            "etnia",
             "comite_nombre",
             "comite_comuna",
             "edad",
             "persona_mayor",
             "discapacidad",
+            "postulacion_unipersonal",
             "estado_general",
             "rsh_porcentaje",
             "ahorro_monto",
             "alertas_activas",
         ]
+
+    def get_postulacion_unipersonal(self, obj):
+        caracterizacion = getattr(obj, "caracterizacion_social", None)
+        if not caracterizacion:
+            return False
+        if caracterizacion.integrantes == 1:
+            return True
+        texto = " ".join(
+            filter(
+                None,
+                [caracterizacion.grupo_familiar, caracterizacion.tipo_familia],
+            )
+        ).lower()
+        return "unipersonal" in texto or "persona sola" in texto
 
 
 class PersonaDetailSerializer(serializers.ModelSerializer):
@@ -169,6 +186,7 @@ class PersonaDetailSerializer(serializers.ModelSerializer):
     documentos = DocumentoSerializer(many=True, read_only=True)
     observaciones = ObservacionSerializer(many=True, read_only=True)
     alertas = AlertaSerializer(many=True, read_only=True)
+    postulacion_unipersonal = serializers.SerializerMethodField()
 
     class Meta:
         model = Persona
@@ -188,6 +206,7 @@ class PersonaDetailSerializer(serializers.ModelSerializer):
             "persona_mayor",
             "discapacidad",
             "neurodivergencia",
+            "postulacion_unipersonal",
             "estado_general",
             "comite",
             "caracterizacion_social",
@@ -200,6 +219,9 @@ class PersonaDetailSerializer(serializers.ModelSerializer):
             "datos_originales",
             "actualizado_en",
         ]
+
+    def get_postulacion_unipersonal(self, obj):
+        return PersonaListSerializer().get_postulacion_unipersonal(obj)
 
 
 class ImportacionExcelSerializer(serializers.ModelSerializer):

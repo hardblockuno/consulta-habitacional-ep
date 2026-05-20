@@ -46,7 +46,7 @@ export default function Alertas() {
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar alerta, persona, RUT o comite"
+              placeholder="Buscar alerta, persona, RUT o comité"
               className="h-11 w-full rounded-lg border border-slate-300 bg-white pl-10 pr-3 text-sm outline-none ring-cyan-700 transition focus:border-cyan-700 focus:ring-2"
             />
           </label>
@@ -58,7 +58,7 @@ export default function Alertas() {
               className="h-11 w-full rounded-lg border border-slate-300 bg-white pl-10 pr-3 text-sm outline-none ring-cyan-700 transition focus:border-cyan-700 focus:ring-2"
             >
               <option value="">Todas</option>
-              <option value="critica">Criticas</option>
+              <option value="critica">Críticas</option>
               <option value="preventiva">Preventivas</option>
             </select>
           </label>
@@ -81,7 +81,7 @@ export default function Alertas() {
                   <h2 className="mt-2 font-semibold text-slate-950">{alerta.titulo}</h2>
                   <p className="mt-1 text-sm text-slate-600">{alerta.detalle}</p>
                   <p className="mt-2 text-sm text-slate-500">
-                    {alerta.persona_nombre} · {alerta.persona_rut} · {alerta.comite}
+                    {alerta.persona_nombre} - {alerta.persona_rut} - {alerta.comite}
                   </p>
                 </div>
                 <Link

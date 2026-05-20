@@ -64,6 +64,10 @@ class PersonaViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(persona_mayor=True)
         elif filtro == "discapacidad":
             queryset = queryset.filter(discapacidad=True)
+        elif filtro == "etnia":
+            queryset = filter_personas_con_etnia(queryset)
+        elif filtro == "unipersonal":
+            queryset = filter_personas_unipersonales(queryset)
         return queryset
 
     @action(detail=False, methods=["get"], url_path="buscar")
@@ -92,7 +96,7 @@ class ImportarExcelAPIView(APIView):
             ahorro_minimo = Decimal(request.data.get("ahorro_minimo") or "10")
         except (InvalidOperation, TypeError):
             return Response(
-                {"detail": "ahorro_minimo debe ser un numero valido."},
+                {"detail": "ahorro_minimo debe ser un número válido."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -183,6 +187,8 @@ def dashboard_resumen_data():
         "bloqueadas": personas.filter(estado_general=Persona.ESTADO_BLOQUEADA).count(),
         "personas_mayores": personas.filter(persona_mayor=True).count(),
         "discapacidad": personas.filter(discapacidad=True).count(),
+        "etnia": filter_personas_con_etnia(personas).count(),
+        "unipersonales": filter_personas_unipersonales(personas).count(),
         "hijos_revision_18": count_personas_con_hijos_revision(personas),
         "cedulas_revision": Documento.objects.filter(
             tipo=Documento.TIPO_CEDULA,
@@ -211,6 +217,30 @@ def dashboard_resumen_data():
             .order_by("estado_general")
         ),
     }
+
+
+def filter_personas_con_etnia(queryset):
+    return (
+        queryset.exclude(etnia__isnull=True)
+        .exclude(etnia__exact="")
+        .exclude(etnia__iexact="no")
+        .exclude(etnia__iexact="ninguna")
+        .exclude(etnia__iexact="ninguno")
+        .exclude(etnia__iexact="sin dato")
+        .exclude(etnia__iexact="no aplica")
+        .exclude(etnia__iexact="no informado")
+        .exclude(etnia__iexact="no informada")
+    )
+
+
+def filter_personas_unipersonales(queryset):
+    return queryset.filter(
+        Q(caracterizacion_social__integrantes=1)
+        | Q(caracterizacion_social__grupo_familiar__icontains="unipersonal")
+        | Q(caracterizacion_social__tipo_familia__icontains="unipersonal")
+        | Q(caracterizacion_social__grupo_familiar__icontains="persona sola")
+        | Q(caracterizacion_social__tipo_familia__icontains="persona sola")
+    ).distinct()
 
 
 def count_personas_con_hijos_revision(personas):

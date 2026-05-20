@@ -1,4 +1,4 @@
-import { AlertTriangle, ClipboardList, FileText, Users } from "lucide-react";
+import { AlertTriangle, ClipboardList, FileText, Leaf, UserRound, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { api } from "../api/client.js";
@@ -31,10 +31,12 @@ export default function Reportes() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Personas" value={data.total_personas} icon={Users} tone="slate" />
-        <StatCard label="Alertas criticas" value={data.alertas_criticas} icon={AlertTriangle} tone="rose" />
-        <StatCard label="Cedulas vencidas" value={data.cedulas_vencidas} icon={FileText} tone="rose" />
+        <StatCard label="Alertas críticas" value={data.alertas_criticas} icon={AlertTriangle} tone="rose" />
+        <StatCard label="Cédulas vencidas" value={data.cedulas_vencidas} icon={FileText} tone="rose" />
         <StatCard label="Hijos rev. 18" value={data.hijos_revision_18} icon={ClipboardList} tone="amber" />
         <StatCard label="Ahorro bajo referencia" value={data.ahorro_insuficiente} icon={ClipboardList} tone="amber" />
+        <StatCard label="Etnia / pueblo originario" value={data.etnia} icon={Leaf} tone="emerald" />
+        <StatCard label="Postulación unipersonal" value={data.unipersonales} icon={UserRound} tone="amber" />
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
@@ -61,14 +63,14 @@ export default function Reportes() {
         </Section>
       </div>
 
-      <Section title="Comites">
+      <Section title="Comités">
         {data.por_comite?.length ? (
           <Table
-            columns={["Comite", "Personas"]}
-            rows={data.por_comite.map((item) => [item.comite__nombre || "Sin comite", item.total])}
+            columns={["Comité", "Personas"]}
+            rows={data.por_comite.map((item) => [item.comite__nombre || "Sin comité", item.total])}
           />
         ) : (
-          <EmptyState label="Sin comites" />
+          <EmptyState label="Sin comités" />
         )}
       </Section>
     </div>

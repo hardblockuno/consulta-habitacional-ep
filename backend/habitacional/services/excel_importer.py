@@ -74,7 +74,19 @@ COLUMN_ALIASES = {
     "sexo": ["sexo", "genero"],
     "estado_civil": ["estadocivil", "ecivil"],
     "nacionalidad": ["nacionalidad", "macionalidad", "paisorigen"],
-    "etnia": ["etnia", "pueblooriginario"],
+    "etnia": [
+        "etnia",
+        "pueblo",
+        "pueblooriginario",
+        "puebloindigena",
+        "pueblonativo",
+        "perteneceapueblooriginario",
+        "pertenenciapueblooriginario",
+        "calidadindigena",
+        "indigena",
+        "mapuche",
+        "aymara",
+    ],
     "fecha_nacimiento": [
         "fecnac",
         "fechnac",
@@ -185,7 +197,7 @@ def importar_excel(
     hoja = seleccionar_hoja_base(sheet_names)
     header_index = detectar_fila_encabezados(archivo_path, hoja)
     if header_index is None:
-        raise ImportacionError("No se encontro una fila de encabezados con NOMBRE y RUT.")
+        raise ImportacionError("No se encontró una fila de encabezados con RUT/RUN y nombre.")
 
     df = pd.read_excel(archivo_path, sheet_name=hoja, header=header_index)
     df = limpiar_dataframe(df)
@@ -588,16 +600,16 @@ def generar_alertas(persona, valor, hijos=None):
                 persona,
                 Alerta.TIPO_DOCUMENTAL,
                 Alerta.SEVERIDAD_CRITICA,
-                "Cedula vencida",
-                f"Cedula vencida el {fecha_vencimiento.isoformat()}.",
+                "Cédula vencida",
+                f"Cédula vencida el {fecha_vencimiento.isoformat()}.",
             )
         elif dias <= 30:
             crear_alerta(
                 persona,
                 Alerta.TIPO_DOCUMENTAL,
                 Alerta.SEVERIDAD_PREVENTIVA,
-                "Cedula por vencer",
-                f"Cedula vence el {fecha_vencimiento.isoformat()}.",
+                "Cédula por vencer",
+                f"Cédula vence el {fecha_vencimiento.isoformat()}.",
             )
 
     if persona.discapacidad:
@@ -617,7 +629,7 @@ def generar_alertas(persona, valor, hijos=None):
             persona,
             Alerta.TIPO_DOCUMENTAL,
             Alerta.SEVERIDAD_PREVENTIVA,
-            "Revisar hijo/a por mayoria de edad",
+            "Revisar hijo/a por mayoría de edad",
             detalle_revision_hijo(hijo),
             impacta_estado=False,
         )
@@ -775,15 +787,15 @@ def detalle_revision_hijo(hijo):
     nombre = hijo.get("nombre") or hijo.get("descripcion") or "Hijo/a o carga familiar"
     estado = hijo.get("estado_mayoria_edad")
     if estado == "cumple_hoy":
-        return f"{nombre} cumple 18 anos hoy; revisar actualizacion documental de la postulacion."
+        return f"{nombre} cumple 18 años hoy; revisar actualización documental de la postulación."
     if estado == "proximo_18":
         return (
-            f"{nombre} cumple 18 anos el {hijo.get('fecha_cumple_18')}; "
-            "revisar documentacion antes del cambio."
+            f"{nombre} cumple 18 años el {hijo.get('fecha_cumple_18')}; "
+            "revisar documentación antes del cambio."
         )
     if estado == "proximo_sin_fecha":
-        return f"{nombre} registra 17 anos sin fecha exacta; revisar fecha de nacimiento y documentacion."
-    return f"{nombre} ya registra 18 anos o mas; revisar actualizacion documental de la postulacion."
+        return f"{nombre} registra 17 años sin fecha exacta; revisar fecha de nacimiento y documentación."
+    return f"{nombre} ya registra 18 años o más; revisar actualización documental de la postulación."
 
 
 def deducir_nombre_comite(nombre_archivo, hoja):

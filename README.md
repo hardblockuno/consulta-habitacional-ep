@@ -171,6 +171,8 @@ El importador:
 ## Reglas implementadas
 
 - Persona mayor: `edad >= 60`.
+- Etnia o pueblo originario: se identifica cuando el campo de etnia/pueblo originario contiene un valor informado distinto de `No`, `Ninguna`, `Sin dato` o equivalentes.
+- Postulacion unipersonal: se identifica cuando el grupo familiar registra `1` integrante o cuando el tipo/grupo familiar indica `unipersonal` o `persona sola`.
 - RSH `<= 40`: preferente.
 - RSH: dato informativo; no genera alerta ni cambia el estado de postulacion.
 - Ahorro: dato informativo; no genera alerta ni cambia el estado de postulacion.

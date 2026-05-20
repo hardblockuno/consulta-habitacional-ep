@@ -1,4 +1,4 @@
-import { Accessibility, FileText, Users, UserRoundCheck } from "lucide-react";
+import { Accessibility, FileText, Leaf, UserRound, Users, UserRoundCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -25,7 +25,7 @@ export default function Dashboard() {
   const stats = [
     { label: "Total personas", value: data.total_personas, icon: Users, tone: "slate", to: "/personas" },
     {
-      label: "Cedulas vencidas o por vencer",
+      label: "Cédulas vencidas o por vencer",
       value: data.cedulas_revision,
       icon: FileText,
       tone: "rose",
@@ -45,6 +45,20 @@ export default function Dashboard() {
       tone: "indigo",
       to: "/personas?filtro=discapacidad",
     },
+    {
+      label: "Etnia / pueblo originario",
+      value: data.etnia,
+      icon: Leaf,
+      tone: "emerald",
+      to: "/personas?filtro=etnia",
+    },
+    {
+      label: "Postulación unipersonal",
+      value: data.unipersonales,
+      icon: UserRound,
+      tone: "amber",
+      to: "/personas?filtro=unipersonal",
+    },
   ];
 
   return (
@@ -54,7 +68,7 @@ export default function Dashboard() {
         <h1 className="mt-1 text-2xl font-semibold text-slate-950">Dashboard</h1>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {stats.map((stat) => (
           <Link key={stat.label} to={stat.to} className="block transition hover:-translate-y-0.5">
             <StatCard {...stat} />

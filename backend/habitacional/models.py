@@ -116,7 +116,7 @@ class CaracterizacionSocial(TimeStampedModel):
     observaciones = models.TextField(blank=True)
 
     def __str__(self):
-        return f"Caracterizacion {self.persona.rut}"
+        return f"Caracterización {self.persona.rut}"
 
 
 class RSH(TimeStampedModel):
@@ -165,7 +165,7 @@ class Documento(TimeStampedModel):
     TIPO_DISCAPACIDAD = "discapacidad"
     TIPO_OTRO = "otro"
     TIPO_CHOICES = [
-        (TIPO_CEDULA, "Cedula"),
+        (TIPO_CEDULA, "Cédula"),
         (TIPO_LIBRETA, "Libreta"),
         (TIPO_RSH, "RSH"),
         (TIPO_DISCAPACIDAD, "Discapacidad"),
@@ -214,7 +214,7 @@ class Observacion(TimeStampedModel):
         ordering = ["-creado_en"]
 
     def __str__(self):
-        return f"Observacion {self.persona.rut}"
+        return f"Observación {self.persona.rut}"
 
 
 class Alerta(TimeStampedModel):

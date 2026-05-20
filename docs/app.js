@@ -46,7 +46,19 @@ const COLUMN_ALIASES = {
   sexo: ["sexo", "genero"],
   estadoCivil: ["estadocivil", "ecivil"],
   nacionalidad: ["nacionalidad", "macionalidad", "paisorigen"],
-  etnia: ["etnia", "pueblooriginario", "pueblooriginario"],
+  etnia: [
+    "etnia",
+    "pueblo",
+    "pueblooriginario",
+    "puebloindigena",
+    "pueblonativo",
+    "perteneceapueblooriginario",
+    "pertenenciapueblooriginario",
+    "calidadindigena",
+    "indigena",
+    "mapuche",
+    "aymara",
+  ],
   fechaNacimiento: [
     "fecnac",
     "fechnac",
@@ -281,9 +293,11 @@ function renderDashboard() {
     </div>
     <section class="grid stats">
       ${stat("Total personas", resumen.totalPersonas, "", "total")}
-      ${stat("Cedulas vencidas o por vencer", resumen.cedulasRevision, "rose", "cedulas_revision")}
+      ${stat("Cédulas vencidas o por vencer", resumen.cedulasRevision, "rose", "cedulas_revision")}
       ${stat("Adultos mayores", resumen.personasMayores, "cyan", "adultos_mayores")}
       ${stat("Discapacidad", resumen.discapacidad, "indigo", "discapacidad")}
+      ${stat("Etnia / pueblo originario", resumen.etnia, "emerald", "etnia")}
+      ${stat("Postulación unipersonal", resumen.unipersonales, "amber", "unipersonal")}
     </section>
   `);
 
@@ -297,7 +311,7 @@ function renderPersonas(params = {}) {
   setApp(`
     <div class="page-head">
       <div>
-        <div class="eyebrow">Consulta rapida</div>
+        <div class="eyebrow">Consulta rápida</div>
         <h2>Buscar persona</h2>
       </div>
     </div>
@@ -317,12 +331,14 @@ function renderPersonas(params = {}) {
           </select>
         </label>
         <label class="field">
-          <span>Filtro rapido</span>
+          <span>Filtro rápido</span>
           <select id="quickFilter" class="select">
             <option value="">Todos</option>
-            <option value="cedulas_revision">Cedulas vencidas o por vencer</option>
+            <option value="cedulas_revision">Cédulas vencidas o por vencer</option>
             <option value="adultos_mayores">Adultos mayores</option>
             <option value="discapacidad">Discapacidad</option>
+            <option value="etnia">Etnia / pueblo originario</option>
+            <option value="unipersonal">Postulación unipersonal</option>
           </select>
         </label>
       </div>
@@ -373,7 +389,7 @@ function renderPersonasTable(query = "", estado = "", filtroRapido = "") {
         <thead>
           <tr>
             <th>Persona</th>
-            <th>Comite</th>
+            <th>Comité</th>
             <th>Estado</th>
             <th>Motivos</th>
             <th>RSH</th>
@@ -387,11 +403,11 @@ function renderPersonasTable(query = "", estado = "", filtroRapido = "") {
                 <tr>
                   <td>
                     <button class="person-link" data-rut="${escapeAttr(persona.rut)}">${escapeHtml(persona.nombre)}</button>
-                    <div class="muted small">${escapeHtml(persona.rut)} - ${escapeHtml(persona.telefono || "Sin telefono")}</div>
+                    <div class="muted small">${escapeHtml(persona.rut)} - ${escapeHtml(persona.telefono || "Sin teléfono")}</div>
                     ${personFlags(persona)}
                   </td>
                   <td>
-                    ${escapeHtml(persona.comite.nombre || "Sin comite")}
+                    ${escapeHtml(persona.comite.nombre || "Sin comité")}
                     <div class="muted small">${escapeHtml(persona.comite.comuna || "Sin comuna")}</div>
                   </td>
                   <td>${badge(persona.estadoGeneral)}</td>
@@ -424,8 +440,8 @@ function renderImportar() {
       <form id="excelForm" class="grid">
         <div class="field-row">
           <label class="field">
-            <span>Comite</span>
-            <input id="comiteNombre" class="input" placeholder="Nombre del comite" />
+            <span>Comité</span>
+            <input id="comiteNombre" class="input" placeholder="Nombre del comité" />
           </label>
           <label class="field">
             <span>Comuna</span>
@@ -444,7 +460,7 @@ function renderImportar() {
     </section>
     <section id="manualImportPanel" class="panel manual-mapping hidden" style="margin-top: 18px;"></section>
     <section class="panel" style="margin-top: 18px;">
-      <h3>Ultimas importaciones</h3>
+      <h3>Últimas importaciones</h3>
       <div id="importHistory"></div>
     </section>
   `);
@@ -462,7 +478,7 @@ async function handleExcelImport(event) {
   const ahorroMinimo = 0;
 
   if (!window.XLSX) {
-    message.innerHTML = notice("No se pudo cargar el lector Excel. Revisa tu conexion a internet.", "error");
+    message.innerHTML = notice("No se pudo cargar el lector Excel. Revisa tu conexión a internet.", "error");
     return;
   }
   if (!file) {
@@ -485,7 +501,7 @@ async function handleExcelImport(event) {
     if (!prepared.ready) {
       pendingManualImport = { workbook, options };
       message.innerHTML = notice(
-        "No pude reconocer todas las columnas automaticamente. Ajusta el mapeo de columnas abajo y vuelve a cargar.",
+        "No pude reconocer todas las columnas automáticamente. Ajusta el mapeo de columnas abajo y vuelve a cargar.",
         "error"
       );
       renderManualImportPanel(prepared);
@@ -522,7 +538,7 @@ function prepareWorkbookImport(workbook, options) {
       headers: [],
       columnMap: {},
       ready: false,
-      error: "No se encontro una fila de encabezados compatible.",
+      error: "No se encontró una fila de encabezados compatible.",
     };
   }
 
@@ -698,12 +714,13 @@ function manualMappingFields() {
     { key: "apellidos", label: "Apellidos" },
     { key: "fechaNacimiento", label: "Fecha nacimiento" },
     { key: "edad", label: "Edad" },
-    { key: "telefono", label: "Telefono" },
+    { key: "telefono", label: "Teléfono" },
     { key: "correo", label: "Correo" },
-    { key: "direccion", label: "Direccion" },
+    { key: "direccion", label: "Dirección" },
     { key: "comuna", label: "Comuna" },
+    { key: "etnia", label: "Etnia / pueblo originario" },
     { key: "rsh", label: "RSH" },
-    { key: "cedulaVencimiento", label: "Vencimiento cedula" },
+    { key: "cedulaVencimiento", label: "Vencimiento cédula" },
     { key: "discapacidad", label: "Discapacidad" },
     { key: "neurodivergencia", label: "Neurodivergencia" },
     { key: "grupoFamiliar", label: "Grupo familiar" },
@@ -924,10 +941,10 @@ function createCedulaAlerts(cedulaVencimiento) {
   const today = atStartOfDay(new Date());
   const days = Math.round((atStartOfDay(cedulaVencimiento) - today) / 86400000);
   if (days < 0) {
-    return [createAlert("documental", "critica", "Cedula vencida", `Cedula vencida el ${formatDate(cedulaVencimiento)}.`)];
+    return [createAlert("documental", "critica", "Cédula vencida", `Cédula vencida el ${formatDate(cedulaVencimiento)}.`)];
   }
   if (days <= 30) {
-    return [createAlert("documental", "preventiva", "Cedula por vencer", `Cedula vence el ${formatDate(cedulaVencimiento)}.`)];
+    return [createAlert("documental", "preventiva", "Cédula por vencer", `Cédula vence el ${formatDate(cedulaVencimiento)}.`)];
   }
   return [];
 }
@@ -957,7 +974,7 @@ function renderFicha(rut) {
       <div>
         <div class="eyebrow">Ficha persona</div>
         <h2>${escapeHtml(persona.nombre)}</h2>
-        <p class="muted">${escapeHtml(persona.rut)} · ${escapeHtml(persona.comite.nombre || "Sin comite")}</p>
+        <p class="muted">${escapeHtml(persona.rut)} - ${escapeHtml(persona.comite.nombre || "Sin comité")}</p>
       </div>
       <button class="button secondary" id="backToPeople">Volver</button>
     </div>
@@ -966,39 +983,42 @@ function renderFicha(rut) {
       <div class="list-item-head">
         <div class="kv" style="flex: 1;">
           ${kv("Estado", badge(persona.estadoGeneral), true)}
-          ${kv("Edad", persona.edad !== null ? `${persona.edad} anos` : "Sin dato")}
+          ${kv("Edad", persona.edad !== null ? `${persona.edad} años` : "Sin dato")}
           ${kv("RSH", formatPercent(persona.rsh.porcentaje))}
           ${kv("Ahorro", formatUf(persona.ahorro.montoActual))}
-          ${kv("Cedula", cedulaSummary(persona))}
+          ${kv("Cédula", cedulaSummary(persona))}
           ${kv("Hijos rev. 18", childReviewSummary(persona))}
-          ${kv("Persona mayor", persona.personaMayor ? "Si" : "No")}
-          ${kv("Discapacidad", persona.discapacidad ? "Si" : "No")}
+          ${kv("Persona mayor", persona.personaMayor ? "Sí" : "No")}
+          ${kv("Discapacidad", persona.discapacidad ? "Sí" : "No")}
+          ${kv("Etnia / pueblo originario", hasEtnia(persona) ? persona.etnia : "Sin dato")}
+          ${kv("Postulación", isUnipersonal(persona) ? "Unipersonal" : "Grupo familiar")}
         </div>
       </div>
     </section>
 
     <section class="grid two" style="margin-top: 18px;">
       <div class="panel">
-        <h3>Identificacion</h3>
+        <h3>Identificación</h3>
         <div class="kv">
-          ${kv("Telefono", persona.telefono || "Sin dato")}
+          ${kv("Teléfono", persona.telefono || "Sin dato")}
           ${kv("Correo", persona.correo || "Sin dato")}
-          ${kv("Direccion", persona.direccion || "Sin dato")}
+          ${kv("Dirección", persona.direccion || "Sin dato")}
           ${kv("Sexo", persona.sexo || "Sin dato")}
           ${kv("Estado civil", persona.estadoCivil || "Sin dato")}
           ${kv("Nacionalidad", persona.nacionalidad || "Sin dato")}
-          ${kv("Etnia", persona.etnia || "Sin dato")}
+          ${kv("Etnia / pueblo originario", hasEtnia(persona) ? persona.etnia : "Sin dato")}
           ${kv("Fecha nac.", persona.fechaNacimiento || "Sin dato")}
-          ${kv("Neurodivergencia", persona.neurodivergencia ? "Si" : "No")}
+          ${kv("Neurodivergencia", persona.neurodivergencia ? "Sí" : "No")}
         </div>
       </div>
       <div class="panel">
-        <h3>Comite y social</h3>
+        <h3>Comité y caracterización social</h3>
         <div class="kv">
-          ${kv("Comite", persona.comite.nombre || "Sin dato")}
+          ${kv("Comité", persona.comite.nombre || "Sin dato")}
           ${kv("Comuna", persona.comite.comuna || persona.caracterizacion.comuna || "Sin dato")}
           ${kv("Parentesco", persona.caracterizacion.parentesco || "Sin dato")}
           ${kv("Tipo familia", persona.caracterizacion.tipoFamilia || "Sin dato")}
+          ${kv("Postulación", isUnipersonal(persona) ? "Unipersonal" : "Grupo familiar")}
           ${kv("MINVU Conecta", formatPercent(persona.postulacion.minvuConecta))}
         </div>
       </div>
@@ -1042,13 +1062,13 @@ function renderAlertas() {
       <div class="field-row" style="grid-template-columns: 1fr 220px;">
         <label class="field">
           <span>Buscar</span>
-          <input id="alertSearch" class="input" placeholder="Alerta, persona, RUT o comite" />
+          <input id="alertSearch" class="input" placeholder="Alerta, persona, RUT o comité" />
         </label>
         <label class="field">
           <span>Severidad</span>
           <select id="alertSeverity" class="select">
             <option value="">Todas</option>
-            <option value="critica">Criticas</option>
+            <option value="critica">Críticas</option>
             <option value="preventiva">Preventivas</option>
           </select>
         </label>
@@ -1101,7 +1121,7 @@ function renderAlertasResult(query = "", severity = "") {
                   <span class="muted small">${escapeHtml(alerta.tipo)}</span>
                   <h3 style="margin: 10px 0 4px;">${escapeHtml(alerta.titulo)}</h3>
                   <p class="muted" style="margin: 0;">${escapeHtml(alerta.detalle)}</p>
-                  <p class="small muted">${escapeHtml(alerta.persona.nombre)} · ${escapeHtml(alerta.persona.rut)} · ${escapeHtml(alerta.persona.comite.nombre || "Sin comite")}</p>
+                  <p class="small muted">${escapeHtml(alerta.persona.nombre)} - ${escapeHtml(alerta.persona.rut)} - ${escapeHtml(alerta.persona.comite.nombre || "Sin comité")}</p>
                 </div>
                 <button class="button secondary person-alert-link" data-rut="${escapeAttr(alerta.persona.rut)}">Ver ficha</button>
               </div>
@@ -1121,7 +1141,7 @@ function renderReportes() {
   const resumen = getResumen();
   const docs = countDocuments();
   const alertas = countAlerts();
-  const comites = topBy(state.personas, (persona) => persona.comite.nombre || "Sin comite");
+  const comites = topBy(state.personas, (persona) => persona.comite.nombre || "Sin comité");
 
   setApp(`
     <div class="page-head">
@@ -1132,9 +1152,11 @@ function renderReportes() {
     </div>
     <section class="grid stats">
       ${stat("Personas", resumen.totalPersonas)}
-      ${stat("Alertas criticas", resumen.alertasCriticas, "rose")}
-      ${stat("Cedulas vencidas", resumen.cedulasVencidas, "rose")}
+      ${stat("Alertas críticas", resumen.alertasCriticas, "rose")}
+      ${stat("Cédulas vencidas", resumen.cedulasVencidas, "rose")}
       ${stat("Hijos rev. 18", resumen.hijosRevision18, "amber")}
+      ${stat("Etnia / pueblo originario", resumen.etnia, "emerald")}
+      ${stat("Postulación unipersonal", resumen.unipersonales, "amber")}
     </section>
     <section class="grid two" style="margin-top: 18px;">
       <div class="panel">
@@ -1147,8 +1169,8 @@ function renderReportes() {
       </div>
     </section>
     <section class="panel" style="margin-top: 18px;">
-      <h3>Comites</h3>
-      ${simpleTable(["Comite", "Personas"], comites.map((item) => [item.label, item.total]))}
+      <h3>Comités</h3>
+      ${simpleTable(["Comité", "Personas"], comites.map((item) => [item.label, item.total]))}
     </section>
   `);
 }
@@ -1182,6 +1204,8 @@ function getResumen() {
     bloqueadas: state.personas.filter((p) => p.estadoGeneral === "bloqueada").length,
     personasMayores: state.personas.filter((p) => p.personaMayor).length,
     discapacidad: state.personas.filter((p) => p.discapacidad).length,
+    etnia: state.personas.filter(hasEtnia).length,
+    unipersonales: state.personas.filter(isUnipersonal).length,
     hijosRevision18: state.personas.filter((p) => hijosConRevision(p).length).length,
     rshSobre40: state.personas.filter((p) => Number(p.rsh.porcentaje) > 40).length,
     ahorroInsuficiente: state.personas.filter((p) => p.ahorro.insuficiente).length,
@@ -1677,16 +1701,63 @@ function personMatchesQuickFilter(persona, filter) {
   if (filter === "cedulas_revision") return hasCedulaRevision(persona);
   if (filter === "adultos_mayores") return Boolean(persona.personaMayor);
   if (filter === "discapacidad") return Boolean(persona.discapacidad);
+  if (filter === "etnia") return hasEtnia(persona);
+  if (filter === "unipersonal") return isUnipersonal(persona);
   return true;
 }
 
 function personFilterLabel(filter) {
   const labels = {
-    cedulas_revision: "cedulas vencidas o por vencer",
+    cedulas_revision: "cédulas vencidas o por vencer",
     adultos_mayores: "adultos mayores",
     discapacidad: "personas con discapacidad",
+    etnia: "personas con etnia o pueblo originario",
+    unipersonal: "postulaciones unipersonales",
   };
   return labels[filter] || "todas las personas";
+}
+
+function hasEtnia(persona) {
+  const text = normalize(persona?.etnia);
+  if (!text) return false;
+  return ![
+    "no",
+    "n",
+    "ninguna",
+    "ninguno",
+    "sin",
+    "sindato",
+    "noaplica",
+    "noaplicable",
+    "nodeclara",
+    "noinforma",
+    "noinformado",
+    "noinformada",
+    "none",
+    "0",
+  ].includes(text);
+}
+
+function isUnipersonal(persona) {
+  const caracterizacion = persona?.caracterizacion || {};
+  const integrantes = parseInteger(caracterizacion.integrantes);
+  if (integrantes === 1) return true;
+  const text = normalize(
+    [
+      caracterizacion.grupoFamiliar,
+      caracterizacion.tipoFamilia,
+      caracterizacion.parentesco,
+      persona?.original?.["Grupo familiar"],
+      persona?.original?.["Tipo familia"],
+    ].filter(Boolean).join(" ")
+  );
+  return (
+    text.includes("unipersonal") ||
+    text.includes("personasola") ||
+    text.includes("solopostulante") ||
+    text.includes("sola") ||
+    text.includes("solo")
+  );
 }
 
 function hasCedulaRevision(persona) {
@@ -1831,7 +1902,7 @@ function ensureChildAgeAlerts(alerts, hijos = []) {
       id: cryptoId(),
       tipo: "documental",
       severidad: "preventiva",
-      titulo: "Revisar hijo/a por mayoria de edad",
+      titulo: "Revisar hijo/a por mayoría de edad",
       detalle: childReviewDetail(hijo),
       activa: true,
       impactaEstado: false,
@@ -1844,28 +1915,28 @@ function ensureChildAgeAlerts(alerts, hijos = []) {
 function childReviewDetail(hijo) {
   const nombre = hijo.nombre || hijo.descripcion || "Hijo/a o carga familiar";
   if (hijo.estadoMayoriaEdad === "cumple_hoy") {
-    return `${nombre} cumple 18 anos hoy; revisar actualizacion documental de la postulacion.`;
+    return `${nombre} cumple 18 años hoy; revisar actualización documental de la postulación.`;
   }
   if (hijo.estadoMayoriaEdad === "proximo_18") {
-    return `${nombre} cumple 18 anos el ${hijo.fechaCumple18}; revisar documentacion antes del cambio.`;
+    return `${nombre} cumple 18 años el ${hijo.fechaCumple18}; revisar documentación antes del cambio.`;
   }
   if (hijo.estadoMayoriaEdad === "proximo_sin_fecha") {
-    return `${nombre} registra 17 anos sin fecha exacta; revisar fecha de nacimiento y documentacion.`;
+    return `${nombre} registra 17 años sin fecha exacta; revisar fecha de nacimiento y documentación.`;
   }
-  return `${nombre} ya registra 18 anos o mas; revisar actualizacion documental de la postulacion.`;
+  return `${nombre} ya registra 18 años o más; revisar actualización documental de la postulación.`;
 }
 
 function childStatusLabel(hijo) {
   if (hijo.estadoMayoriaEdad === "cumple_hoy") return "Cumple 18 hoy";
   if (hijo.estadoMayoriaEdad === "proximo_18") return `Cumple 18 en ${hijo.diasPara18} dias`;
-  if (hijo.estadoMayoriaEdad === "proximo_sin_fecha") return "17 anos, revisar fecha";
-  if (hijo.estadoMayoriaEdad === "cumplio_18") return "18 anos o mas";
-  return "Sin revision";
+  if (hijo.estadoMayoriaEdad === "proximo_sin_fecha") return "17 años, revisar fecha";
+  if (hijo.estadoMayoriaEdad === "cumplio_18") return "18 años o más";
+  return "Sin revisión";
 }
 
 function childReviewSummary(persona) {
   const total = hijosConRevision(persona).length;
-  if (!total) return "Sin revision";
+  if (!total) return "Sin revisión";
   return total === 1 ? "1 caso" : `${total} casos`;
 }
 
@@ -1883,7 +1954,7 @@ function renderHijosMayoriaEdad(hijos = []) {
 
   return `
     <div style="margin-top: 16px;">
-      <h3>Hijos y mayoria de edad</h3>
+      <h3>Hijos y mayoría de edad</h3>
       <div class="list">
         ${hijos
           .map(
@@ -1891,14 +1962,14 @@ function renderHijosMayoriaEdad(hijos = []) {
               <div class="list-item">
                 <div class="list-item-head">
                   <strong>${escapeHtml(hijo.nombre || hijo.descripcion || "Hijo/a o carga familiar")}</strong>
-                  ${hijo.requiereRevisionDocumental ? '<span class="badge preventiva">Revision doc.</span>' : '<span class="badge vigente">Sin revision</span>'}
+                  ${hijo.requiereRevisionDocumental ? '<span class="badge preventiva">Revisión doc.</span>' : '<span class="badge vigente">Sin revisión</span>'}
                 </div>
                 <p class="muted small">
                   ${escapeHtml([
                     hijo.rut ? `RUT ${hijo.rut}` : "",
-                    hijo.edad !== null ? `${hijo.edad} anos` : "",
+                    hijo.edad !== null ? `${hijo.edad} años` : "",
                     hijo.fechaNacimiento ? `nac. ${hijo.fechaNacimiento}` : "",
-                    hijo.fechaCumple18 ? `18 anos: ${hijo.fechaCumple18}` : "",
+                    hijo.fechaCumple18 ? `18 años: ${hijo.fechaCumple18}` : "",
                     childStatusLabel(hijo),
                   ].filter(Boolean).join(" - "))}
                 </p>
@@ -1939,6 +2010,12 @@ function personFlags(persona) {
   }
   if (persona.discapacidad) {
     flags.push('<span class="person-flag disability" title="Persona con discapacidad">DIS</span>');
+  }
+  if (hasEtnia(persona)) {
+    flags.push(`<span class="person-flag ethnicity" title="Etnia o pueblo originario: ${escapeAttr(persona.etnia)}">ETN</span>`);
+  }
+  if (isUnipersonal(persona)) {
+    flags.push('<span class="person-flag single" title="Postulación unipersonal">UNI</span>');
   }
   if (!flags.length) return "";
   return `<div class="person-flags">${flags.join("")}</div>`;
@@ -2125,7 +2202,7 @@ async function importJson(event) {
     saveState();
     navigate(currentView);
   } catch {
-    alert("El archivo JSON no tiene un formato valido.");
+    alert("El archivo JSON no tiene un formato válido.");
   } finally {
     event.target.value = "";
   }

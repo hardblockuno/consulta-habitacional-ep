@@ -123,6 +123,8 @@ git pull
 - Cedula por vencer si afecta el estado y deja a la persona observada.
 - Observaciones internas de documentacion secundaria no cambian la aptitud de postulacion.
 - Discapacidad y adulto mayor deben mostrarse como identificadores visuales en la lista de personas.
+- Etnia/pueblo originario debe mostrarse como indicador visual, filtro y metrica de dashboard.
+- Postulaciones unipersonales deben mostrarse como indicador visual, filtro y metrica de dashboard.
 - La ficha de persona debe mostrar grupo familiar y su valor.
 - La ficha debe mostrar hijos/cargas familiares cuando el Excel los informe.
 - Hijos/cargas que ya cumplieron 18 anos o cumplen 18 dentro de 90 dias generan revision documental interna sin cambiar aptitud por si solos.

@@ -126,6 +126,7 @@ class ImportadorExcelTests(TestCase):
                         "FECHA VENC. CI",
                         "CREDENCIAL DISCAPACIDAD",
                         "TOTAL INTEGRANTES",
+                        "PUEBLO ORIGINARIO",
                     ],
                     [
                         "12345678",
@@ -136,7 +137,8 @@ class ImportadorExcelTests(TestCase):
                         "40%",
                         fecha_vigente.isoformat(),
                         "NO",
-                        4,
+                        1,
+                        "Mapuche",
                     ],
                 ]
             )
@@ -158,8 +160,9 @@ class ImportadorExcelTests(TestCase):
 
         persona = Persona.objects.get(rut="12345678-5")
         self.assertEqual(persona.nombre, "Ana Maria Perez Soto")
+        self.assertEqual(persona.etnia, "Mapuche")
         self.assertEqual(persona.rsh.porcentaje, Decimal("40.00"))
-        self.assertEqual(persona.caracterizacion_social.integrantes, 4)
+        self.assertEqual(persona.caracterizacion_social.integrantes, 1)
         self.assertEqual(persona.estado_general, Persona.ESTADO_APTA)
 
     def test_cedula_vencida_bloquea_persona(self):
@@ -275,7 +278,7 @@ class ImportadorExcelTests(TestCase):
         self.assertEqual(len(persona.caracterizacion_social.hijos), 1)
         self.assertTrue(
             persona.alertas.filter(
-                titulo="Revisar hijo/a por mayoria de edad",
+                titulo="Revisar hijo/a por mayoría de edad",
                 impacta_estado=False,
             ).exists()
         )

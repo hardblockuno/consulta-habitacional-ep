@@ -49,7 +49,7 @@ export default function Personas() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold uppercase text-cyan-700">Consulta</p>
+          <p className="text-sm font-semibold uppercase text-cyan-700">Consulta rápida</p>
           <h1 className="mt-1 text-2xl font-semibold text-slate-950">Buscar persona</h1>
         </div>
       </div>
@@ -87,9 +87,11 @@ export default function Personas() {
             className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none ring-cyan-700 transition focus:border-cyan-700 focus:ring-2"
           >
             <option value="">Todos</option>
-            <option value="cedulas_revision">Cedulas vencidas o por vencer</option>
+            <option value="cedulas_revision">Cédulas vencidas o por vencer</option>
             <option value="adultos_mayores">Adultos mayores</option>
             <option value="discapacidad">Discapacidad</option>
+            <option value="etnia">Etnia / pueblo originario</option>
+            <option value="unipersonal">Postulación unipersonal</option>
           </select>
         </div>
       </section>
@@ -104,7 +106,7 @@ export default function Personas() {
               <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
                 <tr>
                   <th className="px-4 py-3">Persona</th>
-                  <th className="px-4 py-3">Comite</th>
+                  <th className="px-4 py-3">Comité</th>
                   <th className="px-4 py-3">Estado</th>
                   <th className="px-4 py-3">RSH</th>
                   <th className="px-4 py-3">Ahorro</th>
@@ -120,7 +122,7 @@ export default function Personas() {
                       </Link>
                       <PersonFlags persona={persona} />
                       <div className="mt-1 text-xs text-slate-500">
-                        {persona.rut} - {persona.telefono || "Sin telefono"}
+                        {persona.rut} - {persona.telefono || "Sin teléfono"}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-slate-700">
@@ -148,6 +150,8 @@ function PersonFlags({ persona }) {
   const flags = [];
   if (persona.persona_mayor) flags.push({ label: "60+", title: "Persona mayor" });
   if (persona.discapacidad) flags.push({ label: "DIS", title: "Persona con discapacidad" });
+  if (hasEtnia(persona)) flags.push({ label: "ETN", title: `Etnia o pueblo originario: ${persona.etnia}` });
+  if (persona.postulacion_unipersonal) flags.push({ label: "UNI", title: "Postulación unipersonal" });
   if (!flags.length) return null;
 
   return (
@@ -162,5 +166,30 @@ function PersonFlags({ persona }) {
         </span>
       ))}
     </div>
+  );
+}
+
+function hasEtnia(persona) {
+  const text = String(persona.etnia || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return Boolean(
+    text &&
+      ![
+        "no",
+        "n",
+        "ninguna",
+        "ninguno",
+        "sin dato",
+        "sindato",
+        "no aplica",
+        "noaplica",
+        "no informado",
+        "noinformado",
+        "no informada",
+        "noinformada",
+      ].includes(text)
   );
 }

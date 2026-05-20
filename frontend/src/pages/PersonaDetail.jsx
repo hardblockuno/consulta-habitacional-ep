@@ -46,7 +46,7 @@ export default function PersonaDetail() {
           <StatusBadge value={persona.estado_general} />
         </div>
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Info label="Edad" value={persona.edad ? `${persona.edad} anos` : "Sin dato"} />
+          <Info label="Edad" value={persona.edad ? `${persona.edad} años` : "Sin dato"} />
           <Info label="RSH" value={percent(persona.rsh?.porcentaje)} />
           <Info label="Ahorro" value={money(persona.ahorro?.monto_actual)} />
           <Info label="Alertas" value={(persona.alertas || []).filter((item) => item.activa).length} />
@@ -54,24 +54,25 @@ export default function PersonaDetail() {
       </section>
 
       <div className="grid gap-5 lg:grid-cols-2">
-        <Section title="Identificacion">
+        <Section title="Identificación">
           <div className="grid gap-3 text-sm sm:grid-cols-2">
-            <Info label="Telefono" value={persona.telefono || "Sin dato"} icon={Phone} />
+            <Info label="Teléfono" value={persona.telefono || "Sin dato"} icon={Phone} />
             <Info label="Correo" value={persona.correo || "Sin dato"} icon={Mail} />
-            <Info label="Direccion" value={persona.direccion || "Sin dato"} />
+            <Info label="Dirección" value={persona.direccion || "Sin dato"} />
             <Info label="Sexo" value={persona.sexo || "Sin dato"} />
             <Info label="Estado civil" value={persona.estado_civil || "Sin dato"} />
             <Info label="Nacionalidad" value={persona.nacionalidad || "Sin dato"} />
-            <Info label="Etnia" value={persona.etnia || "Sin dato"} />
+            <Info label="Etnia / pueblo originario" value={hasEtnia(persona) ? persona.etnia : "Sin dato"} />
             <Info label="Fecha nacimiento" value={persona.fecha_nacimiento || "Sin dato"} />
           </div>
         </Section>
 
-        <Section title="Caracterizacion social">
+        <Section title="Caracterización social">
           <div className="grid gap-3 text-sm sm:grid-cols-2">
-            <Info label="Persona mayor" value={persona.persona_mayor ? "Si" : "No"} />
-            <Info label="Discapacidad" value={persona.discapacidad ? "Si" : "No"} />
-            <Info label="Neurodivergencia" value={persona.neurodivergencia ? "Si" : "No"} />
+            <Info label="Persona mayor" value={persona.persona_mayor ? "Sí" : "No"} />
+            <Info label="Discapacidad" value={persona.discapacidad ? "Sí" : "No"} />
+            <Info label="Neurodivergencia" value={persona.neurodivergencia ? "Sí" : "No"} />
+            <Info label="Postulación" value={persona.postulacion_unipersonal ? "Unipersonal" : "Grupo familiar"} />
             <Info label="Comuna" value={persona.caracterizacion_social?.comuna || "Sin dato"} />
             <Info label="Parentesco" value={persona.caracterizacion_social?.parentesco || "Sin dato"} />
             <Info label="Tipo familia" value={persona.caracterizacion_social?.tipo_familia || "Sin dato"} />
@@ -92,7 +93,7 @@ export default function PersonaDetail() {
         <Section title="RSH">
           <div className="space-y-3 text-sm">
             <Info label="Porcentaje" value={percent(persona.rsh?.porcentaje)} />
-            <Info label="Preferente" value={persona.rsh?.es_preferente ? "Si" : "No"} />
+          <Info label="Preferente" value={persona.rsh?.es_preferente ? "Sí" : "No"} />
             <Info label="Fuente" value={persona.rsh?.fuente || "Sin dato"} />
           </div>
         </Section>
@@ -104,7 +105,7 @@ export default function PersonaDetail() {
             <Info label="Cuenta" value={persona.ahorro?.numero_cuenta || "Sin dato"} />
           </div>
         </Section>
-        <Section title="Postulacion">
+        <Section title="Postulación">
           <div className="space-y-3 text-sm">
             <Info label="Programa" value={persona.postulacion?.programa || "Sin dato"} />
             <Info label="Estado" value={persona.postulacion?.estado || "Sin dato"} />
@@ -143,7 +144,7 @@ export default function PersonaDetail() {
         </Section>
       </div>
 
-      <Section title="Hijos y mayoria de edad">
+      <Section title="Hijos y mayoría de edad">
         {persona.caracterizacion_social?.hijos?.length ? (
           <div className="space-y-3">
             {persona.caracterizacion_social.hijos.map((hijo) => (
@@ -158,9 +159,9 @@ export default function PersonaDetail() {
               >
                 {[
                   hijo.rut ? `RUT ${hijo.rut}` : "",
-                  hijo.edad !== null && hijo.edad !== undefined ? `${hijo.edad} anos` : "",
+                  hijo.edad !== null && hijo.edad !== undefined ? `${hijo.edad} años` : "",
                   hijo.fecha_nacimiento ? `nac. ${hijo.fecha_nacimiento}` : "",
-                  hijo.fecha_cumple_18 ? `18 anos: ${hijo.fecha_cumple_18}` : "",
+                  hijo.fecha_cumple_18 ? `18 años: ${hijo.fecha_cumple_18}` : "",
                   childStatusLabel(hijo),
                 ].filter(Boolean).join(" - ")}
               </Row>
@@ -175,7 +176,7 @@ export default function PersonaDetail() {
         {persona.observaciones?.length ? (
           <div className="space-y-3">
             {persona.observaciones.map((observacion) => (
-              <Row key={observacion.id} title={observacion.autor || "Observacion"}>
+              <Row key={observacion.id} title={observacion.autor || "Observación"}>
                 {observacion.texto}
               </Row>
             ))}
@@ -190,10 +191,35 @@ export default function PersonaDetail() {
 
 function childStatusLabel(hijo) {
   if (hijo.estado_mayoria_edad === "cumple_hoy") return "Cumple 18 hoy";
-  if (hijo.estado_mayoria_edad === "proximo_18") return `Cumple 18 en ${hijo.dias_para_18} dias`;
-  if (hijo.estado_mayoria_edad === "proximo_sin_fecha") return "17 anos, revisar fecha";
-  if (hijo.estado_mayoria_edad === "cumplio_18") return "18 anos o mas";
-  return "Sin revision";
+  if (hijo.estado_mayoria_edad === "proximo_18") return `Cumple 18 en ${hijo.dias_para_18} días`;
+  if (hijo.estado_mayoria_edad === "proximo_sin_fecha") return "17 años, revisar fecha";
+  if (hijo.estado_mayoria_edad === "cumplio_18") return "18 años o más";
+  return "Sin revisión";
+}
+
+function hasEtnia(persona) {
+  const text = String(persona.etnia || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return Boolean(
+    text &&
+      ![
+        "no",
+        "n",
+        "ninguna",
+        "ninguno",
+        "sin dato",
+        "sindato",
+        "no aplica",
+        "noaplica",
+        "no informado",
+        "noinformado",
+        "no informada",
+        "noinformada",
+      ].includes(text)
+  );
 }
 
 function Info({ label, value, icon: Icon }) {

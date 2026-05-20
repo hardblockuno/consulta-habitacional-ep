@@ -52,12 +52,12 @@ export default function Importar() {
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <label className="block">
-              <span className="text-sm font-semibold text-slate-700">Comite</span>
+              <span className="text-sm font-semibold text-slate-700">Comité</span>
               <input
                 value={comiteNombre}
                 onChange={(event) => setComiteNombre(event.target.value)}
                 className="mt-1 h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none ring-cyan-700 transition focus:border-cyan-700 focus:ring-2"
-                placeholder="Nombre del comite"
+                placeholder="Nombre del comité"
               />
             </label>
             <label className="block">
