@@ -31,36 +31,139 @@ MAYORIA_EDAD = 18
 HIJO_PROXIMO_18_DIAS = 90
 
 COLUMN_ALIASES = {
-    "nombre": ["nombre", "nombrecompleto", "postulante", "socio"],
-    "rut": ["rut", "run"],
-    "correo": ["correo", "email", "mail"],
-    "telefono": ["fono", "telefono", "celular", "contacto"],
-    "direccion": ["direccion", "domicilio"],
+    "nombre": [
+        "nombre",
+        "nombrecompleto",
+        "nombrepostulante",
+        "nombrespostulante",
+        "nombresocio",
+        "nombresocia",
+        "nombretitular",
+        "nombrebeneficiario",
+        "postulante",
+        "socio",
+        "titular",
+        "beneficiario",
+    ],
+    "nombres": ["nombres", "primernombre", "segundonombre", "nombrespostulante", "nombressocio"],
+    "apellido_paterno": ["apellidopaterno", "apaterno", "paterno", "primerapellido"],
+    "apellido_materno": ["apellidomaterno", "amaterno", "materno", "segundoapellido"],
+    "apellidos": ["apellidos", "apellido", "apellidospostulante", "apellidossocio"],
+    "rut": [
+        "rut",
+        "run",
+        "rutpostulante",
+        "runpostulante",
+        "rutsocio",
+        "runsocio",
+        "ruttitular",
+        "runtitular",
+        "rutbeneficiario",
+        "runbeneficiario",
+        "cedulaidentidad",
+        "ci",
+        "documentoidentidad",
+        "nrodocumento",
+        "numerodocumento",
+        "numdocumento",
+        "dni",
+    ],
+    "correo": ["correo", "email", "mail", "correoelectronico", "e-mail"],
+    "telefono": ["fono", "telefono", "telefonocelular", "celular", "contacto", "whatsapp", "ncontacto"],
+    "direccion": ["direccion", "domicilio", "direccionparticular", "domicilioparticular"],
     "sexo": ["sexo", "genero"],
-    "estado_civil": ["estadocivil"],
-    "nacionalidad": ["nacionalidad", "macionalidad"],
+    "estado_civil": ["estadocivil", "ecivil"],
+    "nacionalidad": ["nacionalidad", "macionalidad", "paisorigen"],
     "etnia": ["etnia", "pueblooriginario"],
-    "fecha_nacimiento": ["fecnac", "fechnac", "fechanacimiento", "nacimiento"],
-    "edad": ["edad"],
-    "discapacidad": ["discapacidad"],
-    "neurodivergencia": ["neurodivergencia", "neurodivergente"],
-    "numero_cuenta": ["ncuenta", "numerocuenta", "cuenta", "libreta"],
-    "banco": ["banco"],
-    "rsh": ["rsh", "registrosocial", "tramorhs", "tramo"],
-    "minvu_conecta": ["minvuconecta", "minvu"],
-    "comuna": ["comuna"],
+    "fecha_nacimiento": [
+        "fecnac",
+        "fechnac",
+        "fnac",
+        "fechanac",
+        "fechanacimiento",
+        "fnacimiento",
+        "nacimiento",
+        "fechadenacimiento",
+    ],
+    "edad": ["edad", "edadpostulante"],
+    "discapacidad": [
+        "discapacidad",
+        "discapacitado",
+        "discapacitada",
+        "credencialdiscapacidad",
+        "registrodiscapacidad",
+        "movilidadreducida",
+    ],
+    "neurodivergencia": ["neurodivergencia", "neurodivergente", "tea", "trastornoespectroautista"],
+    "numero_cuenta": ["ncuenta", "numerocuenta", "cuenta", "libreta", "nlibreta", "nrolibreta"],
+    "banco": ["banco", "institucionfinanciera", "entidadfinanciera"],
+    "rsh": [
+        "rsh",
+        "registrosocial",
+        "registrosocialhogares",
+        "registrosocialdehogares",
+        "tramorhs",
+        "tramo",
+        "tramorsh",
+        "porcentajersh",
+        "calificacionsocioeconomica",
+        "cse",
+    ],
+    "minvu_conecta": ["minvuconecta", "minvu", "foliominvu", "codigominvu"],
+    "comuna": ["comuna", "comunapostulacion", "comunaproyecto", "comunadomicilio"],
     "parentesco": ["parentesco", "parentezco"],
-    "tipo_familia": ["tipofamilia", "familia"],
-    "grupo_familiar": ["grupofamiliar", "grupfam", "grupofam"],
-    "integrantes": ["integrantes", "nintegrantes", "cantidadintegrantes"],
-    "ahorro": ["ahorro", "saldoahorro", "montoahorro", "ahorrodia", "ahorroal"],
+    "tipo_familia": ["tipofamilia", "familia", "tipologiadefamilia", "tipologiafamilia"],
+    "grupo_familiar": ["grupofamiliar", "grupfam", "grupofam", "grupohogar", "nucleofamiliar"],
+    "integrantes": [
+        "integrantes",
+        "nintegrantes",
+        "nrointegrantes",
+        "numerointegrantes",
+        "cantidadintegrantes",
+        "totalintegrantes",
+        "integrantesgrupofamiliar",
+    ],
+    "ahorro": ["ahorro", "saldoahorro", "montoahorro", "ahorrodia", "ahorroal", "saldoctaahorro"],
     "cedula_vencimiento": [
         "vencimientocedula",
         "cedulavence",
         "fechavencimientocedula",
         "vencimientoci",
         "civence",
+        "fechavencimientoci",
+        "fechavencimiento",
+        "vencimientodocumento",
+        "fechacaducidad",
+        "caducidadci",
+        "vigenciaci",
+        "fechavigencia",
+        "fechaexpiracionci",
+        "venci",
     ],
+}
+
+MAIN_PERSON_EXCLUDES = [
+    "conyuge",
+    "pareja",
+    "hijo",
+    "hija",
+    "carga",
+    "dependiente",
+    "menor",
+    "integrante",
+    "familiar",
+]
+
+COLUMN_EXCLUDES = {
+    "nombre": MAIN_PERSON_EXCLUDES + ["rut", "run", "cedula", "documento", "telefono", "fono", "correo", "mail", "fecha", "edad"],
+    "nombres": MAIN_PERSON_EXCLUDES + ["rut", "run", "cedula", "documento", "telefono", "fono", "correo", "mail", "fecha", "edad"],
+    "apellido_paterno": MAIN_PERSON_EXCLUDES,
+    "apellido_materno": MAIN_PERSON_EXCLUDES,
+    "apellidos": MAIN_PERSON_EXCLUDES,
+    "rut": MAIN_PERSON_EXCLUDES + ["vencimiento", "vence", "vigencia", "caducidad", "expiracion", "fecha", "nombre", "apellido"],
+    "fecha_nacimiento": MAIN_PERSON_EXCLUDES + ["vencimiento", "vence", "vigencia", "caducidad", "expiracion", "cedula", "ci"],
+    "nacionalidad": MAIN_PERSON_EXCLUDES,
+    "cedula_vencimiento": ["hijo", "hija", "carga", "dependiente", "conyuge", "pareja"],
 }
 
 
@@ -157,24 +260,65 @@ def seleccionar_hoja_base(sheet_names):
 
 
 def detectar_fila_encabezados(archivo_path, hoja):
-    muestra = pd.read_excel(archivo_path, sheet_name=hoja, header=None, nrows=12)
+    muestra = pd.read_excel(archivo_path, sheet_name=hoja, header=None, nrows=30)
     mejor_indice = None
     mejor_score = 0
     for indice, fila in muestra.iterrows():
-        valores = [normalizar_texto(valor) for valor in fila.tolist()]
-        score = 0
-        if any(valor in {"nombre", "nombrecompleto"} for valor in valores):
-            score += 3
-        if any(valor in {"rut", "run"} for valor in valores):
-            score += 3
-        if any(valor in {"fono", "telefono", "celular"} for valor in valores):
-            score += 1
-        if any(valor in {"rsh", "registrosocial"} for valor in valores):
-            score += 1
+        columnas = encabezados_unicos(fila.tolist())
+        mapa = construir_mapa_columnas(columnas)
+        score = puntuar_fila_encabezados(columnas, mapa)
         if score > mejor_score:
             mejor_indice = int(indice)
             mejor_score = score
-    return mejor_indice if mejor_score >= 6 else None
+    return mejor_indice if mejor_score >= 8 else None
+
+
+def encabezados_unicos(valores):
+    columnas = []
+    vistos = {}
+    for indice, valor in enumerate(valores, start=1):
+        nombre = limpiar_string(valor) or f"sin_nombre_{indice}"
+        if nombre in vistos:
+            vistos[nombre] += 1
+            nombre = f"{nombre}_{vistos[nombre]}"
+        else:
+            vistos[nombre] = 0
+        columnas.append(nombre)
+    return columnas
+
+
+def puntuar_fila_encabezados(columnas, mapa):
+    columnas_con_dato = [
+        columna
+        for columna in columnas
+        if normalizar_texto(columna) and not normalizar_texto(columna).startswith("sinnombre")
+    ]
+    if len(columnas_con_dato) < 2:
+        return 0
+
+    score = 0
+    if "rut" in mapa:
+        score += 4
+    if "nombre" in mapa:
+        score += 4
+    elif tiene_columnas_nombre_separado(mapa):
+        score += 4
+
+    for campo in [
+        "fecha_nacimiento",
+        "telefono",
+        "correo",
+        "rsh",
+        "cedula_vencimiento",
+        "discapacidad",
+        "grupo_familiar",
+        "integrantes",
+        "comuna",
+    ]:
+        if campo in mapa:
+            score += 1
+
+    return score
 
 
 def limpiar_dataframe(df):
@@ -199,7 +343,7 @@ def limpiar_dataframe(df):
 def construir_mapa_columnas(columnas):
     mapa = {}
     for clave, aliases in COLUMN_ALIASES.items():
-        exclude = ["conyuge"] if clave in {"rut", "fecha_nacimiento", "nacionalidad"} else []
+        exclude = COLUMN_EXCLUDES.get(clave, [])
         columna = encontrar_columna(columnas, aliases, exclude=exclude)
         if columna:
             mapa[clave] = columna
@@ -207,11 +351,22 @@ def construir_mapa_columnas(columnas):
 
 
 def validar_columnas_minimas(mapa):
-    faltantes = [campo for campo in ["nombre", "rut"] if campo not in mapa]
+    faltantes = []
+    if "rut" not in mapa:
+        faltantes.append("RUT/RUN")
+    if "nombre" not in mapa and not tiene_columnas_nombre_separado(mapa):
+        faltantes.append("NOMBRE o NOMBRES/APELLIDOS")
     if faltantes:
         raise ImportacionError(
-            "Faltan columnas obligatorias: " + ", ".join(faltantes).upper()
+            "Faltan columnas obligatorias: " + ", ".join(faltantes)
         )
+
+
+def tiene_columnas_nombre_separado(mapa):
+    return any(
+        campo in mapa
+        for campo in ["nombres", "apellidos", "apellido_paterno", "apellido_materno"]
+    )
 
 
 def encontrar_columna(columnas, aliases, exclude=None):
@@ -247,7 +402,7 @@ def procesar_fila(*, fila, columnas, mapa, comite, ahorro_minimo):
             return None
         return valor_columna(fila, columnas, columna, desplazamiento)
 
-    nombre = limpiar_string(valor("nombre"))
+    nombre = componer_nombre_persona(valor, mapa)
     rut = normalizar_rut(valor("rut"))
     if not nombre or not rut:
         return "omitido"
@@ -295,7 +450,7 @@ def procesar_fila(*, fila, columnas, mapa, comite, ahorro_minimo):
 
 
 def detectar_desplazamiento(fila, columnas, mapa):
-    nombre_col = mapa.get("nombre")
+    nombre_col = columna_nombre_identidad(mapa)
     rut_col = mapa.get("rut")
     if not nombre_col or not rut_col:
         return 0
@@ -305,6 +460,45 @@ def detectar_desplazamiento(fila, columnas, mapa):
     if es_numero_orden(nombre_valor) and not parece_rut(rut_valor) and parece_rut(siguiente_rut):
         return 1
     return 0
+
+
+def columna_nombre_identidad(mapa):
+    for campo in ["nombre", "nombres", "apellidos", "apellido_paterno", "apellido_materno"]:
+        if mapa.get(campo):
+            return mapa[campo]
+    return None
+
+
+def componer_nombre_persona(valor, mapa):
+    base = limpiar_string(valor("nombre"))
+    nombres = limpiar_string(valor("nombres"))
+    apellido_paterno = limpiar_string(valor("apellido_paterno"))
+    apellido_materno = limpiar_string(valor("apellido_materno"))
+    apellidos = limpiar_string(valor("apellidos"))
+
+    if nombres or apellido_paterno or apellido_materno or apellidos:
+        primeros_nombres = nombres or (
+            base if es_encabezado_solo_nombres(mapa.get("nombre")) else ""
+        )
+        partes = [
+            primeros_nombres or base,
+            apellido_paterno,
+            apellido_materno or (apellidos if not apellido_paterno else ""),
+        ]
+        nombre = " ".join(parte for parte in partes if parte).strip()
+        if nombre:
+            return re.sub(r"\s+", " ", nombre)
+
+    return re.sub(r"\s+", " ", base).strip()
+
+
+def es_encabezado_solo_nombres(encabezado):
+    texto = normalizar_texto(encabezado)
+    if not texto:
+        return False
+    if texto in {"nombre", "nombres", "primernombre", "segundonombre"}:
+        return True
+    return "nombre" in texto and "completo" not in texto and "apellido" not in texto
 
 
 def valor_columna(fila, columnas, columna, desplazamiento):

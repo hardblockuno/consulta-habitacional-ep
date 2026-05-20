@@ -159,8 +159,8 @@ El endpoint `POST /api/importar/excel/` espera `multipart/form-data`:
 El importador:
 
 - busca una hoja `BASE` o similar.
-- detecta la fila de encabezados con `NOMBRE` y `RUT`.
-- normaliza columnas frecuentes (`FEC NAC`, `FECH NAC`, `RSH`, `AHORRO`, `MINVU CONECTA`, etc.).
+- detecta la fila de encabezados con `RUT/RUN` y nombre completo o nombres/apellidos separados.
+- normaliza columnas frecuentes y variantes (`NOMBRE`, `NOMBRES`, `APELLIDO PATERNO`, `RUN POSTULANTE`, `FECHA NACIMIENTO`, `TRAMO RSH`, `FECHA VENC. CI`, `MINVU CONECTA`, etc.).
 - calcula edad y marca persona mayor desde `edad >= 60`.
 - registra RSH y ahorro como datos informativos, y genera alertas por cedula vencida o por vencer y observaciones internas por datos secundarios.
 - detecta hijos/cargas familiares cuando existen columnas como `NOMBRE HIJO 1`, `FEC NAC HIJO 1`, `EDAD HIJO 1`, `CARGA`, `DEPENDIENTE`, etc.

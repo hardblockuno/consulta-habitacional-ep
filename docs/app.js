@@ -3,36 +3,139 @@ const MAYORIA_EDAD = 18;
 const HIJO_PROXIMO_18_DIAS = 90;
 
 const COLUMN_ALIASES = {
-  nombre: ["nombre", "nombrecompleto", "postulante", "socio"],
-  rut: ["rut", "run"],
-  correo: ["correo", "email", "mail"],
-  telefono: ["fono", "telefono", "celular", "contacto"],
-  direccion: ["direccion", "domicilio"],
+  nombre: [
+    "nombre",
+    "nombrecompleto",
+    "nombrepostulante",
+    "nombrespostulante",
+    "nombresocio",
+    "nombresocia",
+    "nombretitular",
+    "nombrebeneficiario",
+    "postulante",
+    "socio",
+    "titular",
+    "beneficiario",
+  ],
+  nombres: ["nombres", "primernombre", "segundonombre", "nombrespostulante", "nombressocio"],
+  apellidoPaterno: ["apellidopaterno", "apaterno", "paterno", "primerapellido"],
+  apellidoMaterno: ["apellidomaterno", "amaterno", "materno", "segundoapellido"],
+  apellidos: ["apellidos", "apellido", "apellidospostulante", "apellidossocio"],
+  rut: [
+    "rut",
+    "run",
+    "rutpostulante",
+    "runpostulante",
+    "rutsocio",
+    "runsocio",
+    "ruttitular",
+    "runtitular",
+    "rutbeneficiario",
+    "runbeneficiario",
+    "cedulaidentidad",
+    "ci",
+    "documentoidentidad",
+    "nrodocumento",
+    "numerodocumento",
+    "numdocumento",
+    "dni",
+  ],
+  correo: ["correo", "email", "mail", "correoelectronico", "e-mail"],
+  telefono: ["fono", "telefono", "telefonocelular", "celular", "contacto", "whatsapp", "ncontacto"],
+  direccion: ["direccion", "domicilio", "direccionparticular", "domicilioparticular"],
   sexo: ["sexo", "genero"],
-  estadoCivil: ["estadocivil"],
-  nacionalidad: ["nacionalidad", "macionalidad"],
-  etnia: ["etnia", "pueblooriginario"],
-  fechaNacimiento: ["fecnac", "fechnac", "fechanacimiento", "nacimiento"],
-  edad: ["edad"],
-  discapacidad: ["discapacidad"],
-  neurodivergencia: ["neurodivergencia", "neurodivergente"],
-  numeroCuenta: ["ncuenta", "numerocuenta", "cuenta", "libreta"],
-  banco: ["banco"],
-  rsh: ["rsh", "registrosocial", "tramorhs", "tramo"],
-  minvuConecta: ["minvuconecta", "minvu"],
-  comuna: ["comuna"],
+  estadoCivil: ["estadocivil", "ecivil"],
+  nacionalidad: ["nacionalidad", "macionalidad", "paisorigen"],
+  etnia: ["etnia", "pueblooriginario", "pueblooriginario"],
+  fechaNacimiento: [
+    "fecnac",
+    "fechnac",
+    "fnac",
+    "fechanac",
+    "fechanacimiento",
+    "fnacimiento",
+    "nacimiento",
+    "fechadenacimiento",
+  ],
+  edad: ["edad", "edadpostulante"],
+  discapacidad: [
+    "discapacidad",
+    "discapacitado",
+    "discapacitada",
+    "credencialdiscapacidad",
+    "registrodiscapacidad",
+    "movilidadreducida",
+  ],
+  neurodivergencia: ["neurodivergencia", "neurodivergente", "tea", "trastornoespectroautista"],
+  numeroCuenta: ["ncuenta", "numerocuenta", "cuenta", "libreta", "nlibreta", "nrolibreta"],
+  banco: ["banco", "institucionfinanciera", "entidadfinanciera"],
+  rsh: [
+    "rsh",
+    "registrosocial",
+    "registrosocialhogares",
+    "registrosocialdehogares",
+    "tramorhs",
+    "tramo",
+    "tramorsh",
+    "porcentajersh",
+    "calificacionsocioeconomica",
+    "cse",
+  ],
+  minvuConecta: ["minvuconecta", "minvu", "foliominvu", "codigominvu"],
+  comuna: ["comuna", "comunapostulacion", "comunaproyecto", "comunadomicilio"],
   parentesco: ["parentesco", "parentezco"],
-  tipoFamilia: ["tipofamilia", "familia"],
-  grupoFamiliar: ["grupofamiliar", "grupfam", "grupofam"],
-  integrantes: ["integrantes", "nintegrantes", "cantidadintegrantes"],
-  ahorro: ["ahorro", "saldoahorro", "montoahorro", "ahorrodia", "ahorroal"],
+  tipoFamilia: ["tipofamilia", "familia", "tipologiadefamilia", "tipologiafamilia"],
+  grupoFamiliar: ["grupofamiliar", "grupfam", "grupofam", "grupohogar", "nucleofamiliar"],
+  integrantes: [
+    "integrantes",
+    "nintegrantes",
+    "nrointegrantes",
+    "numerointegrantes",
+    "cantidadintegrantes",
+    "totalintegrantes",
+    "integrantesgrupofamiliar",
+  ],
+  ahorro: ["ahorro", "saldoahorro", "montoahorro", "ahorrodia", "ahorroal", "saldoctaahorro"],
   cedulaVencimiento: [
     "vencimientocedula",
     "cedulavence",
     "fechavencimientocedula",
     "vencimientoci",
     "civence",
+    "fechavencimientoci",
+    "fechavencimiento",
+    "vencimientodocumento",
+    "fechacaducidad",
+    "caducidadci",
+    "vigenciaci",
+    "fechavigencia",
+    "fechaexpiracionci",
+    "venci",
   ],
+};
+
+const MAIN_PERSON_EXCLUDES = [
+  "conyuge",
+  "pareja",
+  "hijo",
+  "hija",
+  "carga",
+  "dependiente",
+  "menor",
+  "integrante",
+  "familiar",
+];
+
+const COLUMN_EXCLUDES = {
+  nombre: [...MAIN_PERSON_EXCLUDES, "rut", "run", "cedula", "documento", "telefono", "fono", "correo", "mail", "fecha", "edad"],
+  nombres: [...MAIN_PERSON_EXCLUDES, "rut", "run", "cedula", "documento", "telefono", "fono", "correo", "mail", "fecha", "edad"],
+  apellidoPaterno: [...MAIN_PERSON_EXCLUDES],
+  apellidoMaterno: [...MAIN_PERSON_EXCLUDES],
+  apellidos: [...MAIN_PERSON_EXCLUDES],
+  rut: [...MAIN_PERSON_EXCLUDES, "vencimiento", "vence", "vigencia", "caducidad", "expiracion", "fecha", "nombre", "apellido"],
+  fechaNacimiento: [...MAIN_PERSON_EXCLUDES, "vencimiento", "vence", "vigencia", "caducidad", "expiracion", "cedula", "ci"],
+  nacionalidad: [...MAIN_PERSON_EXCLUDES],
+  cedulaVencimiento: ["hijo", "hija", "carga", "dependiente", "conyuge", "pareja"],
 };
 
 let state = normalizeLoadedState(loadState());
@@ -393,13 +496,13 @@ function importWorkbook(workbook, options) {
   const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: true });
   const headerIndex = detectHeaderRow(rows);
   if (headerIndex < 0) {
-    throw new Error("No se encontro una fila de encabezados con NOMBRE y RUT.");
+    throw new Error("No se encontro una fila de encabezados compatible. La base debe incluir RUT/RUN y nombre completo o nombres/apellidos.");
   }
 
   const headers = uniqueHeaders(rows[headerIndex]);
   const columnMap = buildColumnMap(headers);
-  if (!columnMap.nombre || !columnMap.rut) {
-    throw new Error("Faltan columnas obligatorias: NOMBRE y RUT.");
+  if (!hasRequiredIdentityColumns(columnMap)) {
+    throw new Error(missingColumnsMessage(columnMap, headers));
   }
 
   const stats = { creados: 0, actualizados: 0, omitidos: 0, errores: [] };
@@ -453,7 +556,7 @@ function rowToPersona(row, headers, columnMap, options) {
     return index >= 0 ? row[index] : "";
   };
 
-  const nombre = cleanString(value("nombre"));
+  const nombre = composePersonName(value, columnMap);
   const rut = normalizeRut(value("rut"));
   if (!nombre || !rut || normalize(nombre) === "nombre") return null;
 
@@ -831,19 +934,16 @@ function selectBaseSheet(sheetNames) {
 function detectHeaderRow(rows) {
   let bestIndex = -1;
   let bestScore = 0;
-  rows.slice(0, 12).forEach((row, index) => {
-    const values = row.map(normalize);
-    let score = 0;
-    if (values.some((value) => value === "nombre" || value === "nombrecompleto")) score += 3;
-    if (values.some((value) => value === "rut" || value === "run")) score += 3;
-    if (values.some((value) => ["fono", "telefono", "celular"].includes(value))) score += 1;
-    if (values.some((value) => value === "rsh" || value === "registrosocial")) score += 1;
+  rows.slice(0, 30).forEach((row, index) => {
+    const headers = uniqueHeaders(row);
+    const columnMap = buildColumnMap(headers);
+    const score = scoreHeaderCandidate(headers, columnMap);
     if (score > bestScore) {
       bestScore = score;
       bestIndex = index;
     }
   });
-  return bestScore >= 6 ? bestIndex : -1;
+  return bestScore >= 8 ? bestIndex : -1;
 }
 
 function uniqueHeaders(row) {
@@ -859,11 +959,56 @@ function uniqueHeaders(row) {
 function buildColumnMap(headers) {
   const map = {};
   Object.entries(COLUMN_ALIASES).forEach(([field, aliases]) => {
-    const exclude = ["rut", "fechaNacimiento", "nacionalidad"].includes(field) ? ["conyuge"] : [];
+    const exclude = COLUMN_EXCLUDES[field] || [];
     const column = findColumn(headers, aliases, exclude);
     if (column) map[field] = column;
   });
   return map;
+}
+
+function scoreHeaderCandidate(headers, columnMap) {
+  const filledHeaders = headers.filter((header) => normalize(header) && !normalize(header).startsWith("sinnombre"));
+  if (filledHeaders.length < 2) return 0;
+
+  let score = 0;
+  if (columnMap.rut) score += 4;
+  if (columnMap.nombre) score += 4;
+  else if (hasSplitNameColumns(columnMap)) score += 4;
+
+  [
+    "fechaNacimiento",
+    "telefono",
+    "correo",
+    "rsh",
+    "cedulaVencimiento",
+    "discapacidad",
+    "grupoFamiliar",
+    "integrantes",
+    "comuna",
+  ].forEach((field) => {
+    if (columnMap[field]) score += 1;
+  });
+
+  return score;
+}
+
+function hasRequiredIdentityColumns(columnMap) {
+  return Boolean(columnMap.rut && (columnMap.nombre || hasSplitNameColumns(columnMap)));
+}
+
+function hasSplitNameColumns(columnMap) {
+  return Boolean(columnMap.nombres || columnMap.apellidos || columnMap.apellidoPaterno || columnMap.apellidoMaterno);
+}
+
+function missingColumnsMessage(columnMap, headers) {
+  const missing = [];
+  if (!columnMap.rut) missing.push("RUT/RUN");
+  if (!columnMap.nombre && !hasSplitNameColumns(columnMap)) missing.push("NOMBRE o NOMBRES/APELLIDOS");
+  const preview = headers
+    .filter((header) => cleanString(header))
+    .slice(0, 12)
+    .join(", ");
+  return `Faltan columnas obligatorias: ${missing.join(" y ")}.${preview ? ` Columnas detectadas: ${preview}.` : ""}`;
 }
 
 function findColumn(headers, aliases, exclude = []) {
@@ -884,8 +1029,9 @@ function findColumn(headers, aliases, exclude = []) {
 }
 
 function detectDisplacement(row, headers, columnMap) {
-  const nombreIndex = headers.indexOf(columnMap.nombre);
+  const nombreIndex = headers.indexOf(identityNameColumn(columnMap));
   const rutIndex = headers.indexOf(columnMap.rut);
+  if (nombreIndex < 0 || rutIndex < 0) return 0;
   const nombreValue = row[nombreIndex];
   const rutValue = row[rutIndex];
   const nextRutValue = row[rutIndex + 1];
@@ -893,6 +1039,35 @@ function detectDisplacement(row, headers, columnMap) {
     return 1;
   }
   return 0;
+}
+
+function identityNameColumn(columnMap) {
+  return columnMap.nombre || columnMap.nombres || columnMap.apellidos || columnMap.apellidoPaterno || columnMap.apellidoMaterno || "";
+}
+
+function composePersonName(value, columnMap) {
+  const base = cleanString(value("nombre"));
+  const nombres = cleanString(value("nombres"));
+  const apellidoPaterno = cleanString(value("apellidoPaterno"));
+  const apellidoMaterno = cleanString(value("apellidoMaterno"));
+  const apellidos = cleanString(value("apellidos"));
+
+  if (nombres || apellidoPaterno || apellidoMaterno || apellidos) {
+    const firstNames = nombres || (isNamesOnlyHeader(columnMap.nombre) ? base : "");
+    const parts = [firstNames || base, apellidoPaterno, apellidoMaterno || (!apellidoPaterno ? apellidos : "")].filter(Boolean);
+    const name = parts.join(" ").replace(/\s+/g, " ").trim();
+    if (name) return name;
+  }
+
+  return base.replace(/\s+/g, " ").trim();
+}
+
+function isNamesOnlyHeader(header) {
+  const text = normalize(header);
+  if (!text) return false;
+  if (["nombre", "nombres", "primernombre", "segundonombre"].includes(text)) return true;
+  if (text.includes("nombre") && !text.includes("completo") && !text.includes("apellido")) return true;
+  return false;
 }
 
 function getGeneralStatus(alerts) {

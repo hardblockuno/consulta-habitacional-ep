@@ -109,6 +109,59 @@ class ImportadorExcelTests(TestCase):
         self.assertTrue(persona.ahorro.insuficiente)
         self.assertEqual(persona.alertas.count(), 0)
 
+    def test_importa_base_con_encabezados_alternativos(self):
+        fecha_vigente = timezone.localdate() + timedelta(days=120)
+        with TemporaryDirectory() as tmpdir:
+            archivo = Path(tmpdir) / "NOMINA COMITE FORMATOS DISTINTOS.xlsx"
+            df = pd.DataFrame(
+                [
+                    ["ANTECEDENTES DEL POSTULANTE"],
+                    [
+                        "RUN POSTULANTE",
+                        "NOMBRES",
+                        "APELLIDO PATERNO",
+                        "APELLIDO MATERNO",
+                        "FECHA NACIMIENTO",
+                        "TRAMO RSH",
+                        "FECHA VENC. CI",
+                        "CREDENCIAL DISCAPACIDAD",
+                        "TOTAL INTEGRANTES",
+                    ],
+                    [
+                        "12345678",
+                        "Ana Maria",
+                        "Perez",
+                        "Soto",
+                        "1985-03-02",
+                        "40%",
+                        fecha_vigente.isoformat(),
+                        "NO",
+                        4,
+                    ],
+                ]
+            )
+            with pd.ExcelWriter(archivo, engine="openpyxl") as writer:
+                df.to_excel(writer, index=False, header=False, sheet_name="Nomina")
+
+            importacion = ImportacionExcel.objects.create(
+                archivo=str(archivo),
+                nombre_archivo=archivo.name,
+            )
+
+            importar_excel(
+                importacion=importacion,
+                archivo_path=archivo,
+                comite_nombre="Comite Formatos",
+                comuna="Temuco",
+                ahorro_minimo=Decimal("10"),
+            )
+
+        persona = Persona.objects.get(rut="12345678-5")
+        self.assertEqual(persona.nombre, "Ana Maria Perez Soto")
+        self.assertEqual(persona.rsh.porcentaje, Decimal("40.00"))
+        self.assertEqual(persona.caracterizacion_social.integrantes, 4)
+        self.assertEqual(persona.estado_general, Persona.ESTADO_APTA)
+
     def test_cedula_vencida_bloquea_persona(self):
         fecha_vencida = timezone.localdate() - timedelta(days=1)
         with TemporaryDirectory() as tmpdir:

@@ -136,6 +136,16 @@ git pull
 - `backend/habitacional/models.py`: modelos Django.
 - `README.md`: instrucciones generales de ejecucion.
 
+## Importador Excel
+
+El importador debe ser flexible porque las bases no siempre vienen con los mismos encabezados. Actualmente reconoce, entre otras variantes:
+
+- `RUT`, `RUN`, `RUN POSTULANTE`, `RUT SOCIO`, `CEDULA IDENTIDAD`.
+- `NOMBRE`, `NOMBRE COMPLETO`, `NOMBRES` con `APELLIDO PATERNO` y `APELLIDO MATERNO`.
+- `FECHA NACIMIENTO`, `FEC NAC`, `FNAC`.
+- `RSH`, `TRAMO RSH`, `REGISTRO SOCIAL DE HOGARES`.
+- `FECHA VENC. CI`, `VENCIMIENTO CEDULA`, `CADUCIDAD CI`, `VIGENCIA CI`.
+
 ## Datos sensibles
 
 No subir bases Excel reales ni datos personales al repositorio. La carpeta `Bases datos Comites 2026/` esta ignorada por Git.
