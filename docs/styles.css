@@ -333,6 +333,28 @@ textarea {
   font-size: 17px;
 }
 
+.report-export-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.report-export-head h3 {
+  margin-bottom: 6px;
+}
+
+.report-export-head p {
+  margin: 0;
+}
+
+.report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .hidden {
   display: none !important;
 }
@@ -793,9 +815,14 @@ tbody tr:hover {
   }
 
   .topbar,
-  .page-head {
+  .page-head,
+  .report-export-head {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .report-actions {
+    justify-content: flex-start;
   }
 
   .grid.stats,

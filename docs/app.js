@@ -1855,14 +1855,30 @@ function renderReportes() {
   const docs = countDocuments();
   const alertas = countAlerts();
   const comites = topBy(state.personas, (persona) => persona.comite.nombre || "Sin comité");
+  const workspace = getActiveWorkspace();
+  const criticalRows = criticalObservationRows();
 
   setApp(`
     <div class="page-head">
       <div>
         <div class="eyebrow">Resumen</div>
         <h2>Reportes</h2>
+        <p class="muted">${escapeHtml(workspaceDisplayName(workspace))}</p>
       </div>
     </div>
+    <section class="panel">
+      <div class="report-export-head">
+        <div>
+          <h3>Documentos del comité</h3>
+          <p class="muted">Exporta análisis del comité activo en PDF para revisión interna.</p>
+        </div>
+        <div class="report-actions">
+          <button id="executivePdfBtn" class="button primary" type="button">Resumen ejecutivo PDF</button>
+          <button id="criticalPdfBtn" class="button danger" type="button">Observaciones críticas PDF</button>
+        </div>
+      </div>
+      <p class="small muted">El PDF de observaciones críticas incluye nombre, RUT, estado y qué falta o debe revisarse.</p>
+    </section>
     <section class="grid stats">
       ${stat("Personas", resumen.totalPersonas)}
       ${stat("Alertas críticas", resumen.alertasCriticas, "rose")}
@@ -1882,10 +1898,23 @@ function renderReportes() {
       </div>
     </section>
     <section class="panel" style="margin-top: 18px;">
+      <h3>Vista previa observaciones críticas</h3>
+      ${criticalRows.length
+        ? simpleTable(
+            ["Nombre", "RUT", "Estado", "Qué falta / revisar"],
+            criticalRows.slice(0, 8).map((row) => [row.nombre, row.rut, row.estado, row.falta])
+          )
+        : emptyHtml("Sin observaciones críticas para el comité activo")}
+      ${criticalRows.length > 8 ? `<p class="small muted" style="margin-bottom: 0;">Se muestran 8 de ${formatNumber(criticalRows.length)} registros. El PDF incluye el listado completo.</p>` : ""}
+    </section>
+    <section class="panel" style="margin-top: 18px;">
       <h3>Comités</h3>
       ${simpleTable(["Comité", "Personas"], comites.map((item) => [item.label, item.total]))}
     </section>
   `);
+
+  document.getElementById("executivePdfBtn").addEventListener("click", exportExecutiveSummaryPdf);
+  document.getElementById("criticalPdfBtn").addEventListener("click", exportCriticalObservationsPdf);
 }
 
 function renderImportHistory() {
@@ -1916,6 +1945,324 @@ function importModeLabel(mode) {
     observaciones_correcciones: "Observaciones",
   };
   return labels[mode] || "Base";
+}
+
+function exportExecutiveSummaryPdf() {
+  const doc = createPdfDocument();
+  if (!doc) {
+    openExecutiveSummaryPrint();
+    return;
+  }
+
+  const resumen = getResumen();
+  const workspace = getActiveWorkspace();
+  const criticalRows = criticalObservationRows();
+  const importacion = state.importaciones[0];
+  const title = "Resumen ejecutivo del comité";
+  const subtitle = workspaceDisplayName(workspace);
+  let y = addPdfHeader(doc, title, subtitle);
+
+  doc.setFontSize(10);
+  doc.setTextColor(71, 85, 105);
+  doc.text(`Fecha de emisión: ${formatDate(new Date())}`, 40, y);
+  y += 18;
+  doc.text(`Comuna: ${workspace.comuna || "Sin dato"}`, 40, y);
+  y += 18;
+  doc.text(`Última importación: ${importacion ? `${importacion.archivo} (${formatDateTime(importacion.fecha)})` : "Sin registro"}`, 40, y);
+  y += 16;
+
+  addPdfTable(doc, {
+    startY: y,
+    head: [["Indicador", "Total"]],
+    body: [
+      ["Total personas", formatNumber(resumen.totalPersonas)],
+      ["Aptas", formatNumber(resumen.personasAptas)],
+      ["Observadas", formatNumber(resumen.observadas)],
+      ["Bloqueadas", formatNumber(resumen.bloqueadas)],
+      ["Cédulas vencidas", formatNumber(resumen.cedulasVencidas)],
+      ["Cédulas vencidas o por vencer", formatNumber(resumen.cedulasRevision)],
+      ["Adultos mayores", formatNumber(resumen.personasMayores)],
+      ["Personas con discapacidad", formatNumber(resumen.discapacidad)],
+      ["Hijos / cargas revisión 18 años", formatNumber(resumen.hijosRevision18)],
+      ["Etnia / pueblo originario", formatNumber(resumen.etnia)],
+      ["Postulación unipersonal", formatNumber(resumen.unipersonales)],
+    ],
+  });
+
+  y = doc.lastAutoTable.finalY + 22;
+  addPdfTable(doc, {
+    startY: y,
+    head: [["Foco operativo", "Lectura"]],
+    body: [
+      ["Observaciones críticas", criticalRows.length ? `${formatNumber(criticalRows.length)} socios requieren revisión prioritaria.` : "Sin observaciones críticas activas."],
+      ["Documentación", resumen.cedulasRevision ? "Priorizar cédulas vencidas o próximas a vencer." : "Sin cédulas vencidas o próximas a vencer registradas."],
+      ["Revisión familiar", resumen.hijosRevision18 ? "Revisar cargas o hijos que cumplen 18 años o ya cumplieron." : "Sin casos de mayoría de edad detectados."],
+    ],
+    columnStyles: { 0: { cellWidth: 145 }, 1: { cellWidth: 365 } },
+  });
+
+  doc.save(pdfFileName("resumen-ejecutivo"));
+}
+
+function exportCriticalObservationsPdf() {
+  const doc = createPdfDocument("landscape");
+  if (!doc) {
+    openCriticalObservationsPrint();
+    return;
+  }
+
+  const rows = criticalObservationRows();
+  const workspace = getActiveWorkspace();
+  let y = addPdfHeader(doc, "Observaciones críticas del comité", workspaceDisplayName(workspace));
+
+  doc.setFontSize(10);
+  doc.setTextColor(71, 85, 105);
+  doc.text(`Fecha de emisión: ${formatDate(new Date())}`, 40, y);
+  y += 16;
+  doc.text(`Total registros críticos: ${formatNumber(rows.length)}`, 40, y);
+  y += 14;
+
+  if (!rows.length) {
+    doc.setFontSize(12);
+    doc.setTextColor(15, 23, 42);
+    doc.text("Sin observaciones críticas activas para el comité seleccionado.", 40, y + 20);
+    doc.save(pdfFileName("observaciones-criticas"));
+    return;
+  }
+
+  addPdfTable(doc, {
+    startY: y,
+    head: [["Prioridad", "Nombre", "RUT", "Estado", "Qué falta / revisar"]],
+    body: rows.map((row) => [row.prioridad, row.nombre, row.rut, row.estado, row.falta]),
+    columnStyles: {
+      0: { cellWidth: 70 },
+      1: { cellWidth: 170 },
+      2: { cellWidth: 80 },
+      3: { cellWidth: 70 },
+      4: { cellWidth: 360 },
+    },
+  });
+
+  doc.save(pdfFileName("observaciones-criticas"));
+}
+
+function createPdfDocument(orientation = "portrait") {
+  const PdfCtor = window.jspdf?.jsPDF;
+  if (!PdfCtor) return null;
+  const doc = new PdfCtor({ orientation, unit: "pt", format: "letter" });
+  if (typeof doc.autoTable !== "function") return null;
+  doc.setProperties({
+    title: "Consulta Habitacional EP",
+    subject: workspaceDisplayName(getActiveWorkspace()),
+    creator: "Consulta Habitacional EP",
+  });
+  return doc;
+}
+
+function openExecutiveSummaryPrint() {
+  const resumen = getResumen();
+  const workspace = getActiveWorkspace();
+  const criticalRows = criticalObservationRows();
+  const importacion = state.importaciones[0];
+  const indicators = [
+    ["Total personas", formatNumber(resumen.totalPersonas)],
+    ["Aptas", formatNumber(resumen.personasAptas)],
+    ["Observadas", formatNumber(resumen.observadas)],
+    ["Bloqueadas", formatNumber(resumen.bloqueadas)],
+    ["Cédulas vencidas", formatNumber(resumen.cedulasVencidas)],
+    ["Cédulas vencidas o por vencer", formatNumber(resumen.cedulasRevision)],
+    ["Adultos mayores", formatNumber(resumen.personasMayores)],
+    ["Personas con discapacidad", formatNumber(resumen.discapacidad)],
+    ["Hijos / cargas revisión 18 años", formatNumber(resumen.hijosRevision18)],
+    ["Etnia / pueblo originario", formatNumber(resumen.etnia)],
+    ["Postulación unipersonal", formatNumber(resumen.unipersonales)],
+  ];
+  const focusRows = [
+    ["Comuna", workspace.comuna || "Sin dato"],
+    ["Última importación", importacion ? `${importacion.archivo} (${formatDateTime(importacion.fecha)})` : "Sin registro"],
+    ["Observaciones críticas", criticalRows.length ? `${formatNumber(criticalRows.length)} socios requieren revisión prioritaria.` : "Sin observaciones críticas activas."],
+  ];
+  openPrintDocument(
+    "Resumen ejecutivo del comité",
+    workspaceDisplayName(workspace),
+    `${printTableHtml(["Indicador", "Total"], indicators)}${printTableHtml(["Foco operativo", "Lectura"], focusRows)}`
+  );
+}
+
+function openCriticalObservationsPrint() {
+  const rows = criticalObservationRows();
+  const workspace = getActiveWorkspace();
+  const content = rows.length
+    ? printTableHtml(
+        ["Prioridad", "Nombre", "RUT", "Estado", "Qué falta / revisar"],
+        rows.map((row) => [row.prioridad, row.nombre, row.rut, row.estado, row.falta])
+      )
+    : `<p class="empty-print">Sin observaciones críticas activas para el comité seleccionado.</p>`;
+  openPrintDocument(
+    "Observaciones críticas del comité",
+    workspaceDisplayName(workspace),
+    `<p class="meta-print">Total registros críticos: ${formatNumber(rows.length)}</p>${content}`
+  );
+}
+
+function openPrintDocument(title, subtitle, content) {
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    alert("El navegador bloqueó la ventana de impresión. Permite ventanas emergentes para generar el PDF.");
+    return;
+  }
+  printWindow.document.write(`
+    <!doctype html>
+    <html lang="es">
+      <head>
+        <meta charset="utf-8" />
+        <title>${escapeHtml(title)}</title>
+        <style>
+          body { color: #0f172a; font-family: Arial, sans-serif; margin: 32px; }
+          h1 { margin: 0 0 6px; font-size: 22px; }
+          h2 { margin: 0 0 18px; color: #0e7490; font-size: 15px; font-weight: 700; }
+          .meta-print { color: #475569; margin: 0 0 14px; }
+          table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 12px; }
+          th { background: #0e7490; color: #fff; text-align: left; }
+          th, td { border: 1px solid #cbd5e1; padding: 7px; vertical-align: top; }
+          tr:nth-child(even) td { background: #f8fafc; }
+          .empty-print { border: 1px dashed #cbd5e1; color: #64748b; padding: 18px; text-align: center; }
+          .date-print { color: #64748b; font-size: 12px; margin-bottom: 18px; }
+          @page { margin: 16mm; }
+        </style>
+      </head>
+      <body>
+        <h1>${escapeHtml(title)}</h1>
+        <h2>${escapeHtml(subtitle || DEFAULT_WORKSPACE_NAME)}</h2>
+        <p class="date-print">Fecha de emisión: ${formatDate(new Date())}</p>
+        ${content}
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => printWindow.print(), 250);
+}
+
+function printTableHtml(headers, rows) {
+  return `
+    <table>
+      <thead>
+        <tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr>
+      </thead>
+      <tbody>
+        ${rows
+          .map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`)
+          .join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function addPdfHeader(doc, title, subtitle) {
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.setTextColor(15, 23, 42);
+  doc.text(title, 40, 42);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.setTextColor(14, 116, 144);
+  doc.text(subtitle || "Comité sin nombre", 40, 61);
+  doc.setDrawColor(216, 222, 232);
+  doc.line(40, 74, doc.internal.pageSize.getWidth() - 40, 74);
+  return 94;
+}
+
+function addPdfTable(doc, options) {
+  doc.autoTable({
+    ...options,
+    theme: "grid",
+    styles: {
+      font: "helvetica",
+      fontSize: 8.5,
+      cellPadding: 5,
+      overflow: "linebreak",
+      valign: "top",
+    },
+    headStyles: {
+      fillColor: [14, 116, 144],
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+    },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    margin: { left: 40, right: 40 },
+    didDrawPage: (data) => {
+      const pageHeight = doc.internal.pageSize.getHeight();
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Página ${doc.internal.getNumberOfPages()}`, data.settings.margin.left, pageHeight - 20);
+    },
+  });
+}
+
+function criticalObservationRows() {
+  return state.personas
+    .map((persona) => {
+      const criticalAlerts = activeAlerts(persona).filter((alerta) => alerta.severidad === "critica" && alertAffectsStatus(alerta));
+      const criticalNotes = (persona.observaciones || []).filter((item) => isCriticalObservationText(item.texto));
+      if (!criticalAlerts.length && !criticalNotes.length) return null;
+      const faltas = uniqueTexts([
+        ...criticalAlerts.map((alerta) => `${alerta.titulo}: ${alerta.detalle || alerta.tipo}`),
+        ...criticalNotes.map((item) => item.texto),
+      ]);
+      return {
+        prioridad: criticalAlerts.length ? "Crítica" : "Revisión",
+        nombre: persona.nombre || "Sin nombre",
+        rut: persona.rut || "Sin RUT",
+        estado: statusLabel(persona.estadoGeneral),
+        falta: faltas.join(" | "),
+        orden: criticalAlerts.length ? 0 : 1,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre, "es"));
+}
+
+function isCriticalObservationText(text) {
+  const value = normalize(text);
+  if (!value) return false;
+  return [
+    "falta",
+    "faltante",
+    "pendiente",
+    "vencid",
+    "rechaz",
+    "bloque",
+    "critica",
+    "critico",
+    "subsanar",
+    "incomplet",
+    "noacredita",
+    "sincedula",
+    "sindocumento",
+  ].some((token) => value.includes(token));
+}
+
+function uniqueTexts(values) {
+  const seen = new Set();
+  return values
+    .map(cleanString)
+    .filter(Boolean)
+    .filter((value) => {
+      const key = normalize(value);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function statusLabel(value) {
+  return cleanString(value).replaceAll("_", " ") || "Sin estado";
+}
+
+function pdfFileName(prefix) {
+  const workspace = normalize(workspaceDisplayName(getActiveWorkspace())) || "comite";
+  return `${prefix}-${workspace}-${new Date().toISOString().slice(0, 10)}.pdf`;
 }
 
 function getResumen() {
