@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Consulta Habitacional EP</title>
-    <link rel="stylesheet" href="./styles.css?v=20260520-observaciones-excepcion" />
+    <link rel="stylesheet" href="./styles.css?v=20260522-workspaces-comite" />
   </head>
   <body>
     <aside class="sidebar">
@@ -37,6 +37,11 @@
           Reportes
         </button>
       </nav>
+      <div class="workspace-card">
+        <p class="label">Comité activo</p>
+        <select id="workspaceSelect" class="select workspace-select" aria-label="Comité activo"></select>
+        <button id="newWorkspaceBtn" class="button secondary workspace-button" type="button">Nuevo comité</button>
+      </div>
       <div class="storage-card">
         <p class="label">Datos locales</p>
         <p id="storageSummary">0 personas guardadas</p>
@@ -55,7 +60,7 @@
             Importar JSON
             <input id="importJsonInput" type="file" accept=".json,application/json" />
           </label>
-          <button id="clearDataBtn" class="button danger" type="button">Limpiar datos</button>
+          <button id="clearDataBtn" class="button danger" type="button">Limpiar comité</button>
         </div>
       </header>
 
@@ -67,6 +72,6 @@
     </template>
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="./app.js?v=20260520-observaciones-excepcion"></script>
+    <script src="./app.js?v=20260522-workspaces-comite"></script>
   </body>
 </html>

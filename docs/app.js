@@ -1,4 +1,6 @@
 const STORAGE_KEY = "consultaHabitacionalEP:v1";
+const WORKSPACES_KEY = "consultaHabitacionalEP:workspaces:v1";
+const DEFAULT_WORKSPACE_NAME = "Comité sin nombre";
 const MAYORIA_EDAD = 18;
 const HIJO_PROXIMO_18_DIAS = 90;
 
@@ -150,10 +152,11 @@ const COLUMN_EXCLUDES = {
   cedulaVencimiento: ["hijo", "hija", "carga", "dependiente", "conyuge", "pareja"],
 };
 
-let state = normalizeLoadedState(loadState());
-localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-let currentView = "dashboard";
+let workspaceStore = loadWorkspaceStore();
+let state = getWorkspaceState(getActiveWorkspace());
+let currentView = "personas";
 let pendingManualImport = null;
+saveWorkspaceStore({ updateUi: false });
 
 document.addEventListener("DOMContentLoaded", () => {
   bindGlobalEvents();
@@ -168,6 +171,11 @@ function bindGlobalEvents() {
   document.getElementById("exportJsonBtn").addEventListener("click", exportJson);
   document.getElementById("importJsonInput").addEventListener("change", importJson);
   document.getElementById("clearDataBtn").addEventListener("click", clearData);
+  document.getElementById("workspaceSelect").addEventListener("change", (event) => {
+    setActiveWorkspace(event.target.value);
+  });
+  document.getElementById("newWorkspaceBtn").addEventListener("click", createWorkspaceFromPrompt);
+  updateWorkspaceControls();
 }
 
 function navigate(view, params = {}) {
@@ -200,6 +208,201 @@ function loadState() {
   } catch {
     return { personas: [], importaciones: [] };
   }
+}
+
+function loadWorkspaceStore() {
+  try {
+    const raw = localStorage.getItem(WORKSPACES_KEY);
+    if (raw) {
+      return normalizeWorkspaceStore(JSON.parse(raw));
+    }
+  } catch {
+    // Fall back to legacy data below.
+  }
+  return migrateLegacyStateToWorkspaces(loadState());
+}
+
+function normalizeWorkspaceStore(data) {
+  const workspaces = (Array.isArray(data?.workspaces) ? data.workspaces : [])
+    .map(normalizeWorkspace)
+    .filter(Boolean);
+  const seenIds = new Set();
+  workspaces.forEach((workspace) => {
+    if (seenIds.has(workspace.id)) {
+      workspace.id = cryptoId();
+    }
+    seenIds.add(workspace.id);
+  });
+  if (!workspaces.length) {
+    workspaces.push(createWorkspace({ nombre: DEFAULT_WORKSPACE_NAME }));
+  }
+  const activeWorkspaceId = workspaces.some((workspace) => workspace.id === data?.activeWorkspaceId)
+    ? data.activeWorkspaceId
+    : workspaces[0].id;
+  return { activeWorkspaceId, workspaces };
+}
+
+function migrateLegacyStateToWorkspaces(legacyState) {
+  const legacy = normalizeLoadedState(legacyState);
+  if (!legacy.personas.length) {
+    const workspace = createWorkspace({ nombre: DEFAULT_WORKSPACE_NAME });
+    return { activeWorkspaceId: workspace.id, workspaces: [workspace] };
+  }
+
+  const grouped = new Map();
+  legacy.personas.forEach((persona) => {
+    const nombre = cleanString(persona.comite?.nombre) || DEFAULT_WORKSPACE_NAME;
+    const comuna = cleanString(persona.comite?.comuna);
+    const key = `${normalize(nombre)}|${normalize(comuna)}`;
+    if (!grouped.has(key)) {
+      grouped.set(key, createWorkspace({ nombre, comuna }));
+    }
+    grouped.get(key).personas.push(persona);
+  });
+
+  const workspaces = [...grouped.values()];
+  if (workspaces.length === 1) {
+    workspaces[0].importaciones = legacy.importaciones;
+  }
+  return { activeWorkspaceId: workspaces[0].id, workspaces };
+}
+
+function normalizeWorkspace(workspace) {
+  if (!workspace) return null;
+  const normalized = normalizeLoadedState({
+    personas: Array.isArray(workspace.personas) ? workspace.personas : [],
+    importaciones: Array.isArray(workspace.importaciones) ? workspace.importaciones : [],
+  });
+  return {
+    id: cleanString(workspace.id) || cryptoId(),
+    nombre: cleanString(workspace.nombre) || DEFAULT_WORKSPACE_NAME,
+    comuna: cleanString(workspace.comuna),
+    personas: normalized.personas,
+    importaciones: normalized.importaciones,
+    actualizadoEn: cleanString(workspace.actualizadoEn) || new Date().toISOString(),
+  };
+}
+
+function createWorkspace({ nombre, comuna = "" }) {
+  return {
+    id: cryptoId(),
+    nombre: cleanString(nombre) || DEFAULT_WORKSPACE_NAME,
+    comuna: cleanString(comuna),
+    personas: [],
+    importaciones: [],
+    actualizadoEn: new Date().toISOString(),
+  };
+}
+
+function isDefaultWorkspaceName(nombre) {
+  return normalize(nombre) === normalize(DEFAULT_WORKSPACE_NAME);
+}
+
+function workspaceDisplayName(workspace) {
+  const nombre = cleanString(workspace?.nombre);
+  return !nombre || isDefaultWorkspaceName(nombre) ? DEFAULT_WORKSPACE_NAME : nombre;
+}
+
+function getActiveWorkspace() {
+  let workspace = workspaceStore.workspaces.find((item) => item.id === workspaceStore.activeWorkspaceId);
+  if (!workspace) {
+    workspace = workspaceStore.workspaces[0] || createWorkspace({ nombre: DEFAULT_WORKSPACE_NAME });
+    if (!workspaceStore.workspaces.length) workspaceStore.workspaces.push(workspace);
+    workspaceStore.activeWorkspaceId = workspace.id;
+  }
+  return workspace;
+}
+
+function getWorkspaceState(workspace) {
+  return normalizeLoadedState({
+    personas: workspace?.personas || [],
+    importaciones: workspace?.importaciones || [],
+  });
+}
+
+function syncStateToActiveWorkspace() {
+  const workspace = getActiveWorkspace();
+  workspace.personas = state.personas || [];
+  workspace.importaciones = state.importaciones || [];
+  workspace.actualizadoEn = new Date().toISOString();
+}
+
+function saveWorkspaceStore({ updateUi = true } = {}) {
+  syncStateToActiveWorkspace();
+  localStorage.setItem(WORKSPACES_KEY, JSON.stringify(workspaceStore));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (updateUi && document.body) {
+    updateWorkspaceControls();
+    updateStorageSummary();
+  }
+}
+
+function updateWorkspaceControls() {
+  const select = document.getElementById("workspaceSelect");
+  if (!select) return;
+  const active = getActiveWorkspace();
+  select.innerHTML = workspaceStore.workspaces
+    .map((workspace) => `<option value="${escapeAttr(workspace.id)}">${escapeHtml(workspaceDisplayName(workspace))}</option>`)
+    .join("");
+  select.value = active.id;
+}
+
+function setActiveWorkspace(workspaceId) {
+  syncStateToActiveWorkspace();
+  workspaceStore.activeWorkspaceId = workspaceId;
+  state = getWorkspaceState(getActiveWorkspace());
+  saveWorkspaceStore();
+  navigate(safeWorkspaceView(currentView));
+}
+
+function ensureWorkspace(nombre, comuna = "", switchTo = true) {
+  const workspaceName = cleanString(nombre) || DEFAULT_WORKSPACE_NAME;
+  const workspaceComuna = cleanString(comuna);
+  syncStateToActiveWorkspace();
+
+  let workspace = workspaceStore.workspaces.find(
+    (item) =>
+      normalize(item.nombre) === normalize(workspaceName) &&
+      (normalize(item.comuna) === normalize(workspaceComuna) || !normalize(item.comuna) || !normalize(workspaceComuna))
+  );
+  if (workspace && workspaceComuna && !cleanString(workspace.comuna)) {
+    workspace.comuna = workspaceComuna;
+  }
+
+  const active = getActiveWorkspace();
+  const activeIsEmptyDefault =
+    isDefaultWorkspaceName(active.nombre) &&
+    !active.personas.length &&
+    !active.importaciones.length &&
+    !workspace;
+  if (activeIsEmptyDefault) {
+    active.nombre = workspaceName;
+    active.comuna = workspaceComuna;
+    workspace = active;
+  }
+
+  if (!workspace) {
+    workspace = createWorkspace({ nombre: workspaceName, comuna: workspaceComuna });
+    workspaceStore.workspaces.push(workspace);
+  }
+
+  if (switchTo) {
+    workspaceStore.activeWorkspaceId = workspace.id;
+    state = getWorkspaceState(workspace);
+  }
+  saveWorkspaceStore();
+  return workspace;
+}
+
+function createWorkspaceFromPrompt() {
+  const nombre = prompt("Nombre del comité");
+  if (!cleanString(nombre)) return;
+  ensureWorkspace(nombre, "", true);
+  navigate(safeWorkspaceView(currentView));
+}
+
+function safeWorkspaceView(view) {
+  return view === "ficha" ? "personas" : view;
 }
 
 function normalizeLoadedState(data) {
@@ -304,24 +507,26 @@ function isRuleManagedAlert(alerta) {
 }
 
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  updateStorageSummary();
+  saveWorkspaceStore();
 }
 
 function updateStorageSummary() {
   const count = state.personas.length;
+  const workspace = getActiveWorkspace();
   document.getElementById("storageSummary").textContent =
-    `${formatNumber(count)} ${count === 1 ? "persona guardada" : "personas guardadas"}`;
+    `${formatNumber(count)} ${count === 1 ? "persona" : "personas"} en ${workspaceDisplayName(workspace)}`;
 }
 
 function renderDashboard() {
   const resumen = getResumen();
+  const workspace = getActiveWorkspace();
 
   setApp(`
     <div class="page-head">
       <div>
         <div class="eyebrow">Panel operativo</div>
         <h2>Dashboard</h2>
+        <p class="muted">${escapeHtml(workspaceDisplayName(workspace))}</p>
       </div>
     </div>
     <section class="grid stats">
@@ -341,11 +546,13 @@ function renderDashboard() {
 
 function renderPersonas(params = {}) {
   const initialFilter = params.filtro || "";
+  const workspace = getActiveWorkspace();
   setApp(`
     <div class="page-head">
       <div>
         <div class="eyebrow">Consulta rápida</div>
         <h2>Buscar persona</h2>
+        <p class="muted">${escapeHtml(workspaceDisplayName(workspace))}</p>
       </div>
     </div>
     <section class="card">
@@ -462,11 +669,13 @@ function renderPersonasTable(query = "", estado = "", filtroRapido = "") {
 }
 
 function renderImportar() {
+  const workspace = getActiveWorkspace();
   setApp(`
     <div class="page-head">
       <div>
         <div class="eyebrow">Carga de datos</div>
         <h2>Cargar base</h2>
+        <p class="muted">Espacio activo: ${escapeHtml(workspaceDisplayName(workspace))}</p>
       </div>
     </div>
     <section class="card">
@@ -474,11 +683,11 @@ function renderImportar() {
         <div class="field-row">
           <label class="field">
             <span>Comité</span>
-            <input id="comiteNombre" class="input" placeholder="Nombre del comité" />
+            <input id="comiteNombre" class="input" placeholder="Nombre del comité" value="${escapeHtml(isDefaultWorkspaceName(workspace.nombre) ? "" : workspace.nombre)}" />
           </label>
           <label class="field">
             <span>Comuna</span>
-            <input id="comuna" class="input" placeholder="Comuna" />
+            <input id="comuna" class="input" placeholder="Comuna" value="${escapeHtml(workspace.comuna || "")}" />
           </label>
           <label class="field">
             <span>Archivo</span>
@@ -544,10 +753,12 @@ async function handleExcelImport(event) {
   try {
     const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+    const workspaceName = comiteNombre || inferCommitteeName(file.name, sheetNameSafe(file.name));
+    const workspace = ensureWorkspace(workspaceName, comuna, true);
     const options = {
       fileName: file.name,
-      comiteNombre,
-      comuna,
+      comiteNombre: workspace.nombre,
+      comuna: workspace.comuna || comuna,
       ahorroMinimo,
     };
     const prepared = prepareWorkbookImport(workbook, options);
@@ -1490,7 +1701,7 @@ function renderFicha(rut) {
           ${kv("Estado civil", persona.estadoCivil || "Sin dato")}
           ${kv("Nacionalidad", persona.nacionalidad || "Sin dato")}
           ${kv("Etnia / pueblo originario", hasEtnia(persona) ? persona.etnia : "Sin dato")}
-          ${kv("Fecha nac.", persona.fechaNacimiento || "Sin dato")}
+          ${kv("Fecha nac.", formatStoredDate(persona.fechaNacimiento))}
           ${kv("Neurodivergencia", persona.neurodivergencia ? "Sí" : "No")}
         </div>
       </div>
@@ -1672,7 +1883,7 @@ function renderImportHistory() {
       item.archivo,
       importModeLabel(item.modo),
       item.hoja,
-      new Date(item.fecha).toLocaleString("es-CL"),
+      formatDateTime(item.fecha),
       item.creados,
       item.actualizados,
       item.omitidos,
@@ -2424,7 +2635,7 @@ function childReviewDetail(hijo) {
     return `${nombre} cumple 18 años hoy; revisar actualización documental de la postulación.`;
   }
   if (hijo.estadoMayoriaEdad === "proximo_18") {
-    return `${nombre} cumple 18 años el ${hijo.fechaCumple18}; revisar documentación antes del cambio.`;
+    return `${nombre} cumple 18 años el ${formatStoredDate(hijo.fechaCumple18)}; revisar documentación antes del cambio.`;
   }
   if (hijo.estadoMayoriaEdad === "proximo_sin_fecha") {
     return `${nombre} registra 17 años sin fecha exacta; revisar fecha de nacimiento y documentación.`;
@@ -2450,7 +2661,7 @@ function cedulaSummary(persona) {
   const cedula = (persona.documentos || []).find((doc) => doc.tipo === "cedula");
   if (!cedula) return "Sin dato";
   const estado = cleanString(cedula.estado).replace("_", " ");
-  return `${estado}${cedula.fechaVencimiento ? ` - ${cedula.fechaVencimiento}` : ""}`;
+  return `${estado}${cedula.fechaVencimiento ? ` - ${formatStoredDate(cedula.fechaVencimiento)}` : ""}`;
 }
 
 function renderHijosMayoriaEdad(hijos = []) {
@@ -2474,8 +2685,8 @@ function renderHijosMayoriaEdad(hijos = []) {
                   ${escapeHtml([
                     hijo.rut ? `RUT ${hijo.rut}` : "",
                     hijo.edad !== null ? `${hijo.edad} años` : "",
-                    hijo.fechaNacimiento ? `nac. ${hijo.fechaNacimiento}` : "",
-                    hijo.fechaCumple18 ? `18 años: ${hijo.fechaCumple18}` : "",
+                    hijo.fechaNacimiento ? `nac. ${formatStoredDate(hijo.fechaNacimiento)}` : "",
+                    hijo.fechaCumple18 ? `18 años: ${formatStoredDate(hijo.fechaCumple18)}` : "",
                     childStatusLabel(hijo),
                   ].filter(Boolean).join(" - "))}
                 </p>
@@ -2500,7 +2711,7 @@ function renderDocuments(documents) {
                 <strong>${escapeHtml(doc.tipo)}</strong>
                 ${badge(doc.estado)}
               </div>
-              <p class="muted small">${escapeHtml(doc.fechaVencimiento || "Sin vencimiento")}</p>
+              <p class="muted small">${escapeHtml(formatStoredDate(doc.fechaVencimiento, "Sin vencimiento"))}</p>
             </div>
           `
         )
@@ -2685,11 +2896,19 @@ function setApp(html) {
 }
 
 function exportJson() {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  syncStateToActiveWorkspace();
+  const payload = {
+    tipo: "consulta-habitacional-ep-workspaces",
+    version: 2,
+    exportadoEn: new Date().toISOString(),
+    activeWorkspaceId: workspaceStore.activeWorkspaceId,
+    workspaces: workspaceStore.workspaces,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `consulta-habitacional-${new Date().toISOString().slice(0, 10)}.json`;
+  link.download = `consulta-habitacional-comites-${new Date().toISOString().slice(0, 10)}.json`;
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -2701,12 +2920,14 @@ async function importJson(event) {
   if (!file) return;
   try {
     const parsed = JSON.parse(await file.text());
-    state = {
-      personas: Array.isArray(parsed.personas) ? parsed.personas : [],
-      importaciones: Array.isArray(parsed.importaciones) ? parsed.importaciones : [],
-    };
-    saveState();
-    navigate(currentView);
+    if (Array.isArray(parsed.workspaces)) {
+      importWorkspaceBackup(parsed);
+      alert("Espacios de trabajo importados.");
+    } else {
+      importLegacyBackup(parsed, file.name);
+      alert("Base JSON importada en el comité activo.");
+    }
+    navigate(safeWorkspaceView(currentView));
   } catch {
     alert("El archivo JSON no tiene un formato válido.");
   } finally {
@@ -2714,8 +2935,50 @@ async function importJson(event) {
   }
 }
 
+function importWorkspaceBackup(parsed) {
+  const incomingStore = normalizeWorkspaceStore(parsed);
+  syncStateToActiveWorkspace();
+  incomingStore.workspaces.forEach((incoming) => {
+    const sameIdIndex = workspaceStore.workspaces.findIndex((workspace) => workspace.id === incoming.id);
+    const sameCommitteeIndex = workspaceStore.workspaces.findIndex(
+      (workspace) => normalize(workspace.nombre) === normalize(incoming.nombre) && normalize(workspace.comuna) === normalize(incoming.comuna)
+    );
+    const index = sameIdIndex >= 0 ? sameIdIndex : sameCommitteeIndex;
+    if (index >= 0) {
+      workspaceStore.workspaces[index] = incoming;
+    } else {
+      workspaceStore.workspaces.push(incoming);
+    }
+  });
+  if (workspaceStore.workspaces.some((workspace) => workspace.id === incomingStore.activeWorkspaceId)) {
+    workspaceStore.activeWorkspaceId = incomingStore.activeWorkspaceId;
+  }
+  state = getWorkspaceState(getActiveWorkspace());
+  saveWorkspaceStore();
+}
+
+function importLegacyBackup(parsed, fileName) {
+  const imported = normalizeLoadedState({
+    personas: Array.isArray(parsed.personas) ? parsed.personas : [],
+    importaciones: Array.isArray(parsed.importaciones) ? parsed.importaciones : [],
+  });
+  const firstPersona = imported.personas[0];
+  const workspaceName =
+    cleanString(parsed.nombre) ||
+    cleanString(parsed.comite?.nombre) ||
+    cleanString(firstPersona?.comite?.nombre) ||
+    inferCommitteeName(fileName, "Comité importado");
+  const comuna = cleanString(parsed.comuna) || cleanString(parsed.comite?.comuna) || cleanString(firstPersona?.comite?.comuna);
+  const workspace = ensureWorkspace(workspaceName, comuna, true);
+  workspace.personas = imported.personas;
+  workspace.importaciones = imported.importaciones;
+  state = getWorkspaceState(workspace);
+  saveWorkspaceStore();
+}
+
 function clearData() {
-  if (!confirm("Quieres eliminar los datos guardados en este navegador?")) return;
+  const workspace = getActiveWorkspace();
+  if (!confirm(`Quieres eliminar los datos del comité "${workspaceDisplayName(workspace)}" en este navegador?`)) return;
   state = { personas: [], importaciones: [] };
   saveState();
   navigate("dashboard");
@@ -2749,7 +3012,25 @@ function formatUf(value) {
 }
 
 function formatDate(date) {
-  return date.toISOString().slice(0, 10);
+  const valid = validDate(date);
+  if (!valid) return "";
+  return `${pad2(valid.getDate())}-${pad2(valid.getMonth() + 1)}-${valid.getFullYear()}`;
+}
+
+function formatStoredDate(value, fallback = "Sin dato") {
+  const parsed = parseDateValue(value);
+  return parsed ? formatDate(parsed) : fallback;
+}
+
+function formatDateTime(value) {
+  const direct = value instanceof Date ? value : new Date(cleanString(value));
+  const parsed = validDate(direct) || parseDateValue(value);
+  if (!parsed) return "Sin dato";
+  return `${formatDate(parsed)} ${pad2(parsed.getHours())}:${pad2(parsed.getMinutes())}`;
+}
+
+function pad2(value) {
+  return String(value).padStart(2, "0");
 }
 
 function cryptoId() {
