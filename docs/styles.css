@@ -429,6 +429,20 @@ textarea {
   background: #f8fafc;
 }
 
+.button.subtle {
+  min-height: 34px;
+  border-color: transparent;
+  background: transparent;
+  color: #475569;
+  padding-inline: 4px;
+}
+
+.button.subtle:hover {
+  background: transparent;
+  color: var(--cyan-dark);
+  text-decoration: underline;
+}
+
 .button.danger {
   border-color: #fecdd3;
   background: #fff1f2;

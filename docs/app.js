@@ -608,7 +608,7 @@ function renderPersonas(params = {}) {
         </label>
       </div>
       <div class="toolbar-row">
-        <button id="exportPersonasBtn" class="button secondary" type="button">Exportar vista Excel</button>
+        <button id="exportPersonasBtn" class="button secondary subtle" type="button">Exportar nómina filtrada</button>
       </div>
     </section>
     <section id="personasResult" style="margin-top: 18px;"></section>
@@ -1931,8 +1931,8 @@ function renderGestion() {
         </label>
       </div>
       <div class="toolbar-row">
-        <button id="exportGestionViewBtn" class="button secondary" type="button">Exportar vista Excel</button>
-        <button id="exportGestionOpenBtn" class="button secondary" type="button">Exportar abiertos Excel</button>
+        <button id="exportGestionOpenBtn" class="button primary" type="button">Exportar pendientes abiertos</button>
+        <button id="exportGestionViewBtn" class="button secondary" type="button">Exportar selección actual</button>
       </div>
     </section>
     <section id="gestionResult" style="margin-top: 18px;"></section>
@@ -2057,7 +2057,7 @@ function renderReportes() {
         <div class="report-actions">
           <button id="executivePdfBtn" class="button primary" type="button">Resumen ejecutivo PDF</button>
           <button id="criticalPdfBtn" class="button danger" type="button">Observaciones críticas PDF</button>
-          <button id="criticalExcelBtn" class="button secondary" type="button">Críticos Excel</button>
+          <button id="criticalExcelBtn" class="button secondary" type="button">Exportar críticos Excel</button>
         </div>
       </div>
       <p class="small muted">El PDF de observaciones críticas incluye nombre, RUT, estado y qué falta o debe revisarse.</p>
@@ -2138,36 +2138,31 @@ function exportPersonasExcel(query = "", estado = "", filtroRapido = "") {
     return;
   }
   exportRowsToExcel(
-    `personas-${personFilterLabel(filtroRapido)}`,
+    `nomina-${personFilterLabel(filtroRapido)}`,
     [
       "Nombre",
       "RUT",
       "Teléfono",
-      "Correo",
       "Comité",
-      "Comuna",
       "Estado",
-      "RSH",
-      "Cédula",
-      "Hijos rev. 18",
-      "Motivos activos",
+      "Motivo principal",
     ],
     rows.map((persona) => [
       persona.nombre,
       persona.rut,
       persona.telefono,
-      persona.correo,
       persona.comite.nombre,
-      persona.comite.comuna || persona.caracterizacion.comuna,
       statusLabel(persona.estadoGeneral),
-      formatPercent(persona.rsh.porcentaje),
-      cedulaSummary(persona),
-      childReviewSummary(persona),
-      activeAlerts(persona)
-        .map((alerta) => `${alerta.titulo}: ${alerta.detalle || alerta.tipo}`)
-        .join(" | "),
+      primaryOperationalReason(persona),
     ])
   );
+}
+
+function primaryOperationalReason(persona) {
+  const alert = activeAlerts(persona).find(alertAffectsStatus) || activeAlerts(persona)[0];
+  if (alert) return `${alert.titulo}: ${alert.detalle || alert.tipo}`;
+  const observation = (persona.observaciones || []).find((item) => isActionableObservationText(item.texto));
+  return observation ? observation.texto : "Sin motivo activo";
 }
 
 function exportGestionExcel(rows, prefix = "gestion") {
