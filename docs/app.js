@@ -189,6 +189,7 @@ function navigate(view, params = {}) {
     personas: () => renderPersonas(params),
     importar: renderImportar,
     alertas: renderAlertas,
+    gestion: renderGestion,
     reportes: renderReportes,
     ficha: () => renderFicha(params.rut),
   };
@@ -204,9 +205,10 @@ function loadState() {
     return {
       personas: Array.isArray(parsed.personas) ? parsed.personas : [],
       importaciones: Array.isArray(parsed.importaciones) ? parsed.importaciones : [],
+      gestiones: normalizeGestionStore(parsed.gestiones),
     };
   } catch {
-    return { personas: [], importaciones: [] };
+    return { personas: [], importaciones: [], gestiones: {} };
   }
 }
 
@@ -263,6 +265,7 @@ function migrateLegacyStateToWorkspaces(legacyState) {
   const workspaces = [...grouped.values()];
   if (workspaces.length === 1) {
     workspaces[0].importaciones = legacy.importaciones;
+    workspaces[0].gestiones = legacy.gestiones;
   }
   return { activeWorkspaceId: workspaces[0].id, workspaces };
 }
@@ -272,6 +275,7 @@ function normalizeWorkspace(workspace) {
   const normalized = normalizeLoadedState({
     personas: Array.isArray(workspace.personas) ? workspace.personas : [],
     importaciones: Array.isArray(workspace.importaciones) ? workspace.importaciones : [],
+    gestiones: workspace.gestiones,
   });
   return {
     id: cleanString(workspace.id) || cryptoId(),
@@ -279,6 +283,7 @@ function normalizeWorkspace(workspace) {
     comuna: cleanString(workspace.comuna),
     personas: normalized.personas,
     importaciones: normalized.importaciones,
+    gestiones: normalized.gestiones,
     actualizadoEn: cleanString(workspace.actualizadoEn) || new Date().toISOString(),
   };
 }
@@ -290,6 +295,7 @@ function createWorkspace({ nombre, comuna = "" }) {
     comuna: cleanString(comuna),
     personas: [],
     importaciones: [],
+    gestiones: {},
     actualizadoEn: new Date().toISOString(),
   };
 }
@@ -317,6 +323,7 @@ function getWorkspaceState(workspace) {
   return normalizeLoadedState({
     personas: workspace?.personas || [],
     importaciones: workspace?.importaciones || [],
+    gestiones: workspace?.gestiones || {},
   });
 }
 
@@ -324,6 +331,7 @@ function syncStateToActiveWorkspace() {
   const workspace = getActiveWorkspace();
   workspace.personas = state.personas || [];
   workspace.importaciones = state.importaciones || [];
+  workspace.gestiones = normalizeGestionStore(state.gestiones);
   workspace.actualizadoEn = new Date().toISOString();
 }
 
@@ -438,7 +446,24 @@ function normalizeLoadedState(data) {
       estadoGeneral: getGeneralStatus(alertas),
     };
   });
-  return { ...data, personas };
+  return { ...data, personas, gestiones: normalizeGestionStore(data.gestiones) };
+}
+
+function normalizeGestionStore(gestiones) {
+  if (!gestiones || typeof gestiones !== "object" || Array.isArray(gestiones)) return {};
+  return Object.fromEntries(
+    Object.entries(gestiones)
+      .filter(([key]) => cleanString(key))
+      .map(([key, value]) => [
+        key,
+        {
+          estado: ["pendiente", "en_revision", "resuelto"].includes(value?.estado) ? value.estado : "pendiente",
+          responsable: cleanString(value?.responsable),
+          comentario: cleanString(value?.comentario),
+          actualizadoEn: cleanString(value?.actualizadoEn),
+        },
+      ])
+  );
 }
 
 function normalizeDocument(doc) {
@@ -582,6 +607,9 @@ function renderPersonas(params = {}) {
           </select>
         </label>
       </div>
+      <div class="toolbar-row">
+        <button id="exportPersonasBtn" class="button secondary" type="button">Exportar vista Excel</button>
+      </div>
     </section>
     <section id="personasResult" style="margin-top: 18px;"></section>
   `);
@@ -594,15 +622,18 @@ function renderPersonas(params = {}) {
   searchInput.addEventListener("input", update);
   statusFilter.addEventListener("change", update);
   quickFilter.addEventListener("change", update);
+  document.getElementById("exportPersonasBtn").addEventListener("click", () => {
+    exportPersonasExcel(searchInput.value, statusFilter.value, quickFilter.value);
+  });
   if (window.matchMedia("(min-width: 700px)").matches) {
     searchInput.focus();
   }
   update();
 }
 
-function renderPersonasTable(query = "", estado = "", filtroRapido = "") {
+function filteredPersonasRows(query = "", estado = "", filtroRapido = "") {
   const q = normalize(query);
-  const rows = state.personas
+  return state.personas
     .filter((persona) => {
       const matchQuery =
         !q ||
@@ -615,6 +646,10 @@ function renderPersonasTable(query = "", estado = "", filtroRapido = "") {
       return matchQuery && matchEstado && matchFiltro;
     })
     .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+}
+
+function renderPersonasTable(query = "", estado = "", filtroRapido = "") {
+  const rows = filteredPersonasRows(query, estado, filtroRapido);
 
   const container = document.getElementById("personasResult");
   if (!rows.length) {
@@ -1850,6 +1885,153 @@ function renderAlertasResult(query = "", severity = "") {
   });
 }
 
+function renderGestion() {
+  const tasks = managementTasks();
+  const summary = managementSummary(tasks);
+  const workspace = getActiveWorkspace();
+
+  setApp(`
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">Seguimiento operativo</div>
+        <h2>Gestión</h2>
+        <p class="muted">${escapeHtml(workspaceDisplayName(workspace))}</p>
+      </div>
+    </div>
+    <section class="grid stats">
+      ${stat("Pendientes", summary.pendiente, "amber")}
+      ${stat("En revisión", summary.en_revision, "cyan")}
+      ${stat("Resueltos", summary.resuelto, "emerald")}
+      ${stat("Total casos", summary.total, "indigo")}
+    </section>
+    <section class="card" style="margin-top: 18px;">
+      <div class="field-row" style="grid-template-columns: minmax(260px, 1fr) 220px 220px;">
+        <label class="field">
+          <span>Buscar</span>
+          <input id="gestionSearch" class="input" placeholder="Persona, RUT o motivo" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>Estado gestión</span>
+          <select id="gestionStatusFilter" class="select">
+            <option value="abiertos">Abiertos</option>
+            <option value="">Todos</option>
+            <option value="pendiente">Pendientes</option>
+            <option value="en_revision">En revisión</option>
+            <option value="resuelto">Resueltos</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Prioridad</span>
+          <select id="gestionPriorityFilter" class="select">
+            <option value="">Todas</option>
+            <option value="critica">Crítica</option>
+            <option value="preventiva">Preventiva</option>
+            <option value="interna">Interna</option>
+          </select>
+        </label>
+      </div>
+      <div class="toolbar-row">
+        <button id="exportGestionViewBtn" class="button secondary" type="button">Exportar vista Excel</button>
+        <button id="exportGestionOpenBtn" class="button secondary" type="button">Exportar abiertos Excel</button>
+      </div>
+    </section>
+    <section id="gestionResult" style="margin-top: 18px;"></section>
+  `);
+
+  const search = document.getElementById("gestionSearch");
+  const status = document.getElementById("gestionStatusFilter");
+  const priority = document.getElementById("gestionPriorityFilter");
+  const update = () => renderGestionTable(search.value, status.value, priority.value);
+  search.addEventListener("input", update);
+  status.addEventListener("change", update);
+  priority.addEventListener("change", update);
+  document.getElementById("exportGestionViewBtn").addEventListener("click", () => {
+    exportGestionExcel(filteredManagementTasks(search.value, status.value, priority.value), "gestion-vista");
+  });
+  document.getElementById("exportGestionOpenBtn").addEventListener("click", () => {
+    exportGestionExcel(filteredManagementTasks("", "abiertos", ""), "gestion-abiertos");
+  });
+  update();
+}
+
+function renderGestionTable(query = "", estado = "abiertos", prioridad = "") {
+  const rows = filteredManagementTasks(query, estado, prioridad);
+  const container = document.getElementById("gestionResult");
+  if (!rows.length) {
+    container.innerHTML = emptyHtml("Sin pendientes para la selección actual");
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="table-wrap">
+      <table class="gestion-table">
+        <thead>
+          <tr>
+            <th>Socio</th>
+            <th>Prioridad</th>
+            <th>Qué falta / revisar</th>
+            <th>Gestión</th>
+            <th>Responsable</th>
+            <th>Comentario</th>
+            <th>Ficha</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows
+            .map(
+              (task) => `
+                <tr>
+                  <td>
+                    <strong>${escapeHtml(task.nombre)}</strong>
+                    <div class="muted small">${escapeHtml(task.rut)}</div>
+                  </td>
+                  <td>${badge(task.prioridad)}</td>
+                  <td>
+                    <strong>${escapeHtml(task.motivo)}</strong>
+                    <div class="muted small">${escapeHtml(task.falta)}</div>
+                  </td>
+                  <td>
+                    <select class="select gestion-status" data-key="${escapeAttr(task.key)}">
+                      <option value="pendiente" ${task.estadoGestion === "pendiente" ? "selected" : ""}>Pendiente</option>
+                      <option value="en_revision" ${task.estadoGestion === "en_revision" ? "selected" : ""}>En revisión</option>
+                      <option value="resuelto" ${task.estadoGestion === "resuelto" ? "selected" : ""}>Resuelto</option>
+                    </select>
+                  </td>
+                  <td>
+                    <input class="input gestion-responsable" data-key="${escapeAttr(task.key)}" value="${escapeHtml(task.responsable)}" placeholder="Responsable" />
+                  </td>
+                  <td>
+                    <textarea class="input gestion-comentario" data-key="${escapeAttr(task.key)}" rows="2" placeholder="Comentario">${escapeHtml(task.comentario)}</textarea>
+                  </td>
+                  <td>
+                    <button class="button secondary gestion-person-link" data-rut="${escapeAttr(task.rut)}" type="button">Ver</button>
+                  </td>
+                </tr>
+              `
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  container.querySelectorAll(".gestion-status").forEach((select) => {
+    select.addEventListener("change", () => {
+      updateGestionRecord(select.dataset.key, { estado: select.value });
+      if (estado === "abiertos" && select.value === "resuelto") renderGestionTable(query, estado, prioridad);
+    });
+  });
+  container.querySelectorAll(".gestion-responsable").forEach((input) => {
+    input.addEventListener("blur", () => updateGestionRecord(input.dataset.key, { responsable: input.value }));
+  });
+  container.querySelectorAll(".gestion-comentario").forEach((input) => {
+    input.addEventListener("blur", () => updateGestionRecord(input.dataset.key, { comentario: input.value }));
+  });
+  container.querySelectorAll(".gestion-person-link").forEach((button) => {
+    button.addEventListener("click", () => navigate("ficha", { rut: button.dataset.rut }));
+  });
+}
+
 function renderReportes() {
   const resumen = getResumen();
   const docs = countDocuments();
@@ -1875,6 +2057,7 @@ function renderReportes() {
         <div class="report-actions">
           <button id="executivePdfBtn" class="button primary" type="button">Resumen ejecutivo PDF</button>
           <button id="criticalPdfBtn" class="button danger" type="button">Observaciones críticas PDF</button>
+          <button id="criticalExcelBtn" class="button secondary" type="button">Críticos Excel</button>
         </div>
       </div>
       <p class="small muted">El PDF de observaciones críticas incluye nombre, RUT, estado y qué falta o debe revisarse.</p>
@@ -1915,6 +2098,7 @@ function renderReportes() {
 
   document.getElementById("executivePdfBtn").addEventListener("click", exportExecutiveSummaryPdf);
   document.getElementById("criticalPdfBtn").addEventListener("click", exportCriticalObservationsPdf);
+  document.getElementById("criticalExcelBtn").addEventListener("click", exportCriticalRowsExcel);
 }
 
 function renderImportHistory() {
@@ -1945,6 +2129,92 @@ function importModeLabel(mode) {
     observaciones_correcciones: "Observaciones",
   };
   return labels[mode] || "Base";
+}
+
+function exportPersonasExcel(query = "", estado = "", filtroRapido = "") {
+  const rows = filteredPersonasRows(query, estado, filtroRapido);
+  if (!rows.length) {
+    alert("No hay personas para exportar con la selección actual.");
+    return;
+  }
+  exportRowsToExcel(
+    `personas-${personFilterLabel(filtroRapido)}`,
+    [
+      "Nombre",
+      "RUT",
+      "Teléfono",
+      "Correo",
+      "Comité",
+      "Comuna",
+      "Estado",
+      "RSH",
+      "Cédula",
+      "Hijos rev. 18",
+      "Motivos activos",
+    ],
+    rows.map((persona) => [
+      persona.nombre,
+      persona.rut,
+      persona.telefono,
+      persona.correo,
+      persona.comite.nombre,
+      persona.comite.comuna || persona.caracterizacion.comuna,
+      statusLabel(persona.estadoGeneral),
+      formatPercent(persona.rsh.porcentaje),
+      cedulaSummary(persona),
+      childReviewSummary(persona),
+      activeAlerts(persona)
+        .map((alerta) => `${alerta.titulo}: ${alerta.detalle || alerta.tipo}`)
+        .join(" | "),
+    ])
+  );
+}
+
+function exportGestionExcel(rows, prefix = "gestion") {
+  if (!rows.length) {
+    alert("No hay casos de gestión para exportar.");
+    return;
+  }
+  exportRowsToExcel(
+    prefix,
+    ["Prioridad", "Nombre", "RUT", "Estado persona", "Motivo", "Qué falta / revisar", "Estado gestión", "Responsable", "Comentario"],
+    rows.map((task) => [
+      statusLabel(task.prioridad),
+      task.nombre,
+      task.rut,
+      statusLabel(task.estadoPersona),
+      task.motivo,
+      task.falta,
+      gestionStatusLabel(task.estadoGestion),
+      task.responsable,
+      task.comentario,
+    ])
+  );
+}
+
+function exportCriticalRowsExcel() {
+  const rows = criticalObservationRows();
+  if (!rows.length) {
+    alert("No hay observaciones críticas para exportar.");
+    return;
+  }
+  exportRowsToExcel(
+    "observaciones-criticas",
+    ["Prioridad", "Nombre", "RUT", "Estado", "Qué falta / revisar"],
+    rows.map((row) => [row.prioridad, row.nombre, row.rut, row.estado, row.falta])
+  );
+}
+
+function exportRowsToExcel(prefix, headers, rows) {
+  if (!window.XLSX) {
+    alert("No se pudo cargar el generador Excel. Revisa la conexión a internet y vuelve a intentar.");
+    return;
+  }
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  worksheet["!cols"] = headers.map((header) => ({ wch: Math.min(Math.max(cleanString(header).length + 8, 14), 42) }));
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Datos");
+  XLSX.writeFile(workbook, `${excelFileName(prefix)}.xlsx`);
 }
 
 function exportExecutiveSummaryPdf() {
@@ -2203,8 +2473,15 @@ function addPdfTable(doc, options) {
 function criticalObservationRows() {
   return state.personas
     .map((persona) => {
-      const criticalAlerts = activeAlerts(persona).filter((alerta) => alerta.severidad === "critica" && alertAffectsStatus(alerta));
-      const criticalNotes = (persona.observaciones || []).filter((item) => isCriticalObservationText(item.texto));
+      const criticalAlerts = activeAlerts(persona)
+        .filter((alerta) => alerta.severidad === "critica" && alertAffectsStatus(alerta))
+        .filter((alerta) => {
+          const text = `${alerta.titulo}: ${alerta.detalle || alerta.tipo}`;
+          return !isTaskResolved(managementTaskKey(persona, "alerta", text));
+        });
+      const criticalNotes = (persona.observaciones || []).filter(
+        (item) => isCriticalObservationText(item.texto) && !isTaskResolved(managementTaskKey(persona, "observacion", item.texto))
+      );
       if (!criticalAlerts.length && !criticalNotes.length) return null;
       const faltas = uniqueTexts([
         ...criticalAlerts.map((alerta) => `${alerta.titulo}: ${alerta.detalle || alerta.tipo}`),
@@ -2260,9 +2537,24 @@ function statusLabel(value) {
   return cleanString(value).replaceAll("_", " ") || "Sin estado";
 }
 
+function gestionStatusLabel(value) {
+  const labels = {
+    pendiente: "Pendiente",
+    en_revision: "En revisión",
+    resuelto: "Resuelto",
+  };
+  return labels[value] || statusLabel(value);
+}
+
 function pdfFileName(prefix) {
   const workspace = normalize(workspaceDisplayName(getActiveWorkspace())) || "comite";
   return `${prefix}-${workspace}-${new Date().toISOString().slice(0, 10)}.pdf`;
+}
+
+function excelFileName(prefix) {
+  const workspace = normalize(workspaceDisplayName(getActiveWorkspace())) || "comite";
+  const cleanPrefix = normalize(prefix) || "exportacion";
+  return `${cleanPrefix}-${workspace}-${new Date().toISOString().slice(0, 10)}`;
 }
 
 function getResumen() {
@@ -3085,6 +3377,127 @@ function renderDocuments(documents) {
   `;
 }
 
+function managementTasks() {
+  return state.personas
+    .flatMap((persona) => {
+      const alertTasks = activeAlerts(persona).map((alerta) => {
+        const text = `${alerta.titulo}: ${alerta.detalle || alerta.tipo}`;
+        const key = managementTaskKey(persona, "alerta", text);
+        const record = gestionRecord(key);
+        return {
+          key,
+          rut: persona.rut,
+          nombre: persona.nombre,
+          estadoPersona: persona.estadoGeneral,
+          prioridad: alertPriority(alerta),
+          motivo: alerta.titulo || alerta.tipo,
+          falta: alerta.detalle || alerta.tipo,
+          origen: "Alerta",
+          estadoGestion: record.estado,
+          responsable: record.responsable,
+          comentario: record.comentario,
+          actualizadoEn: record.actualizadoEn,
+          orden: alertPriorityOrder(alertPriority(alerta)),
+        };
+      });
+      const observationTasks = (persona.observaciones || [])
+        .filter((item) => isActionableObservationText(item.texto))
+        .map((item) => {
+          const key = managementTaskKey(persona, "observacion", item.texto);
+          const record = gestionRecord(key);
+          return {
+            key,
+            rut: persona.rut,
+            nombre: persona.nombre,
+            estadoPersona: persona.estadoGeneral,
+            prioridad: isCriticalObservationText(item.texto) ? "critica" : "interna",
+            motivo: "Observación pendiente",
+            falta: item.texto,
+            origen: "Observación",
+            estadoGestion: record.estado,
+            responsable: record.responsable,
+            comentario: record.comentario,
+            actualizadoEn: record.actualizadoEn || item.creadoEn || "",
+            orden: isCriticalObservationText(item.texto) ? 0 : 2,
+          };
+        });
+      return [...alertTasks, ...observationTasks];
+    })
+    .sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre, "es") || a.falta.localeCompare(b.falta, "es"));
+}
+
+function filteredManagementTasks(query = "", estado = "abiertos", prioridad = "") {
+  const q = normalize(query);
+  return managementTasks().filter((task) => {
+    const text = [task.nombre, task.rut, task.motivo, task.falta, task.responsable, task.comentario].join(" ");
+    const matchQuery = !q || normalize(text).includes(q);
+    const matchEstado =
+      !estado ||
+      (estado === "abiertos" ? task.estadoGestion !== "resuelto" : task.estadoGestion === estado);
+    const matchPriority = !prioridad || task.prioridad === prioridad;
+    return matchQuery && matchEstado && matchPriority;
+  });
+}
+
+function managementSummary(tasks = managementTasks()) {
+  return {
+    total: tasks.length,
+    pendiente: tasks.filter((task) => task.estadoGestion === "pendiente").length,
+    en_revision: tasks.filter((task) => task.estadoGestion === "en_revision").length,
+    resuelto: tasks.filter((task) => task.estadoGestion === "resuelto").length,
+  };
+}
+
+function alertPriority(alerta) {
+  if (!alertAffectsStatus(alerta)) return "interna";
+  return alerta.severidad === "critica" ? "critica" : "preventiva";
+}
+
+function alertPriorityOrder(priority) {
+  if (priority === "critica") return 0;
+  if (priority === "preventiva") return 1;
+  return 2;
+}
+
+function managementTaskKey(persona, source, text) {
+  return `${normalize(persona.rut)}|${source}|${normalize(text).slice(0, 120)}`;
+}
+
+function gestionRecord(key) {
+  state.gestiones = normalizeGestionStore(state.gestiones);
+  return state.gestiones[key] || { estado: "pendiente", responsable: "", comentario: "", actualizadoEn: "" };
+}
+
+function updateGestionRecord(key, updates) {
+  const current = gestionRecord(key);
+  state.gestiones[key] = {
+    ...current,
+    ...updates,
+    estado: ["pendiente", "en_revision", "resuelto"].includes(updates.estado || current.estado)
+      ? updates.estado || current.estado
+      : "pendiente",
+    responsable: cleanString(updates.responsable ?? current.responsable),
+    comentario: cleanString(updates.comentario ?? current.comentario),
+    actualizadoEn: new Date().toISOString(),
+  };
+  saveState();
+}
+
+function isTaskResolved(key) {
+  return gestionRecord(key).estado === "resuelto";
+}
+
+function isActionableObservationText(text) {
+  const value = normalize(text);
+  if (!value) return false;
+  return (
+    isCriticalObservationText(text) ||
+    ["revisar", "revision", "actualizar", "corregir", "correccion", "documento", "certificado", "pendiente", "gestionar"].some((token) =>
+      value.includes(token)
+    )
+  );
+}
+
 function personFlags(persona) {
   const flags = [];
   if (persona.personaMayor) {
@@ -3326,6 +3739,7 @@ function importLegacyBackup(parsed, fileName) {
   const imported = normalizeLoadedState({
     personas: Array.isArray(parsed.personas) ? parsed.personas : [],
     importaciones: Array.isArray(parsed.importaciones) ? parsed.importaciones : [],
+    gestiones: parsed.gestiones,
   });
   const firstPersona = imported.personas[0];
   const workspaceName =
@@ -3337,6 +3751,7 @@ function importLegacyBackup(parsed, fileName) {
   const workspace = ensureWorkspace(workspaceName, comuna, true);
   workspace.personas = imported.personas;
   workspace.importaciones = imported.importaciones;
+  workspace.gestiones = imported.gestiones;
   state = getWorkspaceState(workspace);
   saveWorkspaceStore();
 }
@@ -3344,7 +3759,7 @@ function importLegacyBackup(parsed, fileName) {
 function clearData() {
   const workspace = getActiveWorkspace();
   if (!confirm(`Quieres eliminar los datos del comité "${workspaceDisplayName(workspace)}" en este navegador?`)) return;
-  state = { personas: [], importaciones: [] };
+  state = { personas: [], importaciones: [], gestiones: {} };
   saveState();
   navigate("dashboard");
 }

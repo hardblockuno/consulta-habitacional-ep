@@ -443,6 +443,24 @@ textarea {
   display: none;
 }
 
+.toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.gestion-table .select,
+.gestion-table .input {
+  min-width: 150px;
+  font-size: 13px;
+}
+
+.gestion-table textarea.input {
+  min-width: 220px;
+  resize: vertical;
+}
+
 .manual-mapping {
   border-color: #bae6fd;
   background: #f8fcff;
