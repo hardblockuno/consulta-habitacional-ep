@@ -675,19 +675,19 @@ function renderImportar() {
       <div>
         <div class="eyebrow">Carga de datos</div>
         <h2>Cargar base</h2>
-        <p class="muted">Espacio activo: ${escapeHtml(workspaceDisplayName(workspace))}</p>
+        <p id="importWorkspaceName" class="muted">Espacio activo: ${escapeHtml(workspaceDisplayName(workspace))}</p>
       </div>
     </div>
     <section class="card">
       <form id="excelForm" class="grid">
         <div class="field-row">
           <label class="field">
-            <span>Comité</span>
-            <input id="comiteNombre" class="input" placeholder="Nombre del comité" value="${escapeHtml(isDefaultWorkspaceName(workspace.nombre) ? "" : workspace.nombre)}" />
+            <span>Comité destino</span>
+            <input id="comiteNombre" class="input" placeholder="Nombre del comité destino" />
           </label>
           <label class="field">
-            <span>Comuna</span>
-            <input id="comuna" class="input" placeholder="Comuna" value="${escapeHtml(workspace.comuna || "")}" />
+            <span>Comuna destino</span>
+            <input id="comuna" class="input" placeholder="Comuna del comité" />
           </label>
           <label class="field">
             <span>Archivo</span>
@@ -755,6 +755,7 @@ async function handleExcelImport(event) {
     const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
     const workspaceName = comiteNombre || inferCommitteeName(file.name, sheetNameSafe(file.name));
     const workspace = ensureWorkspace(workspaceName, comuna, true);
+    updateImportWorkspaceHeader();
     const options = {
       fileName: file.name,
       comiteNombre: workspace.nombre,
@@ -910,10 +911,13 @@ function commitPreparedImport(prepared) {
 
 function completeImport(result, message) {
   saveState();
+  const workspaceName = workspaceDisplayName(getActiveWorkspace());
   message.innerHTML = notice(
-    `Base cargada: ${formatNumber(result.creados)} creados, ${formatNumber(result.actualizados)} actualizados, ${formatNumber(result.omitidos)} omitidos.`,
+    `Base cargada en ${workspaceName}: ${formatNumber(result.creados)} creados, ${formatNumber(result.actualizados)} actualizados, ${formatNumber(result.omitidos)} omitidos.`,
     "success"
   );
+  updateImportWorkspaceHeader();
+  clearImportDestinationFields();
   const panel = document.getElementById("manualImportPanel");
   if (panel) {
     panel.classList.add("hidden");
@@ -921,6 +925,20 @@ function completeImport(result, message) {
   }
   pendingManualImport = null;
   renderImportHistory();
+}
+
+function updateImportWorkspaceHeader() {
+  const heading = document.getElementById("importWorkspaceName");
+  if (heading) {
+    heading.textContent = `Espacio activo: ${workspaceDisplayName(getActiveWorkspace())}`;
+  }
+}
+
+function clearImportDestinationFields() {
+  const comiteInput = document.getElementById("comiteNombre");
+  const comunaInput = document.getElementById("comuna");
+  if (comiteInput) comiteInput.value = "";
+  if (comunaInput) comunaInput.value = "";
 }
 
 function importObservationsWorkbook(workbook, options) {
