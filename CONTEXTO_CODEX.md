@@ -155,7 +155,7 @@ La version estatica en `docs/` incluye mapeo manual de columnas: si la deteccion
 
 Tambien incluye carga de un segundo Excel de observaciones/correcciones del mismo comite. Ese archivo se carga despues de la base principal, se cruza por RUT/RUN, agrega observaciones internas y puede corregir datos frecuentes como telefono, correo, direccion, etnia, integrantes, RSH, MINVU Conecta o vencimiento de cedula.
 
-Cuando la base principal trae columna de tipo de vivienda, la version estatica la guarda dentro de cada persona y agrupa el Dashboard por esa clasificacion real. Debe normalizar codigos internos de base como `TIPO`, `TIPO AHORRO 35 UF`, `MOVILIDAD REDUCIDA POSTULANTE` o `NEURODIVERGENCIA HIJO` hacia el tipo equivalente de la hoja `Financiamiento`. Si el financiamiento repite un tipo por tramo RSH, el Dashboard debe separar las variantes: hasta 40% en la fila 30 UF y sobre 40% en la fila 35 UF. Cada fila del Dashboard debe permitir ver la nomina de personas asociadas y abrir la ficha individual.
+Cuando la base principal trae columna de tipo de vivienda, la version estatica la guarda dentro de cada persona y agrupa el Dashboard por esa clasificacion real. Debe normalizar codigos internos de base como `TIPO`, `TIPO AHORRO 35 UF`, `MOVILIDAD REDUCIDA POSTULANTE` o `NEURODIVERGENCIA HIJO` hacia el tipo equivalente de la hoja `Financiamiento`. Toda persona con RSH mayor a 40% debe clasificarse inmediatamente en variante 35 UF, incluso si el texto de la base es generico o existe una fila de financiamiento de 40%. Cada fila del Dashboard debe permitir ver la nomina de personas asociadas y abrir la ficha individual.
 
 ## Datos sensibles
 

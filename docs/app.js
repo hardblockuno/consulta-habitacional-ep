@@ -3153,13 +3153,17 @@ function findHousingFinancingRow(tipo, rows, persona) {
   const typeKey = normalize(tipo);
   if (!typeKey) return null;
   const exact = rows.filter((row) => normalize(row.tipo) === typeKey);
-  if (exact.length) return selectHousingFinancingVariant(exact, persona);
-
   const contained = rows.filter((row) => {
     const rowKey = normalize(row.tipo);
-    return rowKey.length > 4 && typeKey.length > 4 && (rowKey.includes(typeKey) || typeKey.includes(rowKey));
+    return (
+      rowKey.length > 4 &&
+      typeKey.length > 4 &&
+      normalize(row.tipo) !== typeKey &&
+      (rowKey.includes(typeKey) || typeKey.includes(rowKey))
+    );
   });
-  if (contained.length) return selectHousingFinancingVariant(contained, persona);
+  const directMatches = uniqueHousingRows([...exact, ...contained]);
+  if (directMatches.length) return selectHousingFinancingVariant(directMatches, persona);
 
   const tokens = housingMatchTokens(tipo);
   const scored = rows
@@ -3175,16 +3179,52 @@ function findHousingFinancingRow(tipo, rows, persona) {
 
 function selectHousingFinancingVariant(rows, persona) {
   if (!rows.length) return null;
-  if (rows.length === 1) return rows[0];
 
   const rsh = parseDecimal(persona?.rsh?.porcentaje ?? persona?.rsh?.tramo);
   if (rsh !== null) {
+    if (rsh > 40) {
+      const over40 = rows.filter(isHousing35UfVariant);
+      if (over40.length === 1) return over40[0];
+      if (over40.length > 1) return mergeHousingFinancingRows(over40);
+      return forceHousing35UfVariant(rows[0]);
+    }
+
     const byRsh = rows.filter((row) => housingFinancingMatchesRsh(row, rsh));
     if (byRsh.length === 1) return byRsh[0];
     if (byRsh.length > 1) return mergeHousingFinancingRows(byRsh);
   }
 
+  if (rows.length === 1) return rows[0];
   return mergeHousingFinancingRows(rows);
+}
+
+function uniqueHousingRows(rows) {
+  const seen = new Set();
+  return rows.filter((row) => {
+    const key = cleanString(row.id) || [row.tipo, row.rsh, row.ahorro, row.viviendas].map(cleanString).join("|");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function isHousing35UfVariant(row) {
+  const ahorro = normalize(row?.ahorro);
+  if (ahorro.includes("35")) return true;
+  const band = housingRshBand(row?.rsh);
+  if (band && band.min > 40) return true;
+  return normalize(row?.tipo).includes("ahorro35uf");
+}
+
+function forceHousing35UfVariant(row) {
+  if (!row) return null;
+  return {
+    ...row,
+    id: `${cleanString(row.id) || normalize(row.tipo)}-sobre40-35uf`,
+    rsh: "Sobre 40%",
+    ahorro: "35 UF",
+    viviendas: null,
+  };
 }
 
 function housingFinancingMatchesRsh(row, rsh) {
