@@ -750,21 +750,115 @@ function renderHousingTypeRows(filter = "todas") {
     container.innerHTML = emptyHtml("Sin viviendas para esta clasificación");
     return;
   }
-  container.innerHTML = simpleTable(
-    ["Clasificación", "Tipo vivienda", "Personas", "Viviendas financ.", "RSH", "Ahorro", "Grupo familiar", "Neuro", "Disc. 20 UF", "Mov. 80 UF"],
-    rows.map((row) => [
-      row.clasificacion,
-      row.tipo,
-      row.personas || 0,
-      row.viviendas === null || row.viviendas === undefined ? "Sin dato" : row.viviendas,
-      row.rsh || "Sin dato",
-      row.ahorro || "Sin dato",
-      row.grupoFamiliar || "",
-      row.neurodivergencia || "",
-      row.discapacidad20 || "",
-      row.movilidadReducida || "",
-    ])
-  );
+  container.innerHTML = housingTypeRowsTable(rows);
+  document.querySelectorAll(".housing-people-btn").forEach((button) => {
+    button.addEventListener("click", () => renderHousingPeopleList(button.dataset.housingRow || ""));
+  });
+  renderHousingPeopleList(rows[0]?.id || "");
+}
+
+function housingTypeRowsTable(rows) {
+  return `
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Clasificación</th>
+            <th>Tipo vivienda</th>
+            <th>Personas</th>
+            <th>Viviendas financ.</th>
+            <th>RSH</th>
+            <th>Ahorro</th>
+            <th>Grupo familiar</th>
+            <th>Neuro</th>
+            <th>Disc. 20 UF</th>
+            <th>Mov. 80 UF</th>
+            <th>Lista</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows
+            .map(
+              (row) => `
+                <tr>
+                  <td>${escapeHtml(row.clasificacion)}</td>
+                  <td>${escapeHtml(row.tipo)}</td>
+                  <td>${formatNumber(row.personas || 0)}</td>
+                  <td>${escapeHtml(row.viviendas === null || row.viviendas === undefined ? "Sin dato" : row.viviendas)}</td>
+                  <td>${escapeHtml(row.rsh || "Sin dato")}</td>
+                  <td>${escapeHtml(row.ahorro || "Sin dato")}</td>
+                  <td>${escapeHtml(row.grupoFamiliar || "")}</td>
+                  <td>${escapeHtml(row.neurodivergencia || "")}</td>
+                  <td>${escapeHtml(row.discapacidad20 || "")}</td>
+                  <td>${escapeHtml(row.movilidadReducida || "")}</td>
+                  <td>
+                    <button class="button secondary subtle housing-people-btn" type="button" data-housing-row="${escapeAttr(row.id)}">Ver lista</button>
+                  </td>
+                </tr>
+              `
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+    <div id="housingPeopleResult" class="housing-people-result"></div>
+  `;
+}
+
+function renderHousingPeopleList(rowId) {
+  const container = document.getElementById("housingPeopleResult");
+  if (!container) return;
+  const row = getHousingRows().find((item) => item.id === rowId);
+  document.querySelectorAll(".housing-people-btn").forEach((button) => {
+    button.classList.toggle("active", button.dataset.housingRow === rowId);
+  });
+  if (!row || !Array.isArray(row.personasDetalle) || !row.personasDetalle.length) {
+    container.innerHTML = emptyHtml("Sin personas asociadas a esta fila");
+    return;
+  }
+
+  const title = [row.tipo, row.rsh, row.ahorro].filter(Boolean).join(" - ");
+  container.innerHTML = `
+    <div class="housing-people-head">
+      <div>
+        <h4>${escapeHtml(title)}</h4>
+        <p class="muted">${formatNumber(row.personasDetalle.length)} persona${row.personasDetalle.length === 1 ? "" : "s"} en esta clasificación.</p>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Persona</th>
+            <th>RUT</th>
+            <th>RSH</th>
+            <th>Tipo en base</th>
+            <th>Grupo familiar</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${row.personasDetalle
+            .map(
+              (persona) => `
+                <tr>
+                  <td><button class="person-link housing-person-link" type="button" data-rut="${escapeAttr(persona.rut)}">${escapeHtml(persona.nombre)}</button></td>
+                  <td>${escapeHtml(persona.rut)}</td>
+                  <td>${escapeHtml(persona.rsh)}</td>
+                  <td>${escapeHtml(persona.tipoOriginal || "Sin dato")}</td>
+                  <td>${escapeHtml(persona.grupoFamiliar || "Sin dato")}</td>
+                  <td>${badge(persona.estadoGeneral)}</td>
+                </tr>
+              `
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+  container.querySelectorAll(".housing-person-link").forEach((button) => {
+    button.addEventListener("click", () => navigate("ficha", { rut: button.dataset.rut }));
+  });
 }
 
 function renderPersonas(params = {}) {
@@ -3024,18 +3118,35 @@ function personHousingRows() {
         movilidadReducida: finance?.movilidadReducida || "",
         viviendas: finance?.viviendas ?? null,
         personas: 0,
+        personasDetalle: [],
         hasFinancing: Boolean(finance),
       });
     }
-    grouped.get(key).personas += 1;
+    const group = grouped.get(key);
+    group.personas += 1;
+    group.personasDetalle.push(housingPersonSummary(persona));
   });
 
-  return Array.from(grouped.values()).sort(
+  return Array.from(grouped.values()).map((row) => ({
+    ...row,
+    personasDetalle: row.personasDetalle.sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
+  })).sort(
     (a, b) =>
       HOUSING_CATEGORIES.findIndex((category) => category.key === a.clasificacionKey) -
         HOUSING_CATEGORIES.findIndex((category) => category.key === b.clasificacionKey) ||
       a.tipo.localeCompare(b.tipo, "es")
   );
+}
+
+function housingPersonSummary(persona) {
+  return {
+    rut: persona.rut,
+    nombre: persona.nombre,
+    rsh: formatPercent(persona.rsh?.porcentaje),
+    tipoOriginal: personHousingRawType(persona),
+    grupoFamiliar: persona.caracterizacion?.grupoFamiliar || persona.caracterizacion?.integrantes || "",
+    estadoGeneral: persona.estadoGeneral,
+  };
 }
 
 function findHousingFinancingRow(tipo, rows, persona) {
