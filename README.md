@@ -194,7 +194,7 @@ Este segundo importador:
 - Persona mayor: `edad >= 60`.
 - Etnia o pueblo originario: se identifica cuando el campo de etnia/pueblo originario contiene un valor informado distinto de `No`, `Ninguna`, `Sin dato` o equivalentes.
 - Postulacion unipersonal: se identifica cuando el grupo familiar registra `1` integrante o cuando el tipo/grupo familiar indica `unipersonal` o `persona sola`.
-- Tipos de vivienda: se leen primero desde la columna de la base principal asociada a cada postulante. La hoja de financiamiento se usa para complementar con RSH, ahorro, criterios y numero de viviendas. Si un mismo tipo aparece repetido en financiamiento, por ejemplo `VIVIENDA BASE` hasta 40% y `VIVIENDA BASE` 50-90%, el RSH de la persona decide la variante correcta: hasta 40% usa la fila 30 UF y sobre 40% usa la fila 35 UF.
+- Tipos de vivienda: se leen primero desde la columna de la base principal asociada a cada postulante. La web normaliza codigos internos como `TIPO`, `TIPO AHORRO 35 UF`, `MOVILIDAD REDUCIDA POSTULANTE` o `NEURODIVERGENCIA HIJO` hacia el tipo de vivienda equivalente en financiamiento. Si un mismo tipo aparece repetido en financiamiento, por ejemplo `VIVIENDA BASE` hasta 40% y `VIVIENDA BASE` 50-90%, el RSH de la persona decide la variante correcta: hasta 40% usa la fila 30 UF y sobre 40% usa la fila 35 UF.
 - Adulto mayor y etnia/pueblo originario son criterios de excepcion relevantes para postulaciones unipersonales.
 - Cuando una persona registra etnia/pueblo originario, el sistema agrega una observacion interna para revisar y confirmar el certificado de acreditacion indigena. Esta observacion no cambia la aptitud.
 - RSH `<= 40`: preferente.

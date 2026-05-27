@@ -525,7 +525,7 @@ function normalizeHousingRows(rows) {
 
 function normalizeHousingRow(row, index) {
   if (!row || typeof row !== "object") return null;
-  const tipo = cleanString(row.tipo || row.tipoVivienda);
+  const tipo = canonicalHousingType(row.tipo || row.tipoVivienda);
   const viviendas = parseInteger(row.viviendas ?? row.numeroViviendas ?? row.total);
   if (!tipo || viviendas === null) return null;
   const category = housingCategoryForText(
@@ -543,8 +543,8 @@ function normalizeHousingRow(row, index) {
     tipo,
     clasificacion: cleanString(row.clasificacion) || category.label,
     clasificacionKey: cleanString(row.clasificacionKey) || category.key,
-    rsh: cleanString(row.rsh),
-    ahorro: cleanString(row.ahorro),
+    rsh: formatHousingRshValue(row.rsh),
+    ahorro: formatHousingAhorroValue(row.ahorro),
     grupoFamiliar: cleanString(row.grupoFamiliar),
     discapacidad20: cleanString(row.discapacidad20),
     neurodivergencia: cleanString(row.neurodivergencia),
@@ -1139,7 +1139,7 @@ function commitPreparedImport(prepared) {
   } else {
     stats.viviendas = 0;
   }
-  stats.tiposViviendaPersonas = new Set(state.personas.map(personHousingType).filter(Boolean).map(normalize)).size;
+  stats.tiposViviendaPersonas = getHousingRows().length;
 
   state.importaciones.unshift({
     id: cryptoId(),
@@ -1249,8 +1249,8 @@ function parseHousingBreakdownRows(rows) {
     const viviendas = rowTotal;
     if (!tipo || viviendas === null) continue;
     const values = {
-      rsh: cleanString(row[map.rsh]),
-      ahorro: cleanString(row[map.ahorro]),
+      rsh: formatHousingRshValue(row[map.rsh]),
+      ahorro: formatHousingAhorroValue(row[map.ahorro]),
       grupoFamiliar: cleanString(row[map.grupoFamiliar]),
       discapacidad20: cleanString(row[map.discapacidad20]),
       neurodivergencia: cleanString(row[map.neurodivergencia]),
@@ -1283,6 +1283,22 @@ function housingTitle(rows) {
   return cleanString((titleRow || []).find((cell) => cleanString(cell))) || "";
 }
 
+function formatHousingRshValue(value) {
+  const text = cleanString(value);
+  const number = parseDecimal(value);
+  if (number !== null && number > 0 && number <= 1) return `${formatNumber(Math.round(number * 100))}%`;
+  return text;
+}
+
+function formatHousingAhorroValue(value) {
+  const text = cleanString(value);
+  const normalized = normalize(text);
+  if (normalized.includes("uf")) return text;
+  if (normalized === "10") return "30 UF";
+  if (normalized === "15") return "35 UF";
+  return text;
+}
+
 function detectHousingHeaderRow(rows) {
   let best = { index: -1, score: 0 };
   (rows || []).slice(0, 45).forEach((row, index) => {
@@ -1301,29 +1317,61 @@ function detectHousingHeaderRow(rows) {
 
 function buildHousingColumnMap(headers) {
   const normalized = headers.map(normalize);
-  const find = (predicate, reverse = false) => {
-    const indexes = normalized.map((text, index) => ({ text, index }));
-    const items = reverse ? indexes.reverse() : indexes;
-    return items.find(({ text }) => predicate(text))?.index ?? -1;
-  };
-  const tipo = find((text) => text.includes("tipovivienda") || (text.includes("tipo") && text.includes("vivienda")));
-  const viviendas = find(
-    (text) =>
+  const indexes = normalized.map((text, index) => ({ text, index }));
+  const isTipo = (text) => text.includes("tipovivienda") || (text.includes("tipo") && text.includes("vivienda"));
+  const predicates = {
+    rsh: (text) => text === "rsh" || text.includes("tramorhs") || text.includes("tramorsh"),
+    ahorro: (text) => text.includes("ahorr"),
+    grupoFamiliar: (text) => text.includes("grupofamiliar") || (text.includes("grupo") && text.includes("famili")),
+    discapacidad20: (text) => (text.includes("discap") || text.includes("disc")) && text.includes("20"),
+    neurodivergencia: (text) => text.includes("neuro"),
+    movilidadReducida: (text) =>
+      ((text.includes("discap") || text.includes("movilidad") || text.includes("reduc")) && text.includes("80")) ||
+      text.includes("movilidad") ||
+      text.includes("reducida"),
+    viviendas: (text) =>
       text.includes("nviviendas") ||
       text.includes("numeroviviendas") ||
-      (text.includes("vivienda") && !text.includes("tipo")),
-    true
-  );
-  const discapacidad80 = find((text) => (text.includes("discap") || text.includes("movilidad") || text.includes("reduc")) && text.includes("80"));
-  return {
-    tipo,
-    rsh: find((text) => text === "rsh" || text.includes("tramorhs") || text.includes("tramorsh")),
-    ahorro: find((text) => text.includes("ahorr")),
-    grupoFamiliar: find((text) => text.includes("grupofamiliar") || (text.includes("grupo") && text.includes("famili"))),
-    discapacidad20: find((text) => (text.includes("discap") || text.includes("disc")) && text.includes("20")),
-    neurodivergencia: find((text) => text.includes("neuro")),
-    movilidadReducida: discapacidad80 >= 0 ? discapacidad80 : find((text) => text.includes("movilidad") || text.includes("reducida")),
-    viviendas,
+      ((text.includes("vivienda") || text.includes("viv")) && !text.includes("tipo")),
+  };
+  const nearestAfter = (start, predicate) => {
+    const after = indexes.filter(({ text, index }) => index > start && predicate(text));
+    if (after.length) return after.sort((a, b) => a.index - b.index)[0].index;
+    return indexes.find(({ text }) => predicate(text))?.index ?? -1;
+  };
+  const buildForTipo = (tipo) => {
+    const map = { tipo };
+    Object.entries(predicates).forEach(([field, predicate]) => {
+      map[field] = nearestAfter(tipo, predicate);
+    });
+    return map;
+  };
+  const score = (map) => {
+    let value = 0;
+    ["rsh", "ahorro", "viviendas"].forEach((field) => {
+      if (map[field] > map.tipo) value += 12;
+      if (map[field] >= 0 && map[field] - map.tipo <= 10) value += 6;
+      if (map[field] >= 0) value += 2;
+    });
+    ["grupoFamiliar", "discapacidad20", "neurodivergencia", "movilidadReducida"].forEach((field) => {
+      if (map[field] > map.tipo && map[field] - map.tipo <= 10) value += 2;
+    });
+    return value;
+  };
+
+  const candidates = indexes
+    .filter(({ text }) => isTipo(text))
+    .map(({ index }) => buildForTipo(index))
+    .sort((a, b) => score(b) - score(a));
+  return candidates[0] || {
+    tipo: -1,
+    rsh: -1,
+    ahorro: -1,
+    grupoFamiliar: -1,
+    discapacidad20: -1,
+    neurodivergencia: -1,
+    movilidadReducida: -1,
+    viviendas: -1,
   };
 }
 
@@ -2956,15 +3004,16 @@ function personHousingRows() {
     const tipo = personHousingType(persona);
     if (!tipo) return;
     const finance = findHousingFinancingRow(tipo, financingRows, persona);
-    const key = [normalize(tipo), financeVariantKey(finance)].filter(Boolean).join("-");
-    const categoryFromText = housingCategoryForText([tipo, finance?.clasificacion].join(" "));
+    const displayType = finance?.tipo || tipo;
+    const key = [normalize(displayType), financeVariantKey(finance)].filter(Boolean).join("-");
+    const categoryFromText = housingCategoryForText([displayType, finance?.clasificacion].join(" "));
     const fallbackCategory = housingCategoryForPerson(persona);
     const category = categoryFromText.key === "otra" ? fallbackCategory : categoryFromText;
 
     if (!grouped.has(key)) {
       grouped.set(key, {
         id: `persona-vivienda-${key}`,
-        tipo,
+        tipo: displayType,
         clasificacion: category.label,
         clasificacionKey: category.key,
         rsh: finance?.rsh || "",
@@ -3107,12 +3156,38 @@ function housingMatchTokens(value) {
 }
 
 function personHousingType(persona) {
+  return canonicalHousingType(personHousingRawType(persona));
+}
+
+function personHousingRawType(persona) {
   return cleanString(
     persona?.postulacion?.tipoVivienda ||
       persona?.caracterizacion?.tipoVivienda ||
       persona?.tipoVivienda ||
       inferPersonOriginalValue(persona?.original, "tipoVivienda")
   );
+}
+
+function canonicalHousingType(value) {
+  const text = cleanString(value);
+  const key = normalize(text);
+  if (!key) return "";
+
+  if (key === "tipo" || key === "tipoahorro35uf" || key === "viviendabaseahorro35uf") {
+    return "VIVIENDA BASE";
+  }
+  if (key.includes("movilidadreducidapostulante")) {
+    return "DISC 80 UF (DORMITORIO PRINCIPAL)";
+  }
+  if (key.includes("neurodivergenciahijo")) {
+    return "NEURODIVERGENCIA (2º DORMITORIO)";
+  }
+  if (key.includes("movilidadreducidahijo") && key.includes("neuro")) {
+    return key.includes("ahorro35uf")
+      ? "DISC 80 UF (2º DORMITORIO)/ NEURODIVERGENTE + AHORRO 35 UF"
+      : "DISC 80 UF (2º DORMITORIO)/ NEURODIVERGENTE";
+  }
+  return text;
 }
 
 function housingCategorySummary(rows) {
