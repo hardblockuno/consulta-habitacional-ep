@@ -81,6 +81,20 @@ const COLUMN_ALIASES = {
     "movilidadreducida",
   ],
   neurodivergencia: ["neurodivergencia", "neurodivergente", "tea", "trastornoespectroautista"],
+  tipoVivienda: [
+    "tipovivienda",
+    "tipodevivienda",
+    "tipologiavivienda",
+    "tipologiadevivienda",
+    "clasificacionvivienda",
+    "clasificaciondevivienda",
+    "viviendaasignada",
+    "viviendapostulacion",
+    "viviendapostulante",
+    "tipoviviendapostulante",
+    "tipoviviendaasignada",
+    "vivienda",
+  ],
   numeroCuenta: ["ncuenta", "numerocuenta", "cuenta", "libreta", "nlibreta", "nrolibreta"],
   banco: ["banco", "institucionfinanciera", "entidadfinanciera"],
   rsh: [
@@ -150,6 +164,7 @@ const COLUMN_EXCLUDES = {
   fechaNacimiento: [...MAIN_PERSON_EXCLUDES, "vencimiento", "vence", "vigencia", "caducidad", "expiracion", "cedula", "ci"],
   nacionalidad: [...MAIN_PERSON_EXCLUDES],
   cedulaVencimiento: ["hijo", "hija", "carga", "dependiente", "conyuge", "pareja"],
+  tipoVivienda: ["numero", "numeroviviendas", "nroviviendas", "nviviendas", "cantidad", "total", "uf", "ahorro", "rsh"],
 };
 
 const HOUSING_CATEGORIES = [
@@ -453,9 +468,19 @@ function normalizeLoadedState(data) {
     ) {
       caracterizacion.grupoFamiliar = cleanString(caracterizacion.integrantes);
     }
+    const postulacion = {
+      ...(persona.postulacion || {}),
+      tipoVivienda: cleanString(
+        persona.postulacion?.tipoVivienda ||
+          persona.caracterizacion?.tipoVivienda ||
+          persona.tipoVivienda ||
+          inferPersonOriginalValue(persona.original, "tipoVivienda")
+      ),
+    };
     const normalizedPersona = {
       ...persona,
       caracterizacion,
+      postulacion,
       documentos,
     };
     const alertas = [...buildAlerts(normalizedPersona, cedulaVencimiento), ...alertasBase];
@@ -653,30 +678,31 @@ function renderHousingDashboardSection(rows) {
         <div class="report-export-head">
           <div>
             <h3>Tipos de vivienda</h3>
-            <p class="muted">Sin desglose de viviendas cargado para este comité.</p>
+            <p class="muted">Sin tipos de vivienda cargados para este comité.</p>
           </div>
         </div>
-        <div class="empty">Carga una base que incluya hoja de financiamiento con columnas TIPO VIVIENDA y N° VIVIENDAS.</div>
+        <div class="empty">Carga una base que incluya una columna TIPO VIVIENDA por postulante. La hoja Financiamiento se usará como detalle complementario cuando exista.</div>
       </section>
     `;
   }
 
   const totalViviendas = rows.reduce((sum, row) => sum + Number(row.viviendas || 0), 0);
-  const peopleCounts = peopleHousingCategoryCounts();
-  const categoryRows = housingCategorySummary(rows, peopleCounts);
+  const totalPersonas = rows.reduce((sum, row) => sum + Number(row.personas || 0), 0);
+  const categoryRows = housingCategorySummary(rows);
   const tabs = [
     { key: "todas", label: "Todas" },
     ...HOUSING_CATEGORIES.filter((category) => rows.some((row) => row.clasificacionKey === category.key)),
   ];
+  const sourceText = totalViviendas
+    ? `; ${formatNumber(totalViviendas)} viviendas informadas${source?.hoja ? ` desde hoja ${escapeHtml(source.hoja)}` : ""}`
+    : "";
 
   return `
     <section class="panel dashboard-housing-panel" style="margin-top: 18px;">
       <div class="report-export-head">
         <div>
           <h3>Tipos de vivienda</h3>
-          <p class="muted">
-            ${formatNumber(totalViviendas)} viviendas informadas${source?.hoja ? ` desde hoja ${escapeHtml(source.hoja)}` : ""}.
-          </p>
+          <p class="muted">${formatNumber(totalPersonas)} personas clasificadas por tipo de vivienda${sourceText}.</p>
         </div>
       </div>
       <div class="housing-summary-grid">
@@ -685,8 +711,8 @@ function renderHousingDashboardSection(rows) {
             (row) => `
               <div class="housing-summary-card">
                 <span>${escapeHtml(row.label)}</span>
-                <strong>${formatNumber(row.viviendas)}</strong>
-                <small>${formatNumber(row.personas)} persona${row.personas === 1 ? "" : "s"} detectada${row.personas === 1 ? "" : "s"}</small>
+                <strong>${formatNumber(row.personas)}</strong>
+                <small>${row.viviendas ? `${formatNumber(row.viviendas)} vivienda${row.viviendas === 1 ? "" : "s"} en financiamiento` : "Sin detalle de financiamiento"}</small>
               </div>
             `
           )
@@ -725,17 +751,18 @@ function renderHousingTypeRows(filter = "todas") {
     return;
   }
   container.innerHTML = simpleTable(
-    ["Clasificación", "Tipo vivienda", "RSH", "Ahorro", "Grupo familiar", "Neuro", "Disc. 20 UF", "Mov. 80 UF", "N° viviendas"],
+    ["Clasificación", "Tipo vivienda", "Personas", "Viviendas financ.", "RSH", "Ahorro", "Grupo familiar", "Neuro", "Disc. 20 UF", "Mov. 80 UF"],
     rows.map((row) => [
       row.clasificacion,
       row.tipo,
+      row.personas || 0,
+      row.viviendas === null || row.viviendas === undefined ? "Sin dato" : row.viviendas,
       row.rsh || "Sin dato",
       row.ahorro || "Sin dato",
       row.grupoFamiliar || "",
       row.neurodivergencia || "",
       row.discapacidad20 || "",
       row.movilidadReducida || "",
-      row.viviendas,
     ])
   );
 }
@@ -837,6 +864,7 @@ function renderPersonasTable(query = "", estado = "", filtroRapido = "") {
             <th>Persona</th>
             <th>Comité</th>
             <th>Estado</th>
+            <th>Tipo vivienda</th>
             <th>Motivos</th>
             <th>RSH</th>
             <th>Alertas</th>
@@ -857,6 +885,7 @@ function renderPersonasTable(query = "", estado = "", filtroRapido = "") {
                     <div class="muted small">${escapeHtml(persona.comite.comuna || "Sin comuna")}</div>
                   </td>
                   <td>${badge(persona.estadoGeneral)}</td>
+                  <td>${escapeHtml(personHousingType(persona) || "Sin dato")}</td>
                   <td>${reasonDetails(persona)}</td>
                   <td>${formatPercent(persona.rsh.porcentaje)}</td>
                   <td>${persona.alertas.filter((alerta) => alerta.activa).length}</td>
@@ -1072,7 +1101,7 @@ function prepareWorkbookImport(workbook, options) {
 
 function commitPreparedImport(prepared) {
   const { rows, headers, columnMap, options, sheetName, headerIndex } = prepared;
-  const stats = { creados: 0, actualizados: 0, omitidos: 0, errores: [] };
+  const stats = { creados: 0, actualizados: 0, omitidos: 0, errores: [], tiposViviendaPersonas: 0 };
   const existing = new Map(state.personas.map((persona) => [persona.rut, persona]));
 
   for (let i = headerIndex + 1; i < rows.length; i += 1) {
@@ -1110,6 +1139,7 @@ function commitPreparedImport(prepared) {
   } else {
     stats.viviendas = 0;
   }
+  stats.tiposViviendaPersonas = new Set(state.personas.map(personHousingType).filter(Boolean).map(normalize)).size;
 
   state.importaciones.unshift({
     id: cryptoId(),
@@ -1127,9 +1157,11 @@ function commitPreparedImport(prepared) {
 function completeImport(result, message) {
   saveState();
   const workspaceName = workspaceDisplayName(getActiveWorkspace());
-  const housingMessage = result.viviendas
-    ? `, ${formatNumber(result.viviendas)} tipos de vivienda detectados`
-    : "";
+  const housingMessage = result.tiposViviendaPersonas
+    ? `, ${formatNumber(result.tiposViviendaPersonas)} tipos de vivienda por postulante`
+    : result.viviendas
+      ? `, ${formatNumber(result.viviendas)} filas de financiamiento detectadas`
+      : "";
   message.innerHTML = notice(
     `Base cargada en ${workspaceName}: ${formatNumber(result.creados)} creados, ${formatNumber(result.actualizados)} actualizados, ${formatNumber(result.omitidos)} omitidos${housingMessage}.`,
     "success"
@@ -1399,6 +1431,7 @@ function buildObservationColumnMap(rows, headerIndex, headers) {
     "tipoFamilia",
     "grupoFamiliar",
     "integrantes",
+    "tipoVivienda",
     "rsh",
     "minvuConecta",
     "cedulaVencimiento",
@@ -1580,6 +1613,10 @@ function applyCorrection(persona, field, rawValue) {
     persona.caracterizacion = persona.caracterizacion || {};
     return setValue(persona.caracterizacion, field, value, correctionLabel(field));
   }
+  if (field === "tipoVivienda") {
+    persona.postulacion = persona.postulacion || {};
+    return setValue(persona.postulacion, field, value, correctionLabel(field));
+  }
   if (field === "integrantes") {
     persona.caracterizacion = persona.caracterizacion || {};
     const next = parseInteger(rawValue);
@@ -1644,6 +1681,7 @@ function correctionLabel(field) {
     parentesco: "Parentesco",
     tipoFamilia: "Tipo familia",
     grupoFamiliar: "Grupo familiar",
+    tipoVivienda: "Tipo de vivienda",
   };
   return labels[field] || field;
 }
@@ -1767,6 +1805,7 @@ function manualMappingFields() {
     { key: "comuna", label: "Comuna" },
     { key: "etnia", label: "Etnia / pueblo originario" },
     { key: "rsh", label: "RSH" },
+    { key: "tipoVivienda", label: "Tipo de vivienda" },
     { key: "cedulaVencimiento", label: "Vencimiento cédula" },
     { key: "discapacidad", label: "Discapacidad" },
     { key: "neurodivergencia", label: "Neurodivergencia" },
@@ -1949,6 +1988,7 @@ function rowToPersona(row, headers, columnMap, options) {
       minvuConecta: parseDecimal(value("minvuConecta")),
       estado: "",
       programa: "",
+      tipoVivienda: cleanString(value("tipoVivienda")),
     },
     documentos: [],
     observaciones: [],
@@ -2056,6 +2096,7 @@ function renderFicha(rut) {
           ${kv("Persona mayor", persona.personaMayor ? "Sí" : "No")}
           ${kv("Discapacidad", persona.discapacidad ? "Sí" : "No")}
           ${kv("Etnia / pueblo originario", hasEtnia(persona) ? persona.etnia : "Sin dato")}
+          ${kv("Tipo de vivienda", personHousingType(persona) || "Sin dato")}
           ${kv("Postulación", isUnipersonal(persona) ? "Unipersonal" : "Grupo familiar")}
           ${kv("Criterios excepción", exceptionCriteriaLabel(persona))}
         </div>
@@ -2084,6 +2125,7 @@ function renderFicha(rut) {
           ${kv("Comuna", persona.comite.comuna || persona.caracterizacion.comuna || "Sin dato")}
           ${kv("Parentesco", persona.caracterizacion.parentesco || "Sin dato")}
           ${kv("Tipo familia", persona.caracterizacion.tipoFamilia || "Sin dato")}
+          ${kv("Tipo de vivienda", personHousingType(persona) || "Sin dato")}
           ${kv("Postulación", isUnipersonal(persona) ? "Unipersonal" : "Grupo familiar")}
           ${kv("Criterios excepción", exceptionCriteriaLabel(persona))}
           ${kv("MINVU Conecta", formatPercent(persona.postulacion.minvuConecta))}
@@ -2463,6 +2505,7 @@ function exportPersonasExcel(query = "", estado = "", filtroRapido = "") {
       "RUT",
       "Teléfono",
       "Comité",
+      "Tipo de vivienda",
       "Estado",
       "Motivo principal",
     ],
@@ -2471,6 +2514,7 @@ function exportPersonasExcel(query = "", estado = "", filtroRapido = "") {
       persona.rut,
       persona.telefono,
       persona.comite.nombre,
+      personHousingType(persona) || "Sin dato",
       statusLabel(persona.estadoGeneral),
       primaryOperationalReason(persona),
     ])
@@ -2895,19 +2939,132 @@ function getResumen() {
 }
 
 function getHousingRows() {
-  return normalizeHousingRows(state.viviendas || []);
+  const personRows = personHousingRows();
+  if (personRows.length) return personRows;
+  return normalizeHousingRows(state.viviendas || []).map((row) => ({
+    ...row,
+    personas: 0,
+    hasFinancing: true,
+  }));
 }
 
-function housingCategorySummary(rows, peopleCounts = peopleHousingCategoryCounts()) {
+function personHousingRows() {
+  const financingRows = normalizeHousingRows(state.viviendas || []);
+  const grouped = new Map();
+
+  state.personas.forEach((persona) => {
+    const tipo = personHousingType(persona);
+    if (!tipo) return;
+    const key = normalize(tipo);
+    const finance = findHousingFinancingRow(tipo, financingRows);
+    const categoryFromText = housingCategoryForText([tipo, finance?.clasificacion].join(" "));
+    const fallbackCategory = housingCategoryForPerson(persona);
+    const category = categoryFromText.key === "otra" ? fallbackCategory : categoryFromText;
+
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        id: `persona-vivienda-${key}`,
+        tipo,
+        clasificacion: category.label,
+        clasificacionKey: category.key,
+        rsh: finance?.rsh || "",
+        ahorro: finance?.ahorro || "",
+        grupoFamiliar: finance?.grupoFamiliar || "",
+        discapacidad20: finance?.discapacidad20 || "",
+        neurodivergencia: finance?.neurodivergencia || "",
+        movilidadReducida: finance?.movilidadReducida || "",
+        viviendas: finance?.viviendas ?? null,
+        personas: 0,
+        hasFinancing: Boolean(finance),
+      });
+    }
+    grouped.get(key).personas += 1;
+  });
+
+  return Array.from(grouped.values()).sort(
+    (a, b) =>
+      HOUSING_CATEGORIES.findIndex((category) => category.key === a.clasificacionKey) -
+        HOUSING_CATEGORIES.findIndex((category) => category.key === b.clasificacionKey) ||
+      a.tipo.localeCompare(b.tipo, "es")
+  );
+}
+
+function findHousingFinancingRow(tipo, rows) {
+  const typeKey = normalize(tipo);
+  if (!typeKey) return null;
+  const exact = rows.filter((row) => normalize(row.tipo) === typeKey);
+  if (exact.length) return mergeHousingFinancingRows(exact);
+
+  const contained = rows.filter((row) => {
+    const rowKey = normalize(row.tipo);
+    return rowKey.length > 4 && typeKey.length > 4 && (rowKey.includes(typeKey) || typeKey.includes(rowKey));
+  });
+  if (contained.length) return mergeHousingFinancingRows(contained);
+
+  const tokens = housingMatchTokens(tipo);
+  const scored = rows
+    .map((row) => {
+      const rowTokens = housingMatchTokens([row.tipo, row.rsh, row.ahorro, row.grupoFamiliar, row.discapacidad20, row.neurodivergencia, row.movilidadReducida].join(" "));
+      const score = tokens.filter((token) => rowTokens.includes(token)).length;
+      return { row, score };
+    })
+    .filter((item) => item.score >= 2)
+    .sort((a, b) => b.score - a.score);
+  return scored.length ? mergeHousingFinancingRows(scored.filter((item) => item.score === scored[0].score).map((item) => item.row)) : null;
+}
+
+function mergeHousingFinancingRows(rows) {
+  if (!rows.length) return null;
+  const join = (field) => uniqueTexts(rows.map((row) => row[field])).join(", ");
+  return {
+    ...rows[0],
+    rsh: join("rsh"),
+    ahorro: join("ahorro"),
+    grupoFamiliar: join("grupoFamiliar"),
+    discapacidad20: join("discapacidad20"),
+    neurodivergencia: join("neurodivergencia"),
+    movilidadReducida: join("movilidadReducida"),
+    viviendas: rows.reduce((sum, row) => sum + Number(row.viviendas || 0), 0),
+  };
+}
+
+function housingMatchTokens(value) {
+  const text = normalize(value);
+  const tokens = [];
+  if (text.includes("base")) tokens.push("base");
+  if (text.includes("grupo") && text.includes("famili")) tokens.push("grupo_familiar");
+  if (text.includes("neuro")) tokens.push("neuro");
+  if (text.includes("disc") || text.includes("discap")) tokens.push("discapacidad");
+  if (text.includes("movilidad") || text.includes("reducida")) tokens.push("movilidad_reducida");
+  if (text.includes("dormitorio")) tokens.push("dormitorio");
+  if (text.includes("principal")) tokens.push("principal");
+  if (text.includes("2dormitorio") || text.includes("segundodormitorio")) tokens.push("segundo_dormitorio");
+  ["20", "35", "50", "70", "80", "90"].forEach((number) => {
+    if (text.includes(number)) tokens.push(number);
+  });
+  return tokens;
+}
+
+function personHousingType(persona) {
+  return cleanString(
+    persona?.postulacion?.tipoVivienda ||
+      persona?.caracterizacion?.tipoVivienda ||
+      persona?.tipoVivienda ||
+      inferPersonOriginalValue(persona?.original, "tipoVivienda")
+  );
+}
+
+function housingCategorySummary(rows) {
   return HOUSING_CATEGORIES
     .map((category) => {
       const categoryRows = rows.filter((row) => row.clasificacionKey === category.key);
       const viviendas = categoryRows.reduce((sum, row) => sum + Number(row.viviendas || 0), 0);
+      const personas = categoryRows.reduce((sum, row) => sum + Number(row.personas || 0), 0);
       return {
         key: category.key,
         label: category.label,
         viviendas,
-        personas: peopleCounts[category.key] || 0,
+        personas,
       };
     })
     .filter((row) => row.viviendas || row.personas);
@@ -2915,6 +3072,7 @@ function housingCategorySummary(rows, peopleCounts = peopleHousingCategoryCounts
 
 function peopleHousingCategoryCounts() {
   return state.personas.reduce((counts, persona) => {
+    if (!personHousingType(persona)) return counts;
     const category = housingCategoryForPerson(persona);
     counts[category.key] = (counts[category.key] || 0) + 1;
     return counts;
@@ -2922,6 +3080,11 @@ function peopleHousingCategoryCounts() {
 }
 
 function housingCategoryForPerson(persona) {
+  const tipo = personHousingType(persona);
+  if (tipo) {
+    const category = housingCategoryForText(tipo);
+    if (category.key !== "otra") return category;
+  }
   const hasNeuro = Boolean(persona?.neurodivergencia);
   const hasDiscapacidad = Boolean(persona?.discapacidad);
   if (hasNeuro && hasDiscapacidad) return housingCategoryByKey("combinada");
@@ -2947,6 +3110,15 @@ function housingCategoryForText(value) {
   if (hasGrupo) return housingCategoryByKey("grupo_familiar");
   if (text.includes("viviendabase") || text.includes("base")) return housingCategoryByKey("base");
   return housingCategoryByKey("otra");
+}
+
+function looksLikeHousingType(value) {
+  const text = normalize(value);
+  if (!text || text.length < 3) return false;
+  return (
+    housingCategoryForText(text).key !== "otra" ||
+    ["vivienda", "dormitorio", "habitacional", "subsidio", "tipologia", "uf"].some((token) => text.includes(token))
+  );
 }
 
 function housingCategoryByKey(key) {
@@ -3060,6 +3232,30 @@ function inferColumnMapFromData(rows, headerIndex, headers, baseMap = {}) {
     }
   }
 
+  if (!map.tipoVivienda) {
+    const housingCandidate = bestColumnCandidate(
+      analysis.filter(
+        (item) =>
+          item.values.length > 0 &&
+          item.emailCount === 0 &&
+          item.rutCount === 0 &&
+          item.dateCount === 0 &&
+          item.numericCount <= Math.max(1, Math.ceil(item.values.length * 0.25)) &&
+          !hasAnyToken(item.normalized, COLUMN_EXCLUDES.tipoVivienda || [])
+      ),
+      (item) =>
+        tokenBonus(item.normalized, ["vivienda", "tipologia", "clasificacion", "dormitorio", "subsidio"]) +
+        item.values.filter(looksLikeHousingType).length * 4
+    );
+    if (
+      housingCandidate &&
+      (tokenBonus(housingCandidate.normalized, ["vivienda", "tipologia", "clasificacion", "dormitorio", "subsidio"]) ||
+        housingCandidate.values.filter(looksLikeHousingType).length >= 2)
+    ) {
+      map.tipoVivienda = housingCandidate.header;
+    }
+  }
+
   inferNameColumns(analysis, map);
   return cleanColumnMap(map);
 }
@@ -3150,6 +3346,7 @@ function scoreHeaderCandidate(headers, columnMap) {
     "rsh",
     "cedulaVencimiento",
     "discapacidad",
+    "tipoVivienda",
     "grupoFamiliar",
     "integrantes",
     "comuna",
@@ -3279,6 +3476,13 @@ function rowObject(row, headers) {
     object[header] = value instanceof Date ? value.toISOString() : cleanString(value);
   });
   return object;
+}
+
+function inferPersonOriginalValue(original, field) {
+  if (!original || typeof original !== "object") return "";
+  const headers = Object.keys(original);
+  const header = findColumn(headers, COLUMN_ALIASES[field] || [], COLUMN_EXCLUDES[field] || []);
+  return header ? cleanString(original[header]) : "";
 }
 
 function inferCommitteeName(fileName) {

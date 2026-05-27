@@ -31,7 +31,7 @@ La pantalla de carga permite dos tipos de archivo:
 
 - Base principal del comite: crea o actualiza personas por RUT/RUN.
 - Observaciones y correcciones: se carga despues de la base principal, cruza por RUT/RUN y agrega observaciones internas o actualiza datos como telefono, direccion, etnia, integrantes, RSH, MINVU Conecta o vencimiento de cedula cuando el Excel trae esas columnas.
-- Desglose de tipos de vivienda: si el Excel trae una hoja `Financiamiento` o similar con columnas `TIPO VIVIENDA` y `N° VIVIENDAS`, la web guarda ese resumen en el comite activo y lo muestra en Dashboard por clasificacion.
+- Tipos de vivienda: la base principal puede traer una columna por postulante como `TIPO VIVIENDA`, `TIPO DE VIVIENDA`, `CLASIFICACION VIVIENDA`, `VIVIENDA ASIGNADA` o equivalente. La web la guarda en cada persona y usa la hoja `Financiamiento` solo como detalle complementario cuando exista.
 
 ### Accesos rapidos para trabajar entre PCs
 
@@ -174,7 +174,7 @@ El importador:
 - detecta hijos/cargas familiares cuando existen columnas como `NOMBRE HIJO 1`, `FEC NAC HIJO 1`, `EDAD HIJO 1`, `CARGA`, `DEPENDIENTE`, etc.
 - marca revision documental interna si un hijo/carga ya cumplio 18 anos o cumple 18 dentro de los proximos 90 dias.
 - crea o actualiza personas por RUT.
-- detecta, cuando existe, la hoja de financiamiento con el desglose de tipos de vivienda y la conserva como dato del comite.
+- detecta el tipo de vivienda por persona desde la base principal y, cuando existe, cruza la hoja de financiamiento como detalle del comite.
 
 El endpoint `POST /api/importar/observaciones/` espera `multipart/form-data`:
 
@@ -194,7 +194,7 @@ Este segundo importador:
 - Persona mayor: `edad >= 60`.
 - Etnia o pueblo originario: se identifica cuando el campo de etnia/pueblo originario contiene un valor informado distinto de `No`, `Ninguna`, `Sin dato` o equivalentes.
 - Postulacion unipersonal: se identifica cuando el grupo familiar registra `1` integrante o cuando el tipo/grupo familiar indica `unipersonal` o `persona sola`.
-- Tipos de vivienda: se leen desde la hoja de financiamiento del Excel y se agrupan como vivienda base, grupo familiar, neurodivergencia, discapacidad o combinada.
+- Tipos de vivienda: se leen primero desde la columna de la base principal asociada a cada postulante. La hoja de financiamiento se usa para complementar con RSH, ahorro, criterios y numero de viviendas.
 - Adulto mayor y etnia/pueblo originario son criterios de excepcion relevantes para postulaciones unipersonales.
 - Cuando una persona registra etnia/pueblo originario, el sistema agrega una observacion interna para revisar y confirmar el certificado de acreditacion indigena. Esta observacion no cambia la aptitud.
 - RSH `<= 40`: preferente.

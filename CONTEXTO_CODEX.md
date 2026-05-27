@@ -125,7 +125,7 @@ git pull
 - Discapacidad y adulto mayor deben mostrarse como identificadores visuales en la lista de personas.
 - Etnia/pueblo originario debe mostrarse como indicador visual, filtro y metrica de dashboard.
 - Postulaciones unipersonales deben mostrarse como indicador visual, filtro y metrica de dashboard.
-- El Dashboard debe mostrar tipos de vivienda cuando el Excel traiga hoja `Financiamiento` o similar con `TIPO VIVIENDA` y `N° VIVIENDAS`.
+- El Dashboard debe mostrar tipos de vivienda desde la columna de la base principal asociada a cada postulante. La hoja `Financiamiento` o similar con `TIPO VIVIENDA` y `N° VIVIENDAS` solo complementa el detalle.
 - Adulto mayor y etnia/pueblo originario son criterios de excepcion para postulaciones unipersonales.
 - Si una persona registra etnia/pueblo originario, debe quedar una observacion interna para revisar y confirmar certificado de acreditacion indigena, sin afectar aptitud.
 - La ficha de persona debe mostrar grupo familiar y su valor.
@@ -155,7 +155,7 @@ La version estatica en `docs/` incluye mapeo manual de columnas: si la deteccion
 
 Tambien incluye carga de un segundo Excel de observaciones/correcciones del mismo comite. Ese archivo se carga despues de la base principal, se cruza por RUT/RUN, agrega observaciones internas y puede corregir datos frecuentes como telefono, correo, direccion, etnia, integrantes, RSH, MINVU Conecta o vencimiento de cedula.
 
-Cuando la base trae una hoja `Financiamiento`, `Desglose` o similar, la version estatica intenta extraer la tabla de tipos de vivienda y la guarda dentro del comite activo para mostrarla en Dashboard por clasificacion.
+Cuando la base principal trae columna de tipo de vivienda, la version estatica la guarda dentro de cada persona y agrupa el Dashboard por esa clasificacion real. Si ademas existe una hoja `Financiamiento`, `Desglose` o similar, extrae esa tabla para complementar RSH, ahorro, criterios y numero de viviendas.
 
 ## Datos sensibles
 
