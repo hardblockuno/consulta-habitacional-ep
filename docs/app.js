@@ -2955,8 +2955,8 @@ function personHousingRows() {
   state.personas.forEach((persona) => {
     const tipo = personHousingType(persona);
     if (!tipo) return;
-    const key = normalize(tipo);
-    const finance = findHousingFinancingRow(tipo, financingRows);
+    const finance = findHousingFinancingRow(tipo, financingRows, persona);
+    const key = [normalize(tipo), financeVariantKey(finance)].filter(Boolean).join("-");
     const categoryFromText = housingCategoryForText([tipo, finance?.clasificacion].join(" "));
     const fallbackCategory = housingCategoryForPerson(persona);
     const category = categoryFromText.key === "otra" ? fallbackCategory : categoryFromText;
@@ -2989,17 +2989,17 @@ function personHousingRows() {
   );
 }
 
-function findHousingFinancingRow(tipo, rows) {
+function findHousingFinancingRow(tipo, rows, persona) {
   const typeKey = normalize(tipo);
   if (!typeKey) return null;
   const exact = rows.filter((row) => normalize(row.tipo) === typeKey);
-  if (exact.length) return mergeHousingFinancingRows(exact);
+  if (exact.length) return selectHousingFinancingVariant(exact, persona);
 
   const contained = rows.filter((row) => {
     const rowKey = normalize(row.tipo);
     return rowKey.length > 4 && typeKey.length > 4 && (rowKey.includes(typeKey) || typeKey.includes(rowKey));
   });
-  if (contained.length) return mergeHousingFinancingRows(contained);
+  if (contained.length) return selectHousingFinancingVariant(contained, persona);
 
   const tokens = housingMatchTokens(tipo);
   const scored = rows
@@ -3010,7 +3010,53 @@ function findHousingFinancingRow(tipo, rows) {
     })
     .filter((item) => item.score >= 2)
     .sort((a, b) => b.score - a.score);
-  return scored.length ? mergeHousingFinancingRows(scored.filter((item) => item.score === scored[0].score).map((item) => item.row)) : null;
+  return scored.length ? selectHousingFinancingVariant(scored.filter((item) => item.score === scored[0].score).map((item) => item.row), persona) : null;
+}
+
+function selectHousingFinancingVariant(rows, persona) {
+  if (!rows.length) return null;
+  if (rows.length === 1) return rows[0];
+
+  const rsh = parseDecimal(persona?.rsh?.porcentaje ?? persona?.rsh?.tramo);
+  if (rsh !== null) {
+    const byRsh = rows.filter((row) => housingFinancingMatchesRsh(row, rsh));
+    if (byRsh.length === 1) return byRsh[0];
+    if (byRsh.length > 1) return mergeHousingFinancingRows(byRsh);
+  }
+
+  return mergeHousingFinancingRows(rows);
+}
+
+function housingFinancingMatchesRsh(row, rsh) {
+  const band = housingRshBand(row?.rsh);
+  if (band) return rsh >= band.min && rsh <= band.max;
+
+  const ahorro = normalize(row?.ahorro);
+  if (ahorro.includes("35")) return rsh > 40;
+  if (ahorro.includes("30")) return rsh <= 40;
+  return false;
+}
+
+function housingRshBand(value) {
+  const text = cleanString(value);
+  if (!text) return null;
+  const normalized = normalize(text);
+  if (normalized.includes("sobre40") || normalized.includes("masde40") || normalized.includes("mayor40")) {
+    return { min: 40.01, max: 100 };
+  }
+  const numbers = text
+    .replace(",", ".")
+    .match(/\d+(\.\d+)?/g)
+    ?.map(Number)
+    .filter((number) => Number.isFinite(number)) || [];
+  if (!numbers.length) return null;
+  if (numbers.length >= 2) {
+    const min = Math.min(numbers[0], numbers[1]);
+    const max = Math.max(numbers[0], numbers[1]);
+    return min > 40 ? { min: 40.01, max } : { min, max };
+  }
+  const number = numbers[0];
+  return number <= 40 ? { min: 0, max: 40 } : { min: 40.01, max: 100 };
 }
 
 function mergeHousingFinancingRows(rows) {
@@ -3026,6 +3072,21 @@ function mergeHousingFinancingRows(rows) {
     movilidadReducida: join("movilidadReducida"),
     viviendas: rows.reduce((sum, row) => sum + Number(row.viviendas || 0), 0),
   };
+}
+
+function financeVariantKey(finance) {
+  if (!finance) return "";
+  return normalize(
+    [
+      finance.id,
+      finance.rsh,
+      finance.ahorro,
+      finance.grupoFamiliar,
+      finance.discapacidad20,
+      finance.neurodivergencia,
+      finance.movilidadReducida,
+    ].join(" ")
+  );
 }
 
 function housingMatchTokens(value) {
