@@ -355,6 +355,71 @@ textarea {
   justify-content: flex-end;
 }
 
+.dashboard-housing-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.housing-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.housing-summary-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 12px;
+}
+
+.housing-summary-card span,
+.housing-summary-card small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.housing-summary-card strong {
+  display: block;
+  margin: 6px 0 3px;
+  color: var(--text);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.housing-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+
+.housing-tab {
+  min-height: 34px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.housing-tab:hover,
+.housing-tab.active {
+  border-color: var(--cyan);
+  background: #ecfeff;
+  color: var(--cyan-dark);
+}
+
+.housing-type-result {
+  min-height: 80px;
+}
+
 .hidden {
   display: none !important;
 }
