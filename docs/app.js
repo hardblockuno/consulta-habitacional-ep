@@ -477,11 +477,24 @@ function normalizeLoadedState(data) {
           inferPersonOriginalValue(persona.original, "tipoVivienda")
       ),
     };
-    const birthAndAge = resolveBirthDateAndAge(
-      persona.fechaNacimiento || inferPersonOriginalValue(persona.original, "fechaNacimiento"),
-      persona.edad ?? inferPersonOriginalValue(persona.original, "edad"),
+    const originalBirthSource = inferPersonOriginalValue(persona.original, "fechaNacimiento");
+    const originalAgeSource = inferPersonOriginalValue(persona.original, "edad");
+    let birthAndAge = resolveBirthDateAndAge(
+      persona.fechaNacimiento,
+      persona.edad ?? originalAgeSource,
       { minExpectedAge: 16 }
     );
+    const originalBirthAndAge = originalBirthSource
+      ? resolveBirthDateAndAge(originalBirthSource, originalAgeSource ?? persona.edad, { minExpectedAge: 16 })
+      : null;
+    if (
+      originalBirthAndAge?.fechaNacimiento &&
+      (!birthAndAge.fechaNacimiento ||
+        birthAndAge.edad === null ||
+        (birthAndAge.edad < 16 && originalBirthAndAge.edad >= 16))
+    ) {
+      birthAndAge = originalBirthAndAge;
+    }
     const normalizedPersona = {
       ...persona,
       fechaNacimiento: birthAndAge.fechaNacimiento ? birthAndAge.fechaNacimiento.toISOString().slice(0, 10) : "",
