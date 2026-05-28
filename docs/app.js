@@ -178,13 +178,13 @@ const HOUSING_CATEGORIES = [
 
 let workspaceStore = loadWorkspaceStore();
 let state = getWorkspaceState(getActiveWorkspace());
-let currentView = "personas";
+let currentView = "resumen";
 let pendingManualImport = null;
 saveWorkspaceStore({ updateUi: false });
 
 document.addEventListener("DOMContentLoaded", () => {
   bindGlobalEvents();
-  navigate("personas");
+  navigate("resumen");
 });
 
 function bindGlobalEvents() {
@@ -209,15 +209,17 @@ function navigate(view, params = {}) {
   });
 
   const routes = {
+    resumen: renderResumenEp,
     dashboard: renderDashboard,
     personas: () => renderPersonas(params),
     importar: renderImportar,
     alertas: renderAlertas,
     gestion: renderGestion,
     reportes: renderReportes,
+    tecnica: renderAreaTecnica,
     ficha: () => renderFicha(params.rut),
   };
-  routes[view]();
+  (routes[view] || routes.resumen)();
   updateStorageSummary();
 }
 
@@ -307,6 +309,9 @@ function normalizeWorkspace(workspace) {
     id: cleanString(workspace.id) || cryptoId(),
     nombre: cleanString(workspace.nombre) || DEFAULT_WORKSPACE_NAME,
     comuna: cleanString(workspace.comuna),
+    coordinacion: normalizeCoordination(workspace.coordinacion || workspace.coordinacionAreas || workspace),
+    proyecto: normalizeProjectOverview(workspace.proyecto || workspace),
+    areaTecnica: normalizeTechnicalArea(workspace.areaTecnica || workspace.tecnica || {}),
     personas: normalized.personas,
     importaciones: normalized.importaciones,
     gestiones: normalized.gestiones,
@@ -321,12 +326,41 @@ function createWorkspace({ nombre, comuna = "" }) {
     id: cryptoId(),
     nombre: cleanString(nombre) || DEFAULT_WORKSPACE_NAME,
     comuna: cleanString(comuna),
+    coordinacion: normalizeCoordination(),
+    proyecto: normalizeProjectOverview(),
+    areaTecnica: normalizeTechnicalArea(),
     personas: [],
     importaciones: [],
     gestiones: {},
     viviendas: [],
     viviendaFuente: null,
     actualizadoEn: new Date().toISOString(),
+  };
+}
+
+function normalizeCoordination(source = {}) {
+  return {
+    social: cleanString(source.social || source.coordinadorSocial || source.coordinacionSocial),
+    tecnica: cleanString(source.tecnica || source.coordinadorTecnico || source.coordinacionTecnica),
+  };
+}
+
+function normalizeProjectOverview(source = {}) {
+  return {
+    estado: cleanString(source.estado || source.estadoProyecto || source.proyectoEstado),
+    observaciones: cleanString(source.observaciones || source.observacionesProyecto || source.proyectoObservaciones),
+  };
+}
+
+function normalizeTechnicalArea(source = {}) {
+  return {
+    estado: cleanString(source.estado),
+    terreno: cleanString(source.terreno),
+    factibilidad: cleanString(source.factibilidad),
+    arquitectura: cleanString(source.arquitectura),
+    serviuMinvu: cleanString(source.serviuMinvu || source.serviu_minvu || source.vinculoServiuMinvu),
+    expediente: cleanString(source.expediente || source.expedienteTecnico),
+    observaciones: cleanString(source.observaciones),
   };
 }
 
@@ -661,6 +695,262 @@ function updateStorageSummary() {
     `${formatNumber(count)} ${count === 1 ? "persona" : "personas"} en ${workspaceDisplayName(workspace)}`;
 }
 
+function renderResumenEp() {
+  const resumen = getResumen();
+  const workspace = getActiveWorkspace();
+  const tasks = managementTasks();
+  const summary = managementSummary(tasks);
+  const housingRows = getHousingRows();
+  const abiertas = summary.pendiente + summary.en_revision;
+  const tecnica = normalizeTechnicalArea(workspace.areaTecnica);
+  const coordinacion = normalizeCoordination(workspace.coordinacion);
+  const proyecto = normalizeProjectOverview(workspace.proyecto);
+
+  setApp(`
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">Gestión EP</div>
+        <h2>Resumen EP</h2>
+        <p class="muted">${escapeHtml(workspaceDisplayName(workspace))}${workspace.comuna ? ` · ${escapeHtml(workspace.comuna)}` : ""}</p>
+      </div>
+    </div>
+    <section class="grid stats">
+      ${stat("Personas área social", resumen.totalPersonas, "", "total")}
+      ${stat("Observadas", resumen.observadas, "amber", "observadas")}
+      ${stat("Alertas críticas", resumen.alertasCriticas, "rose")}
+      ${stat("Gestiones abiertas", abiertas, "cyan")}
+      ${stat("Tipos de vivienda", housingRows.length, "indigo")}
+    </section>
+    <section class="grid two area-overview-grid" style="margin-top: 18px;">
+      <article class="panel area-panel">
+        <div class="area-panel-head">
+          <div>
+            <p class="eyebrow">Área Social</p>
+            <h3>Base social y postulantes</h3>
+          </div>
+          <span class="status-pill">${escapeHtml(coordinacion.social || "Sin coordinación")}</span>
+        </div>
+        <div class="area-metric-list">
+          ${areaMetric("Personas aptas", resumen.personasAptas)}
+          ${areaMetric("Cédulas por revisar", resumen.cedulasRevision)}
+          ${areaMetric("Adultos mayores", resumen.personasMayores)}
+          ${areaMetric("Etnia / pueblo originario", resumen.etnia)}
+        </div>
+        <div class="toolbar-row">
+          <button class="button primary overview-nav" type="button" data-target-view="dashboard">Dashboard social</button>
+          <button class="button secondary overview-nav" type="button" data-target-view="personas">Personas</button>
+        </div>
+      </article>
+      <article class="panel area-panel">
+        <div class="area-panel-head">
+          <div>
+            <p class="eyebrow">Área Técnica</p>
+            <h3>Proyecto y expediente técnico</h3>
+          </div>
+          <span class="status-pill">${escapeHtml(coordinacion.tecnica || "Sin coordinación")}</span>
+        </div>
+        <div class="area-metric-list">
+          ${areaMetric("Estado proyecto", proyecto.estado || "Sin estado")}
+          ${areaMetric("Estado técnico", tecnica.estado || "Sin estado")}
+          ${areaMetric("Terreno", tecnica.terreno || "Sin dato")}
+          ${areaMetric("SERVIU / MINVU", tecnica.serviuMinvu || "Sin dato")}
+        </div>
+        <div class="toolbar-row">
+          <button class="button primary overview-nav" type="button" data-target-view="tecnica">Abrir área técnica</button>
+          <button class="button secondary overview-nav" type="button" data-target-view="gestion">Gestión</button>
+        </div>
+      </article>
+    </section>
+    <section class="panel project-form-panel" style="margin-top: 18px;">
+      <div class="report-export-head">
+        <div>
+          <h3>Coordinación del comité</h3>
+          <p class="muted">Responsables y estado general del proyecto activo.</p>
+        </div>
+      </div>
+      <div class="field-row project-field-row">
+        <label class="field">
+          <span>Coordinación social</span>
+          <input class="input workspace-field" data-workspace-field="coordinacion.social" value="${escapeAttr(coordinacion.social)}" placeholder="Nombre responsable social" />
+        </label>
+        <label class="field">
+          <span>Coordinación técnica</span>
+          <input class="input workspace-field" data-workspace-field="coordinacion.tecnica" value="${escapeAttr(coordinacion.tecnica)}" placeholder="Nombre responsable técnico" />
+        </label>
+        <label class="field">
+          <span>Estado proyecto</span>
+          <select class="select workspace-field" data-workspace-field="proyecto.estado">
+            ${projectStatusOptions(proyecto.estado)}
+          </select>
+        </label>
+      </div>
+      <label class="field" style="margin-top: 12px;">
+        <span>Observaciones generales</span>
+        <textarea class="input workspace-field" data-workspace-field="proyecto.observaciones" rows="3" placeholder="Observaciones generales del comité o proyecto">${escapeHtml(proyecto.observaciones)}</textarea>
+      </label>
+    </section>
+  `);
+
+  document.querySelectorAll(".stat-action").forEach((card) => {
+    card.addEventListener("click", () => navigate("personas", { filtro: card.dataset.filter || "total" }));
+  });
+  bindOverviewNavigation();
+  bindWorkspaceFieldInputs();
+}
+
+function renderAreaTecnica() {
+  const workspace = getActiveWorkspace();
+  const coordinacion = normalizeCoordination(workspace.coordinacion);
+  const proyecto = normalizeProjectOverview(workspace.proyecto);
+  const tecnica = normalizeTechnicalArea(workspace.areaTecnica);
+
+  setApp(`
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">Gestión EP</div>
+        <h2>Área Técnica</h2>
+        <p class="muted">${escapeHtml(workspaceDisplayName(workspace))}</p>
+      </div>
+    </div>
+    <section class="grid stats">
+      ${stat("Estado proyecto", proyecto.estado || "Sin estado", "indigo")}
+      ${stat("Estado técnico", tecnica.estado || "Sin estado", "cyan")}
+      ${stat("Coordinación técnica", coordinacion.tecnica || "Sin dato", "emerald")}
+    </section>
+    <section class="panel project-form-panel" style="margin-top: 18px;">
+      <div class="report-export-head">
+        <div>
+          <h3>Ficha técnica del proyecto</h3>
+          <p class="muted">Información general a nivel de comité/proyecto.</p>
+        </div>
+      </div>
+      <div class="field-row project-field-row">
+        <label class="field">
+          <span>Coordinación técnica</span>
+          <input class="input workspace-field" data-workspace-field="coordinacion.tecnica" value="${escapeAttr(coordinacion.tecnica)}" placeholder="Nombre responsable técnico" />
+        </label>
+        <label class="field">
+          <span>Estado técnico</span>
+          <select class="select workspace-field" data-workspace-field="areaTecnica.estado">
+            ${technicalStatusOptions(tecnica.estado)}
+          </select>
+        </label>
+        <label class="field">
+          <span>Estado proyecto</span>
+          <select class="select workspace-field" data-workspace-field="proyecto.estado">
+            ${projectStatusOptions(proyecto.estado)}
+          </select>
+        </label>
+      </div>
+      <div class="field-row project-field-row" style="margin-top: 12px;">
+        <label class="field">
+          <span>Terreno</span>
+          <input class="input workspace-field" data-workspace-field="areaTecnica.terreno" value="${escapeAttr(tecnica.terreno)}" placeholder="Estado o antecedente de terreno" />
+        </label>
+        <label class="field">
+          <span>Factibilidad</span>
+          <input class="input workspace-field" data-workspace-field="areaTecnica.factibilidad" value="${escapeAttr(tecnica.factibilidad)}" placeholder="Factibilidad pendiente, en revisión, aprobada" />
+        </label>
+        <label class="field">
+          <span>SERVIU / MINVU</span>
+          <input class="input workspace-field" data-workspace-field="areaTecnica.serviuMinvu" value="${escapeAttr(tecnica.serviuMinvu)}" placeholder="Vínculo o estado administrativo" />
+        </label>
+      </div>
+      <div class="field-row project-field-row" style="margin-top: 12px;">
+        <label class="field">
+          <span>Arquitectura</span>
+          <input class="input workspace-field" data-workspace-field="areaTecnica.arquitectura" value="${escapeAttr(tecnica.arquitectura)}" placeholder="Anteproyecto, revisión, aprobado" />
+        </label>
+        <label class="field">
+          <span>Expediente técnico</span>
+          <input class="input workspace-field" data-workspace-field="areaTecnica.expediente" value="${escapeAttr(tecnica.expediente)}" placeholder="Estado de expediente" />
+        </label>
+      </div>
+      <label class="field" style="margin-top: 12px;">
+        <span>Observaciones técnicas</span>
+        <textarea class="input workspace-field" data-workspace-field="areaTecnica.observaciones" rows="4" placeholder="Observaciones técnicas generales del proyecto">${escapeHtml(tecnica.observaciones)}</textarea>
+      </label>
+    </section>
+  `);
+
+  bindWorkspaceFieldInputs();
+}
+
+function areaMetric(label, value) {
+  return `
+    <div class="area-metric">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+    </div>
+  `;
+}
+
+function bindOverviewNavigation() {
+  document.querySelectorAll(".overview-nav").forEach((button) => {
+    button.addEventListener("click", () => navigate(button.dataset.targetView));
+  });
+}
+
+function bindWorkspaceFieldInputs() {
+  document.querySelectorAll(".workspace-field").forEach((field) => {
+    if (field.tagName === "SELECT") {
+      field.addEventListener("change", () => updateWorkspaceField(field.dataset.workspaceField, field.value));
+      return;
+    }
+    field.addEventListener("input", () => updateWorkspaceField(field.dataset.workspaceField, field.value));
+    field.addEventListener("blur", () => updateWorkspaceField(field.dataset.workspaceField, field.value));
+  });
+}
+
+function updateWorkspaceField(path, rawValue) {
+  const [group, key] = cleanString(path).split(".");
+  if (!group || !key) return;
+  const workspace = getActiveWorkspace();
+  const value = cleanString(rawValue);
+  if (group === "coordinacion") {
+    workspace.coordinacion = normalizeCoordination({ ...(workspace.coordinacion || {}), [key]: value });
+  }
+  if (group === "proyecto") {
+    workspace.proyecto = normalizeProjectOverview({ ...(workspace.proyecto || {}), [key]: value });
+  }
+  if (group === "areaTecnica") {
+    workspace.areaTecnica = normalizeTechnicalArea({ ...(workspace.areaTecnica || {}), [key]: value });
+  }
+  workspace.actualizadoEn = new Date().toISOString();
+  saveWorkspaceStore();
+}
+
+function projectStatusOptions(selected) {
+  return selectOptions(
+    ["", "En preparación", "En revisión", "En ejecución", "Observado", "Finalizado"],
+    selected,
+    "Sin estado"
+  );
+}
+
+function technicalStatusOptions(selected) {
+  return selectOptions(
+    ["", "Sin iniciar", "Levantamiento", "En revisión", "Con observaciones", "Aprobado"],
+    selected,
+    "Sin estado"
+  );
+}
+
+function selectOptions(values, selected, emptyLabel = "Sin dato") {
+  const normalizedSelected = normalize(selected);
+  const options = [...values];
+  if (cleanString(selected) && !options.some((value) => normalize(value) === normalizedSelected)) {
+    options.push(cleanString(selected));
+  }
+  return options
+    .map((value) => {
+      const label = value || emptyLabel;
+      const isSelected = normalize(value) === normalizedSelected;
+      return `<option value="${escapeAttr(value)}" ${isSelected ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    })
+    .join("");
+}
+
 function renderDashboard() {
   const resumen = getResumen();
   const workspace = getActiveWorkspace();
@@ -669,8 +959,8 @@ function renderDashboard() {
   setApp(`
     <div class="page-head">
       <div>
-        <div class="eyebrow">Panel operativo</div>
-        <h2>Dashboard</h2>
+        <div class="eyebrow">Área Social</div>
+        <h2>Dashboard social</h2>
         <p class="muted">${escapeHtml(workspaceDisplayName(workspace))}</p>
       </div>
     </div>
@@ -888,8 +1178,8 @@ function renderPersonas(params = {}) {
   setApp(`
     <div class="page-head">
       <div>
-        <div class="eyebrow">Consulta rápida</div>
-        <h2>Buscar persona</h2>
+        <div class="eyebrow">Área Social</div>
+        <h2>Personas</h2>
         <p class="muted">${escapeHtml(workspaceDisplayName(workspace))}</p>
       </div>
     </div>
@@ -1023,7 +1313,7 @@ function renderImportar() {
   setApp(`
     <div class="page-head">
       <div>
-        <div class="eyebrow">Carga de datos</div>
+        <div class="eyebrow">Área Social</div>
         <h2>Cargar base</h2>
         <p id="importWorkspaceName" class="muted">Espacio activo: ${escapeHtml(workspaceDisplayName(workspace))}</p>
       </div>
@@ -2241,7 +2531,7 @@ function renderFicha(rut) {
   setApp(`
     <div class="page-head">
       <div>
-        <div class="eyebrow">Ficha persona</div>
+        <div class="eyebrow">Área Social</div>
         <h2>${escapeHtml(persona.nombre)}</h2>
         <p class="muted">${escapeHtml(persona.rut)} - ${escapeHtml(persona.comite.nombre || "Sin comité")}</p>
       </div>
@@ -2327,7 +2617,7 @@ function renderAlertas() {
   setApp(`
     <div class="page-head">
       <div>
-        <div class="eyebrow">Seguimiento</div>
+        <div class="eyebrow">Área Social</div>
         <h2>Alertas</h2>
       </div>
     </div>
@@ -2418,8 +2708,8 @@ function renderGestion() {
   setApp(`
     <div class="page-head">
       <div>
-        <div class="eyebrow">Seguimiento operativo</div>
-        <h2>Gestión</h2>
+        <div class="eyebrow">Gestión EP</div>
+        <h2>Gestión interáreas</h2>
         <p class="muted">${escapeHtml(workspaceDisplayName(workspace))}</p>
       </div>
     </div>
@@ -2568,7 +2858,7 @@ function renderReportes() {
   setApp(`
     <div class="page-head">
       <div>
-        <div class="eyebrow">Resumen</div>
+        <div class="eyebrow">Área Social</div>
         <h2>Reportes</h2>
         <p class="muted">${escapeHtml(workspaceDisplayName(workspace))}</p>
       </div>
@@ -4039,6 +4329,8 @@ function topBy(items, selector) {
 function personMatchesQuickFilter(persona, filter) {
   if (!filter || filter === "total") return true;
   if (filter === "cedulas_revision") return hasCedulaRevision(persona);
+  if (filter === "observadas") return persona.estadoGeneral === "observada";
+  if (filter === "bloqueadas") return persona.estadoGeneral === "bloqueada";
   if (filter === "adultos_mayores") return Boolean(persona.personaMayor);
   if (filter === "discapacidad") return Boolean(persona.discapacidad);
   if (filter === "etnia") return hasEtnia(persona);
@@ -4049,6 +4341,8 @@ function personMatchesQuickFilter(persona, filter) {
 function personFilterLabel(filter) {
   const labels = {
     cedulas_revision: "cédulas vencidas o por vencer",
+    observadas: "personas observadas",
+    bloqueadas: "personas bloqueadas",
     adultos_mayores: "adultos mayores",
     discapacidad: "personas con discapacidad",
     etnia: "personas con etnia o pueblo originario",
@@ -4594,10 +4888,12 @@ function simpleTable(columns, rows) {
 }
 
 function stat(label, value, tone = "", filter = "") {
+  const displayValue = typeof value === "number" ? formatNumber(value) : cleanString(value);
+  const valueClass = typeof value === "number" ? "value" : "value text-value";
   const content = `
     <p class="label">${escapeHtml(label)}</p>
-    <p class="value">${formatNumber(value)}</p>
-    <p class="stat-hint">Ver lista</p>
+    <p class="${valueClass}">${escapeHtml(displayValue)}</p>
+    <p class="stat-hint">${filter ? "Ver lista" : "Resumen"}</p>
   `;
   if (filter) {
     return `
@@ -4744,7 +5040,7 @@ function clearData() {
   if (!confirm(`Quieres eliminar los datos del comité "${workspaceDisplayName(workspace)}" en este navegador?`)) return;
   state = { personas: [], importaciones: [], gestiones: {}, viviendas: [], viviendaFuente: null };
   saveState();
-  navigate("dashboard");
+  navigate("resumen");
 }
 
 function cleanString(value) {

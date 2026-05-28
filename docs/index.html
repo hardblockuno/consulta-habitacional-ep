@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Consulta Habitacional EP</title>
-    <link rel="stylesheet" href="./styles.css?v=20260527-regla-35uf" />
+    <link rel="stylesheet" href="./styles.css?v=20260528-areas-ep" />
   </head>
   <body>
     <aside class="sidebar">
@@ -16,13 +16,18 @@
         </div>
       </div>
       <nav class="nav" aria-label="Principal">
-        <button class="nav-item primary-action active" data-view="personas" title="Buscar persona">
+        <button class="nav-item primary-action active" data-view="resumen" title="Resumen EP">
+          <span class="icon">EP</span>
+          Resumen EP
+        </button>
+        <p class="nav-section-title">Área Social</p>
+        <button class="nav-item" data-view="dashboard" title="Dashboard social">
+          <span class="icon">DS</span>
+          Dashboard
+        </button>
+        <button class="nav-item" data-view="personas" title="Buscar persona">
           <span class="icon">ID</span>
           BUSCAR PERSONA
-        </button>
-        <button class="nav-item" data-view="dashboard" title="Dashboard">
-          <span class="icon">DB</span>
-          Dashboard
         </button>
         <button class="nav-item secondary-action" data-view="importar" title="Cargar base">
           <span class="icon">UP</span>
@@ -32,13 +37,18 @@
           <span class="icon">!</span>
           Alertas
         </button>
+        <button class="nav-item" data-view="reportes" title="Reportes">
+          <span class="icon">RP</span>
+          Reportes
+        </button>
+        <p class="nav-section-title">Gestión EP</p>
         <button class="nav-item" data-view="gestion" title="Gestión">
           <span class="icon">GT</span>
           Gestión
         </button>
-        <button class="nav-item" data-view="reportes" title="Reportes">
-          <span class="icon">RP</span>
-          Reportes
+        <button class="nav-item" data-view="tecnica" title="Área Técnica">
+          <span class="icon">AT</span>
+          Área Técnica
         </button>
       </nav>
       <div class="workspace-card">
@@ -78,6 +88,6 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-    <script src="./app.js?v=20260528-recalculo-edad"></script>
+    <script src="./app.js?v=20260528-areas-ep"></script>
   </body>
 </html>
