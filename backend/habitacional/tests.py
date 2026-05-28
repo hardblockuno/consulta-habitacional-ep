@@ -1,5 +1,5 @@
 from decimal import Decimal
-from datetime import timedelta
+from datetime import date, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -78,6 +78,40 @@ class ImportadorExcelTests(TestCase):
         persona = Persona.objects.get(nombre="Persona RSH Alto")
         self.assertEqual(persona.estado_general, Persona.ESTADO_APTA)
         self.assertEqual(persona.alertas.count(), 0)
+
+    def test_fecha_nacimiento_dos_digitos_calcula_adulto_mayor(self):
+        with TemporaryDirectory() as tmpdir:
+            archivo = Path(tmpdir) / "BASE COMITE EDAD.xlsx"
+            df = pd.DataFrame(
+                [
+                    ["NOMBRE", "RUT", "FEC NAC", "EDAD"],
+                    ["Persona Mayor Dos Digitos", "33333333", "31/12/59", 66],
+                ]
+            )
+            with pd.ExcelWriter(archivo, engine="openpyxl") as writer:
+                df.to_excel(writer, index=False, header=False, sheet_name="BASE")
+
+            importacion = ImportacionExcel.objects.create(
+                archivo=str(archivo),
+                nombre_archivo=archivo.name,
+            )
+
+            importar_excel(
+                importacion=importacion,
+                archivo_path=archivo,
+                comite_nombre="Comite Edad",
+                comuna="Temuco",
+                ahorro_minimo=Decimal("10"),
+            )
+
+        persona = Persona.objects.get(nombre="Persona Mayor Dos Digitos")
+        nacimiento = date(1959, 12, 31)
+        edad = timezone.localdate().year - nacimiento.year
+        if (timezone.localdate().month, timezone.localdate().day) < (nacimiento.month, nacimiento.day):
+            edad -= 1
+        self.assertEqual(persona.fecha_nacimiento, nacimiento)
+        self.assertEqual(persona.edad, edad)
+        self.assertTrue(persona.persona_mayor)
 
     def test_ahorro_bajo_minimo_no_genera_alerta_ni_observacion(self):
         with TemporaryDirectory() as tmpdir:

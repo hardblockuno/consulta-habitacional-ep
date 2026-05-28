@@ -477,8 +477,16 @@ function normalizeLoadedState(data) {
           inferPersonOriginalValue(persona.original, "tipoVivienda")
       ),
     };
+    const birthAndAge = resolveBirthDateAndAge(
+      persona.fechaNacimiento || inferPersonOriginalValue(persona.original, "fechaNacimiento"),
+      persona.edad ?? inferPersonOriginalValue(persona.original, "edad"),
+      { minExpectedAge: 16 }
+    );
     const normalizedPersona = {
       ...persona,
+      fechaNacimiento: birthAndAge.fechaNacimiento ? birthAndAge.fechaNacimiento.toISOString().slice(0, 10) : "",
+      edad: birthAndAge.edad,
+      personaMayor: birthAndAge.edad !== null && birthAndAge.edad >= 60,
       caracterizacion,
       postulacion,
       documentos,
@@ -1726,18 +1734,18 @@ function applyCorrection(persona, field, rawValue) {
     return setValue(persona, field, value, correctionLabel(field));
   }
   if (field === "fechaNacimiento") {
-    const dateValue = parseDateValue(rawValue);
-    if (!dateValue) return false;
-    const next = dateValue.toISOString().slice(0, 10);
+    const birthAndAge = resolveBirthDateAndAge(rawValue, persona.edad, { minExpectedAge: 16 });
+    if (!birthAndAge.fechaNacimiento) return false;
+    const next = birthAndAge.fechaNacimiento.toISOString().slice(0, 10);
     const applied = setValue(persona, "fechaNacimiento", next, correctionLabel(field));
     if (applied) {
-      persona.edad = calculateAge(dateValue);
-      persona.personaMayor = persona.edad >= 60;
+      persona.edad = birthAndAge.edad;
+      persona.personaMayor = birthAndAge.edad !== null && birthAndAge.edad >= 60;
     }
     return applied;
   }
   if (field === "edad") {
-    const next = parseInteger(rawValue);
+    const next = parseAgeValue(rawValue);
     if (next === null || persona.edad === next) return false;
     addObservation(persona, `Corrección aplicada - Edad: ${persona.edad ?? "Sin dato"} -> ${next}`, "Importación observaciones");
     persona.edad = next;
@@ -2077,8 +2085,9 @@ function rowToPersona(row, headers, columnMap, options) {
   const rut = normalizeRut(value("rut"));
   if (!nombre || !rut || normalize(nombre) === "nombre") return null;
 
-  const fechaNacimiento = parseDateValue(value("fechaNacimiento"));
-  const edad = fechaNacimiento ? calculateAge(fechaNacimiento) : parseInteger(value("edad"));
+  const birthAndAge = resolveBirthDateAndAge(value("fechaNacimiento"), value("edad"), { minExpectedAge: 16 });
+  const fechaNacimiento = birthAndAge.fechaNacimiento;
+  const edad = birthAndAge.edad;
   const rshValue = parseDecimal(value("rsh"));
   const ahorroValue = parseDecimal(value("ahorro"));
   const cedulaVencimiento = parseDateValue(value("cedulaVencimiento"));
@@ -3849,26 +3858,117 @@ function parseInteger(value) {
   return number === null ? null : Math.trunc(number);
 }
 
-function parseDateValue(value) {
+function parseAgeValue(value) {
+  const age = parseInteger(value);
+  return isPlausibleAge(age) ? age : null;
+}
+
+function isPlausibleAge(age) {
+  return Number.isInteger(age) && age >= 0 && age <= 125;
+}
+
+function resolveBirthDateAndAge(rawDate, rawAge, options = {}) {
+  const declaredAge = parseAgeValue(rawAge);
+  const birthDate = parseBirthDateValue(rawDate, declaredAge, options);
+  const calculatedAge = birthDate ? calculateAge(birthDate) : null;
+  return {
+    fechaNacimiento: birthDate && isPlausibleAge(calculatedAge) ? birthDate : null,
+    edad: birthDate && isPlausibleAge(calculatedAge) ? calculatedAge : declaredAge,
+  };
+}
+
+function parseBirthDateValue(rawDate, declaredAge, options = {}) {
+  const primary = parseDateValue(rawDate, { twoDigitYear: "birth" });
+  const alternate = hasTwoDigitYear(rawDate) ? parseDateValue(rawDate, { twoDigitYear: "birthAlternate" }) : null;
+  const candidates = [primary, alternate]
+    .filter(Boolean)
+    .filter((date, index, list) => list.findIndex((other) => sameDay(other, date)) === index)
+    .map((date) => ({ date, age: calculateAge(date) }))
+    .filter((item) => isPlausibleAge(item.age));
+
+  if (!candidates.length) return null;
+  if (declaredAge !== null) {
+    const byDeclaredAge = candidates.find((item) => Math.abs(item.age - declaredAge) <= 1);
+    if (byDeclaredAge) return byDeclaredAge.date;
+    if (hasTwoDigitYear(rawDate)) return null;
+  }
+
+  const minExpectedAge = Number.isFinite(options.minExpectedAge) ? options.minExpectedAge : 0;
+  const expectedCandidate = candidates.find((item) => item.age >= minExpectedAge);
+  return (expectedCandidate || candidates[0]).date;
+}
+
+function parseDateValue(value, options = {}) {
   if (!value) return null;
-  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
-  if (typeof value === "number" && value > 20000 && window.XLSX?.SSF) {
-    const parsed = XLSX.SSF.parse_date_code(value);
-    if (parsed) return new Date(parsed.y, parsed.m - 1, parsed.d);
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return dateFromParts(value.getFullYear(), value.getMonth() + 1, value.getDate());
+  }
+  if (typeof value === "number" && value > 15000 && value < 60000) {
+    const xlsx = typeof window !== "undefined" ? window.XLSX : null;
+    if (xlsx?.SSF) {
+      const parsed = xlsx.SSF.parse_date_code(value);
+      if (parsed) return dateFromParts(parsed.y, parsed.m, parsed.d);
+    }
+    const serialDate = excelSerialToDate(value);
+    if (serialDate) return serialDate;
   }
   const text = cleanString(value);
   if (!text) return null;
-  const ymd = text.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+  const ymd = text.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})(?:\D.*)?$/);
   if (ymd) {
-    return validDate(new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3])));
+    return dateFromParts(Number(ymd[1]), Number(ymd[2]), Number(ymd[3]));
   }
-  const dmy = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  const dmy = text.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})(?:\D.*)?$/);
   if (dmy) {
-    const year = Number(dmy[3].length === 2 ? `20${dmy[3]}` : dmy[3]);
-    return validDate(new Date(year, Number(dmy[2]) - 1, Number(dmy[1])));
+    const year = resolveTwoDigitYear(dmy[3], options.twoDigitYear);
+    return dateFromParts(year, Number(dmy[2]), Number(dmy[1]));
   }
   const date = new Date(text);
+  if (!validDate(date)) return null;
+  return dateFromParts(date.getFullYear(), date.getMonth() + 1, date.getDate());
+}
+
+function resolveTwoDigitYear(yearText, mode = "default") {
+  if (String(yearText).length !== 2) return Number(yearText);
+  const year = Number(yearText);
+  if (mode === "birth") {
+    const currentTwoDigits = new Date().getFullYear() % 100;
+    return year <= currentTwoDigits ? 2000 + year : 1900 + year;
+  }
+  if (mode === "birthAlternate") {
+    const currentTwoDigits = new Date().getFullYear() % 100;
+    return year <= currentTwoDigits ? 1900 + year : 2000 + year;
+  }
+  return 2000 + year;
+}
+
+function hasTwoDigitYear(value) {
+  const text = cleanString(value);
+  return /\b\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2}(?:\D|$)/.test(text);
+}
+
+function excelSerialToDate(value) {
+  const serial = Math.floor(Number(value));
+  if (!Number.isFinite(serial) || serial <= 0) return null;
+  const date = new Date((serial - 25569) * 86400000);
+  return dateFromParts(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+}
+
+function dateFromParts(year, month, day) {
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null;
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
   return validDate(date);
+}
+
+function sameDay(a, b) {
+  return (
+    a instanceof Date &&
+    b instanceof Date &&
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
 }
 
 function validDate(date) {
@@ -3876,13 +3976,14 @@ function validDate(date) {
 }
 
 function calculateAge(birthDate) {
+  if (!validDate(birthDate)) return null;
   const today = new Date();
   let age = today.getFullYear() - birthDate.getFullYear();
   const hadBirthday =
     today.getMonth() > birthDate.getMonth() ||
     (today.getMonth() === birthDate.getMonth() && today.getDate() >= birthDate.getDate());
   if (!hadBirthday) age -= 1;
-  return Math.max(age, 0);
+  return age;
 }
 
 function atStartOfDay(date) {
@@ -4036,8 +4137,9 @@ function normalizeHijo(hijo, index) {
   const nombre = cleanString(hijo.nombre);
   const rut = normalizeRut(hijo.rut) || cleanString(hijo.rut);
   const descripcion = cleanString(hijo.descripcion);
-  const fechaNacimiento = parseDateValue(hijo.fechaNacimiento || hijo.fechaNacimientoRaw);
-  const edad = fechaNacimiento ? calculateAge(fechaNacimiento) : parseInteger(hijo.edad);
+  const birthAndAge = resolveBirthDateAndAge(hijo.fechaNacimiento || hijo.fechaNacimientoRaw, hijo.edad);
+  const fechaNacimiento = birthAndAge.fechaNacimiento;
+  const edad = birthAndAge.edad;
   const fechaCumple18 = fechaNacimiento ? addYears(fechaNacimiento, MAYORIA_EDAD) : null;
   const diasPara18 = fechaCumple18
     ? Math.round((atStartOfDay(fechaCumple18) - atStartOfDay(new Date())) / 86400000)

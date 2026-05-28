@@ -1,4 +1,5 @@
 import math
+import numbers
 import re
 import unicodedata
 from datetime import date, datetime, timedelta
@@ -625,10 +626,11 @@ def procesar_fila(*, fila, columnas, mapa, comite, ahorro_minimo):
     if normalizar_texto(nombre) in {"nombre", "basecomite"}:
         return "omitido"
 
-    fecha_nacimiento = parse_fecha(valor("fecha_nacimiento"))
-    edad = parse_entero(valor("edad"))
-    if fecha_nacimiento:
-        edad = calcular_edad(fecha_nacimiento)
+    fecha_nacimiento, edad = resolver_nacimiento_y_edad(
+        valor("fecha_nacimiento"),
+        valor("edad"),
+        edad_minima=16,
+    )
     persona_mayor = bool(edad is not None and edad >= 60)
     discapacidad = parse_booleano(valor("discapacidad"))
     neurodivergencia = parse_booleano(valor("neurodivergencia"))
@@ -723,10 +725,9 @@ def aplicar_correccion_observacion(persona, campo, raw_value):
     if campo in {"correo", "telefono", "direccion", "sexo", "estado_civil", "nacionalidad", "etnia"}:
         return set_persona(campo, valor, etiqueta_correccion(campo))
     if campo == "fecha_nacimiento":
-        fecha = parse_fecha(raw_value)
+        fecha, edad = resolver_nacimiento_y_edad(raw_value, persona.edad, edad_minima=16)
         if not fecha:
             return False
-        edad = calcular_edad(fecha)
         actual = persona.fecha_nacimiento.isoformat() if persona.fecha_nacimiento else ""
         if actual == fecha.isoformat():
             return False
@@ -740,7 +741,7 @@ def aplicar_correccion_observacion(persona, campo, raw_value):
         )
         return True
     if campo == "edad":
-        edad = parse_entero(raw_value)
+        edad = parse_edad(raw_value)
         if edad is None or persona.edad == edad:
             return False
         actual = persona.edad
@@ -1219,8 +1220,7 @@ def normalizar_hijo(datos, index):
     nombre = limpiar_string(datos.get("nombre"))
     rut = normalizar_rut(datos.get("rut")) or limpiar_string(datos.get("rut"))
     descripcion = limpiar_string(datos.get("descripcion"))
-    fecha_nacimiento = parse_fecha(datos.get("fecha_nacimiento"))
-    edad = calcular_edad(fecha_nacimiento) if fecha_nacimiento else parse_entero(datos.get("edad"))
+    fecha_nacimiento, edad = resolver_nacimiento_y_edad(datos.get("fecha_nacimiento"), datos.get("edad"))
     fecha_cumple_18 = sumar_anios(fecha_nacimiento, MAYORIA_EDAD) if fecha_nacimiento else None
     dias_para_18 = (fecha_cumple_18 - timezone.localdate()).days if fecha_cumple_18 else None
     estado_mayoria_edad = estado_mayoria_edad_hijo(
@@ -1451,9 +1451,55 @@ def parse_entero(valor):
         return None
 
 
-def parse_fecha(valor):
+def parse_edad(valor):
+    edad = parse_entero(valor)
+    return edad if edad_plausible(edad) else None
+
+
+def edad_plausible(edad):
+    return isinstance(edad, int) and 0 <= edad <= 125
+
+
+def resolver_nacimiento_y_edad(valor_fecha, valor_edad, *, edad_minima=0):
+    edad_declarada = parse_edad(valor_edad)
+    fecha_nacimiento = parse_fecha_nacimiento(valor_fecha, edad_declarada, edad_minima=edad_minima)
+    edad_calculada = calcular_edad(fecha_nacimiento) if fecha_nacimiento else None
+    if fecha_nacimiento and edad_plausible(edad_calculada):
+        return fecha_nacimiento, edad_calculada
+    return None, edad_declarada
+
+
+def parse_fecha_nacimiento(valor, edad_declarada=None, *, edad_minima=0):
+    principal = parse_fecha(valor, modo_anio_2="nacimiento")
+    alternativa = parse_fecha(valor, modo_anio_2="nacimiento_alternativo") if tiene_anio_2(valor) else None
+    candidatos = []
+    for fecha in [principal, alternativa]:
+        if not fecha or any(misma_fecha(fecha, item["fecha"]) for item in candidatos):
+            continue
+        edad = calcular_edad(fecha)
+        if edad_plausible(edad):
+            candidatos.append({"fecha": fecha, "edad": edad})
+
+    if not candidatos:
+        return None
+    if edad_declarada is not None:
+        for candidato in candidatos:
+            if abs(candidato["edad"] - edad_declarada) <= 1:
+                return candidato["fecha"]
+        if tiene_anio_2(valor):
+            return None
+
+    for candidato in candidatos:
+        if candidato["edad"] >= edad_minima:
+            return candidato["fecha"]
+    return candidatos[0]["fecha"]
+
+
+def parse_fecha(valor, *, modo_anio_2="default"):
     if valor is None or (isinstance(valor, float) and math.isnan(valor)):
         return None
+    if isinstance(valor, numbers.Real) and not isinstance(valor, bool):
+        return parse_fecha_excel_serial(valor)
     if isinstance(valor, datetime):
         return valor.date()
     if isinstance(valor, date):
@@ -1461,24 +1507,65 @@ def parse_fecha(valor):
     texto = limpiar_string(valor)
     if not texto:
         return None
-    iso = re.match(r"^(\d{4})-(\d{1,2})-(\d{1,2})$", texto)
+    iso = re.match(r"^(\d{4})[./-](\d{1,2})[./-](\d{1,2})(?:\D.*)?$", texto)
     if iso:
-        try:
-            return date(int(iso.group(1)), int(iso.group(2)), int(iso.group(3)))
-        except ValueError:
-            return None
+        return fecha_desde_partes(int(iso.group(1)), int(iso.group(2)), int(iso.group(3)))
+    dmy = re.match(r"^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})(?:\D.*)?$", texto)
+    if dmy:
+        anio = resolver_anio_2(dmy.group(3), modo_anio_2)
+        return fecha_desde_partes(anio, int(dmy.group(2)), int(dmy.group(1)))
     fecha = pd.to_datetime(texto, dayfirst=True, errors="coerce")
     if pd.isna(fecha):
         return None
     return fecha.date()
 
 
+def parse_fecha_excel_serial(valor):
+    serial = int(valor)
+    if serial <= 15000 or serial >= 60000:
+        return None
+    try:
+        return date(1899, 12, 30) + timedelta(days=serial)
+    except OverflowError:
+        return None
+
+
+def resolver_anio_2(texto_anio, modo):
+    if len(str(texto_anio)) != 2:
+        return int(texto_anio)
+    anio = int(texto_anio)
+    actual = timezone.localdate().year % 100
+    if modo == "nacimiento":
+        return 2000 + anio if anio <= actual else 1900 + anio
+    if modo == "nacimiento_alternativo":
+        return 1900 + anio if anio <= actual else 2000 + anio
+    return 2000 + anio
+
+
+def tiene_anio_2(valor):
+    texto = limpiar_string(valor)
+    return bool(re.search(r"\b\d{1,2}[./-]\d{1,2}[./-]\d{2}(?:\D|$)", texto))
+
+
+def fecha_desde_partes(anio, mes, dia):
+    try:
+        return date(anio, mes, dia)
+    except ValueError:
+        return None
+
+
+def misma_fecha(a, b):
+    return bool(a and b and a == b)
+
+
 def calcular_edad(fecha_nacimiento):
+    if not fecha_nacimiento:
+        return None
     hoy = timezone.localdate()
     edad = hoy.year - fecha_nacimiento.year
     if (hoy.month, hoy.day) < (fecha_nacimiento.month, fecha_nacimiento.day):
         edad -= 1
-    return max(edad, 0)
+    return edad
 
 
 def serializar_fila(fila):
