@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Consulta Habitacional EP</title>
-    <link rel="stylesheet" href="./styles.css?v=20260528-areas-ep" />
+    <link rel="stylesheet" href="./styles.css?v=20260528-sidebar-limpio" />
   </head>
   <body>
     <aside class="sidebar">
@@ -17,47 +17,48 @@
       </div>
       <nav class="nav" aria-label="Principal">
         <button class="nav-item primary-action active" data-view="resumen" title="Resumen EP">
-          <span class="icon">EP</span>
-          Resumen EP
+          <span class="icon" aria-hidden="true">EP</span>
+          Resumen
         </button>
-        <p class="nav-section-title">Área Social</p>
+        <p class="nav-section-title">Área social</p>
         <button class="nav-item" data-view="dashboard" title="Dashboard social">
-          <span class="icon">DS</span>
+          <span class="icon" aria-hidden="true">DS</span>
           Dashboard
         </button>
         <button class="nav-item" data-view="personas" title="Buscar persona">
-          <span class="icon">ID</span>
-          BUSCAR PERSONA
+          <span class="icon" aria-hidden="true">ID</span>
+          Personas
         </button>
         <button class="nav-item secondary-action" data-view="importar" title="Cargar base">
-          <span class="icon">UP</span>
-          CARGAR BASE
+          <span class="icon" aria-hidden="true">UP</span>
+          Importar base
         </button>
         <button class="nav-item" data-view="alertas" title="Alertas">
-          <span class="icon">!</span>
+          <span class="icon" aria-hidden="true">!</span>
           Alertas
         </button>
         <button class="nav-item" data-view="reportes" title="Reportes">
-          <span class="icon">RP</span>
+          <span class="icon" aria-hidden="true">RP</span>
           Reportes
         </button>
-        <p class="nav-section-title">Gestión EP</p>
-        <button class="nav-item" data-view="gestion" title="Gestión">
-          <span class="icon">GT</span>
-          Gestión
-        </button>
+        <p class="nav-section-title">Proyecto</p>
         <button class="nav-item" data-view="tecnica" title="Área Técnica">
-          <span class="icon">AT</span>
-          Área Técnica
+          <span class="icon" aria-hidden="true">AT</span>
+          Área técnica
+        </button>
+        <p class="nav-section-title">Seguimiento</p>
+        <button class="nav-item" data-view="gestion" title="Gestión">
+          <span class="icon" aria-hidden="true">GT</span>
+          Gestión
         </button>
       </nav>
       <div class="workspace-card">
-        <p class="label">Comité activo</p>
+        <p class="label">Comité</p>
         <select id="workspaceSelect" class="select workspace-select" aria-label="Comité activo"></select>
         <button id="newWorkspaceBtn" class="button secondary workspace-button" type="button">Nuevo comité</button>
       </div>
       <div class="storage-card">
-        <p class="label">Datos locales</p>
+        <p class="label">Datos guardados</p>
         <p id="storageSummary">0 personas guardadas</p>
       </div>
     </aside>
