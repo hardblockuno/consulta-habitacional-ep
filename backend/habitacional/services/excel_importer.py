@@ -127,7 +127,38 @@ COLUMN_ALIASES = {
     "comuna": ["comuna", "comunapostulacion", "comunaproyecto", "comunadomicilio"],
     "parentesco": ["parentesco", "parentezco"],
     "tipo_familia": ["tipofamilia", "familia", "tipologiadefamilia", "tipologiafamilia"],
-    "grupo_familiar": ["grupofamiliar", "grupfam", "grupofam", "grupohogar", "nucleofamiliar"],
+    "grupo_familiar": [
+        "grupofamiliar",
+        "grupfam",
+        "grupofam",
+        "grupofamiliarsocio",
+        "grupofamiliarpostulante",
+        "grupofamiliartitular",
+        "grupofamiliarbeneficiario",
+        "grupo",
+        "gf",
+        "ngf",
+        "grupohogar",
+        "hogarfamiliar",
+        "nucleofamiliar",
+        "nucleohogar",
+        "nucleofam",
+        "nucleofamilia",
+        "composicionfamiliar",
+        "composiciongrupofamiliar",
+        "composicionhogar",
+        "conformacionfamiliar",
+        "conformaciongrupofamiliar",
+        "estructurafamiliar",
+        "unidadfamiliar",
+        "cantidadgrupofamiliar",
+        "numerogrupofamiliar",
+        "nrogrupofamiliar",
+        "totalgrupofamiliar",
+        "tamanogrupofamiliar",
+        "tamanohogar",
+        "tamanonucleo",
+    ],
     "integrantes": [
         "integrantes",
         "nintegrantes",
@@ -136,6 +167,42 @@ COLUMN_ALIASES = {
         "cantidadintegrantes",
         "totalintegrantes",
         "integrantesgrupofamiliar",
+        "integrantesgrupo",
+        "integrantesfamilia",
+        "integrantesfamiliares",
+        "integranteshogar",
+        "integrantesnucleo",
+        "miembros",
+        "nmiembros",
+        "nromiembros",
+        "numeromiembros",
+        "cantidadmiembros",
+        "totalmiembros",
+        "personasgrupo",
+        "personasfamilia",
+        "personasfamiliares",
+        "personashogar",
+        "personasnucleo",
+        "npersonas",
+        "nropersonas",
+        "numeropersonas",
+        "cantidadpersonas",
+        "totalpersonas",
+        "grupofamiliar",
+        "grupfam",
+        "grupofam",
+        "gf",
+        "ngf",
+        "numerogrupofamiliar",
+        "nrogrupofamiliar",
+        "cantidadgrupofamiliar",
+        "totalgrupofamiliar",
+        "tamanogrupofamiliar",
+        "tamanohogar",
+        "tamanonucleo",
+        "nucleofamiliar",
+        "nucleohogar",
+        "nucleofam",
     ],
     "ahorro": ["ahorro", "saldoahorro", "montoahorro", "ahorrodia", "ahorroal", "saldoctaahorro"],
     "cedula_vencimiento": [
@@ -177,6 +244,7 @@ COLUMN_EXCLUDES = {
     "rut": MAIN_PERSON_EXCLUDES + ["vencimiento", "vence", "vigencia", "caducidad", "expiracion", "fecha", "nombre", "apellido"],
     "fecha_nacimiento": MAIN_PERSON_EXCLUDES + ["vencimiento", "vence", "vigencia", "caducidad", "expiracion", "cedula", "ci"],
     "nacionalidad": MAIN_PERSON_EXCLUDES,
+    "tipo_familia": ["grupo", "integrantes", "miembros", "personas", "nucleo", "hogar", "cantidad", "numero", "nro", "total", "tamano"],
     "cedula_vencimiento": ["hijo", "hija", "carga", "dependiente", "conyuge", "pareja"],
 }
 
@@ -768,17 +836,24 @@ def aplicar_correccion_observacion(persona, campo, raw_value):
     if campo in {"comuna", "parentesco", "tipo_familia", "grupo_familiar"}:
         caracterizacion, _ = CaracterizacionSocial.objects.get_or_create(persona=persona)
         actual = limpiar_string(getattr(caracterizacion, campo, ""))
-        if normalizar_texto(actual) == normalizar_texto(valor):
+        integrantes = parse_integrantes(raw_value) if campo == "grupo_familiar" else None
+        if normalizar_texto(actual) == normalizar_texto(valor) and (
+            integrantes is None or caracterizacion.integrantes == integrantes
+        ):
             return False
         setattr(caracterizacion, campo, valor)
-        caracterizacion.save(update_fields=[campo, "actualizado_en"])
+        update_fields = [campo, "actualizado_en"]
+        if integrantes is not None and caracterizacion.integrantes != integrantes:
+            caracterizacion.integrantes = integrantes
+            update_fields.insert(0, "integrantes")
+        caracterizacion.save(update_fields=update_fields)
         agregar_observacion(
             persona,
             f"Corrección aplicada - {etiqueta_correccion(campo)}: {actual or 'Sin dato'} -> {valor}",
         )
         return True
     if campo == "integrantes":
-        integrantes = parse_entero(raw_value)
+        integrantes = parse_integrantes(raw_value)
         if integrantes is None:
             return False
         caracterizacion, _ = CaracterizacionSocial.objects.get_or_create(persona=persona)
@@ -961,8 +1036,10 @@ def actualizar_relaciones(persona, valor, ahorro_minimo, hijos):
     comuna = limpiar_string(valor("comuna"))
     parentesco = limpiar_string(valor("parentesco"))
     tipo_familia = limpiar_string(valor("tipo_familia"))
-    grupo_familiar = limpiar_string(valor("grupo_familiar"))
-    integrantes = parse_entero(valor("integrantes"))
+    valor_grupo_familiar = valor("grupo_familiar")
+    valor_integrantes = valor("integrantes")
+    integrantes = parse_integrantes(valor_integrantes) or parse_integrantes(valor_grupo_familiar)
+    grupo_familiar = limpiar_string(valor_grupo_familiar or valor_integrantes or (integrantes if integrantes is not None else ""))
     if comuna or parentesco or tipo_familia or grupo_familiar or integrantes is not None or hijos:
         CaracterizacionSocial.objects.update_or_create(
             persona=persona,
@@ -1142,7 +1219,8 @@ def postulacion_es_unipersonal(persona):
     caracterizacion = CaracterizacionSocial.objects.filter(persona=persona).first()
     if not caracterizacion:
         return False
-    if caracterizacion.integrantes == 1:
+    integrantes = parse_integrantes(caracterizacion.integrantes) or parse_integrantes(caracterizacion.grupo_familiar)
+    if integrantes == 1:
         return True
     texto = normalizar_texto(
         " ".join(
@@ -1156,10 +1234,7 @@ def postulacion_es_unipersonal(persona):
             )
         )
     )
-    return any(
-        token in texto
-        for token in ["unipersonal", "personasola", "solopostulante", "sola", "solo"]
-    )
+    return es_unipersonal_texto(texto)
 
 
 def criterios_excepcion_unipersonal(persona):
@@ -1449,6 +1524,108 @@ def parse_entero(valor):
         return int(decimal)
     except (TypeError, ValueError):
         return None
+
+
+def parse_integrantes(valor):
+    if isinstance(valor, numbers.Real) and not isinstance(valor, bool):
+        return integrantes_validos(int(valor))
+    texto = limpiar_string(valor)
+    if not texto:
+        return None
+    normalizado = normalizar_texto(texto)
+    if normalizado in {"no", "sin", "sindato", "noinforma", "noinformado", "noaplica", "noaplicable", "ninguno"}:
+        return None
+    if "%" in texto:
+        return None
+    if es_unipersonal_texto(normalizado):
+        return 1
+    if re.fullmatch(r"\d{1,2}([,.]\d+)?", texto):
+        return integrantes_validos(parse_entero(texto))
+
+    patrones = [
+        r"(?:total|integrantes?|miembros?|personas?|familiares?|grupofamiliar|nucleofamiliar|nucleohogar|hogar|gf)(\d{1,2})",
+        r"(\d{1,2})(?:integrantes?|miembros?|personas?|familiares?|grupofamiliar|nucleofamiliar|nucleohogar|hogar|gf)",
+    ]
+    for patron in patrones:
+        match = re.search(patron, normalizado)
+        if match:
+            integrantes = integrantes_validos(int(match.group(1)))
+            if integrantes is not None:
+                return integrantes
+
+    texto_numero = integrantes_en_palabras(normalizado)
+    if texto_numero is not None:
+        return texto_numero
+
+    numeros = [
+        int(match.group(0))
+        for match in re.finditer(r"\b\d{1,2}\b", texto)
+        if integrantes_validos(int(match.group(0))) is not None
+    ]
+    if not numeros:
+        return None
+    if len(numeros) == 1:
+        return integrantes_validos(numeros[0])
+    tokens_composicion = ["adult", "menor", "nino", "nina", "hijo", "hija", "conyuge", "pareja", "postulante", "dependiente", "carga"]
+    if any(token in normalizado for token in tokens_composicion):
+        return integrantes_validos(sum(numeros))
+    return integrantes_validos(numeros[0])
+
+
+def integrantes_validos(valor):
+    return valor if isinstance(valor, int) and 0 < valor < 100 else None
+
+
+def es_unipersonal_texto(normalizado):
+    return any(
+        token in normalizado
+        for token in [
+            "unipersonal",
+            "personaunica",
+            "personasola",
+            "solopostulante",
+            "solicitantesolo",
+            "solicitantesola",
+            "vivesolo",
+            "vivesola",
+            "solo",
+            "sola",
+        ]
+    )
+
+
+def integrantes_en_palabras(normalizado):
+    palabras = {
+        "uno": 1,
+        "una": 1,
+        "un": 1,
+        "dos": 2,
+        "tres": 3,
+        "cuatro": 4,
+        "cinco": 5,
+        "seis": 6,
+        "siete": 7,
+        "ocho": 8,
+        "nueve": 9,
+        "diez": 10,
+        "once": 11,
+        "doce": 12,
+        "trece": 13,
+        "catorce": 14,
+        "quince": 15,
+    }
+    for palabra, cantidad in palabras.items():
+        if (
+            normalizado == palabra
+            or f"{palabra}integrantes" in normalizado
+            or f"{palabra}personas" in normalizado
+            or f"{palabra}miembros" in normalizado
+            or f"integrantes{palabra}" in normalizado
+            or f"personas{palabra}" in normalizado
+            or f"miembros{palabra}" in normalizado
+        ):
+            return cantidad
+    return None
 
 
 def parse_edad(valor):

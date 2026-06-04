@@ -113,6 +113,37 @@ class ImportadorExcelTests(TestCase):
         self.assertEqual(persona.edad, edad)
         self.assertTrue(persona.persona_mayor)
 
+    def test_detecta_integrantes_con_encabezados_y_textos_flexibles(self):
+        with TemporaryDirectory() as tmpdir:
+            archivo = Path(tmpdir) / "BASE COMITE GRUPO FAMILIAR.xlsx"
+            df = pd.DataFrame(
+                [
+                    ["NOMBRE", "RUT", "FEC NAC", "N° Grupo Familiar"],
+                    ["Persona Grupo Numerico", "44444444", "1990-01-01", "4 integrantes"],
+                    ["Persona Grupo Texto", "55555555", "1991-01-01", "2 adultos + 2 niños"],
+                    ["Persona Unipersonal", "66666666", "1992-01-01", "Unipersonal"],
+                ]
+            )
+            with pd.ExcelWriter(archivo, engine="openpyxl") as writer:
+                df.to_excel(writer, index=False, header=False, sheet_name="BASE")
+
+            importacion = ImportacionExcel.objects.create(
+                archivo=str(archivo),
+                nombre_archivo=archivo.name,
+            )
+
+            importar_excel(
+                importacion=importacion,
+                archivo_path=archivo,
+                comite_nombre="Comite Grupo Familiar",
+                comuna="Temuco",
+                ahorro_minimo=Decimal("10"),
+            )
+
+        self.assertEqual(Persona.objects.get(nombre="Persona Grupo Numerico").caracterizacion_social.integrantes, 4)
+        self.assertEqual(Persona.objects.get(nombre="Persona Grupo Texto").caracterizacion_social.integrantes, 4)
+        self.assertEqual(Persona.objects.get(nombre="Persona Unipersonal").caracterizacion_social.integrantes, 1)
+
     def test_ahorro_bajo_minimo_no_genera_alerta_ni_observacion(self):
         with TemporaryDirectory() as tmpdir:
             archivo = Path(tmpdir) / "BASE COMITE AHORRO.xlsx"

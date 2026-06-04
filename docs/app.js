@@ -113,7 +113,38 @@ const COLUMN_ALIASES = {
   comuna: ["comuna", "comunapostulacion", "comunaproyecto", "comunadomicilio"],
   parentesco: ["parentesco", "parentezco"],
   tipoFamilia: ["tipofamilia", "familia", "tipologiadefamilia", "tipologiafamilia"],
-  grupoFamiliar: ["grupofamiliar", "grupfam", "grupofam", "grupohogar", "nucleofamiliar"],
+  grupoFamiliar: [
+    "grupofamiliar",
+    "grupfam",
+    "grupofam",
+    "grupofamiliarsocio",
+    "grupofamiliarpostulante",
+    "grupofamiliartitular",
+    "grupofamiliarbeneficiario",
+    "grupo",
+    "gf",
+    "ngf",
+    "grupohogar",
+    "hogarfamiliar",
+    "nucleofamiliar",
+    "nucleohogar",
+    "nucleofam",
+    "nucleofamilia",
+    "composicionfamiliar",
+    "composiciongrupofamiliar",
+    "composicionhogar",
+    "conformacionfamiliar",
+    "conformaciongrupofamiliar",
+    "estructurafamiliar",
+    "unidadfamiliar",
+    "cantidadgrupofamiliar",
+    "numerogrupofamiliar",
+    "nrogrupofamiliar",
+    "totalgrupofamiliar",
+    "tamanogrupofamiliar",
+    "tamanohogar",
+    "tamanonucleo",
+  ],
   integrantes: [
     "integrantes",
     "nintegrantes",
@@ -122,6 +153,42 @@ const COLUMN_ALIASES = {
     "cantidadintegrantes",
     "totalintegrantes",
     "integrantesgrupofamiliar",
+    "integrantesgrupo",
+    "integrantesfamilia",
+    "integrantesfamiliares",
+    "integranteshogar",
+    "integrantesnucleo",
+    "miembros",
+    "nmiembros",
+    "nromiembros",
+    "numeromiembros",
+    "cantidadmiembros",
+    "totalmiembros",
+    "personasgrupo",
+    "personasfamilia",
+    "personasfamiliares",
+    "personashogar",
+    "personasnucleo",
+    "npersonas",
+    "nropersonas",
+    "numeropersonas",
+    "cantidadpersonas",
+    "totalpersonas",
+    "grupofamiliar",
+    "grupfam",
+    "grupofam",
+    "gf",
+    "ngf",
+    "numerogrupofamiliar",
+    "nrogrupofamiliar",
+    "cantidadgrupofamiliar",
+    "totalgrupofamiliar",
+    "tamanogrupofamiliar",
+    "tamanohogar",
+    "tamanonucleo",
+    "nucleofamiliar",
+    "nucleohogar",
+    "nucleofam",
   ],
   ahorro: ["ahorro", "saldoahorro", "montoahorro", "ahorrodia", "ahorroal", "saldoctaahorro"],
   cedulaVencimiento: [
@@ -163,6 +230,7 @@ const COLUMN_EXCLUDES = {
   rut: [...MAIN_PERSON_EXCLUDES, "vencimiento", "vence", "vigencia", "caducidad", "expiracion", "fecha", "nombre", "apellido"],
   fechaNacimiento: [...MAIN_PERSON_EXCLUDES, "vencimiento", "vence", "vigencia", "caducidad", "expiracion", "cedula", "ci"],
   nacionalidad: [...MAIN_PERSON_EXCLUDES],
+  tipoFamilia: ["grupo", "integrantes", "miembros", "personas", "nucleo", "hogar", "cantidad", "numero", "nro", "total", "tamano"],
   cedulaVencimiento: ["hijo", "hija", "carga", "dependiente", "conyuge", "pareja"],
   tipoVivienda: ["numero", "numeroviviendas", "nroviviendas", "nviviendas", "cantidad", "total", "uf", "ahorro", "rsh"],
 };
@@ -495,6 +563,14 @@ function normalizeLoadedState(data) {
       .filter((alerta) => !isAhorroAlert(alerta))
       .filter((alerta) => !isRuleManagedAlert(alerta))
       .map(normalizeAlert);
+    const familyCount =
+      parseFamilyMemberCount(caracterizacion.integrantes) ??
+      parseFamilyMemberCount(caracterizacion.grupoFamiliar) ??
+      parseFamilyMemberCount(inferPersonOriginalValue(persona.original, "integrantes")) ??
+      parseFamilyMemberCount(inferPersonOriginalValue(persona.original, "grupoFamiliar"));
+    if (familyCount !== null) {
+      caracterizacion.integrantes = familyCount;
+    }
     if (
       !cleanString(caracterizacion.grupoFamiliar) &&
       caracterizacion.integrantes !== null &&
@@ -2064,7 +2140,15 @@ function applyCorrection(persona, field, rawValue) {
   }
   if (["comuna", "parentesco", "tipoFamilia", "grupoFamiliar"].includes(field)) {
     persona.caracterizacion = persona.caracterizacion || {};
-    return setValue(persona.caracterizacion, field, value, correctionLabel(field));
+    const applied = setValue(persona.caracterizacion, field, value, correctionLabel(field));
+    if (field === "grupoFamiliar") {
+      const nextCount = parseFamilyMemberCount(rawValue);
+      if (nextCount !== null && persona.caracterizacion.integrantes !== nextCount) {
+        persona.caracterizacion.integrantes = nextCount;
+        return true;
+      }
+    }
+    return applied;
   }
   if (field === "tipoVivienda") {
     persona.postulacion = persona.postulacion || {};
@@ -2072,7 +2156,7 @@ function applyCorrection(persona, field, rawValue) {
   }
   if (field === "integrantes") {
     persona.caracterizacion = persona.caracterizacion || {};
-    const next = parseInteger(rawValue);
+    const next = parseFamilyMemberCount(rawValue);
     if (next === null || persona.caracterizacion.integrantes === next) return false;
     addObservation(persona, `Corrección aplicada - Integrantes: ${persona.caracterizacion.integrantes ?? "Sin dato"} -> ${next}`, "Importación observaciones");
     persona.caracterizacion.integrantes = next;
@@ -2397,6 +2481,10 @@ function rowToPersona(row, headers, columnMap, options) {
   const discapacidad = parseBoolean(value("discapacidad"));
   const neurodivergencia = parseBoolean(value("neurodivergencia"));
   const hijos = extractHijosFromEntries(headers.map((header, index) => [header, row[index]]));
+  const rawGrupoFamiliar = value("grupoFamiliar");
+  const rawIntegrantes = value("integrantes");
+  const integrantes = parseFamilyMemberCount(rawIntegrantes) ?? parseFamilyMemberCount(rawGrupoFamiliar);
+  const grupoFamiliar = cleanString(rawGrupoFamiliar || rawIntegrantes || (integrantes !== null ? integrantes : ""));
 
   const persona = {
     id: rut,
@@ -2422,8 +2510,8 @@ function rowToPersona(row, headers, columnMap, options) {
       comuna: cleanString(value("comuna")),
       parentesco: cleanString(value("parentesco")),
       tipoFamilia: cleanString(value("tipoFamilia")),
-      grupoFamiliar: cleanString(value("grupoFamiliar")),
-      integrantes: parseInteger(value("integrantes")),
+      grupoFamiliar,
+      integrantes,
       hijos,
     },
     rsh: {
@@ -3857,6 +3945,77 @@ function inferColumnMapFromData(rows, headerIndex, headers, baseMap = {}) {
     }
   }
 
+  if (!map.grupoFamiliar) {
+    const groupCandidate = bestColumnCandidate(
+      analysis.filter(
+        (item) =>
+          item.values.length > 0 &&
+          item.rutCount === 0 &&
+          item.dateCount === 0 &&
+          !hasAnyToken(item.normalized, ["tipo", "vivienda", "rsh", "ahorro", "telefono", "correo", "rut", "run"])
+      ),
+      (item) =>
+        tokenBonus(item.normalized, ["grupofamiliar", "grupo", "grupfam", "gf", "nucleo", "hogar", "composicion", "conformacion"]) * 2 +
+        item.values.filter((value) => parseFamilyMemberCount(value) !== null || isUnipersonalText(normalize(value))).length
+    );
+    if (
+      groupCandidate &&
+      tokenBonus(groupCandidate.normalized, ["grupofamiliar", "grupo", "grupfam", "gf", "nucleo", "hogar", "composicion", "conformacion"])
+    ) {
+      map.grupoFamiliar = groupCandidate.header;
+    }
+  }
+
+  if (!map.integrantes) {
+    const membersCandidate = bestColumnCandidate(
+      analysis.filter(
+        (item) =>
+          item.values.length > 0 &&
+          item.rutCount === 0 &&
+          item.dateCount === 0 &&
+          !hasAnyToken(item.normalized, ["edad", "rsh", "ahorro", "telefono", "fono", "correo", "rut", "run", "uf", "vivienda"])
+      ),
+      (item) =>
+        tokenBonus(item.normalized, [
+          "integrantes",
+          "miembros",
+          "personas",
+          "grupofamiliar",
+          "grupo",
+          "grupfam",
+          "gf",
+          "nucleo",
+          "hogar",
+          "cantidad",
+          "numero",
+          "nro",
+          "total",
+          "tamano",
+        ]) * 2 + item.values.filter((value) => parseFamilyMemberCount(value) !== null).length * 3
+    );
+    if (
+      membersCandidate &&
+      tokenBonus(membersCandidate.normalized, [
+        "integrantes",
+        "miembros",
+        "personas",
+        "grupofamiliar",
+        "grupo",
+        "grupfam",
+        "gf",
+        "nucleo",
+        "hogar",
+        "cantidad",
+        "numero",
+        "nro",
+        "total",
+        "tamano",
+      ])
+    ) {
+      map.integrantes = membersCandidate.header;
+    }
+  }
+
   inferNameColumns(analysis, map);
   return cleanColumnMap(map);
 }
@@ -4163,6 +4322,104 @@ function parseInteger(value) {
   return number === null ? null : Math.trunc(number);
 }
 
+function parseFamilyMemberCount(value) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return validFamilyMemberCount(Math.trunc(value));
+  }
+  const text = cleanString(value);
+  if (!text) return null;
+  const normalized = normalize(text);
+  if (!normalized || ["no", "sin", "sindato", "noinforma", "noinformado", "noaplica", "noaplicable", "ninguno"].includes(normalized)) {
+    return null;
+  }
+  if (text.includes("%")) return null;
+  if (isUnipersonalText(normalized)) return 1;
+
+  if (/^\d{1,2}([,.]\d+)?$/.test(text)) {
+    return validFamilyMemberCount(parseInteger(text));
+  }
+
+  const explicitPatterns = [
+    /(?:total|integrantes?|miembros?|personas?|familiares?|grupofamiliar|nucleofamiliar|nucleohogar|hogar|gf)(\d{1,2})/,
+    /(\d{1,2})(?:integrantes?|miembros?|personas?|familiares?|grupofamiliar|nucleofamiliar|nucleohogar|hogar|gf)/,
+  ];
+  for (const pattern of explicitPatterns) {
+    const match = normalized.match(pattern);
+    const count = validFamilyMemberCount(Number(match?.[1]));
+    if (count !== null) return count;
+  }
+
+  const wordCount = familyMemberWordCount(normalized);
+  if (wordCount !== null) return wordCount;
+
+  const numbers = [...text.matchAll(/\b\d{1,2}\b/g)]
+    .map((match) => Number(match[0]))
+    .filter((number) => validFamilyMemberCount(number) !== null);
+  if (!numbers.length) return null;
+  if (numbers.length === 1) return validFamilyMemberCount(numbers[0]);
+
+  const compositionTokens = ["adult", "menor", "nino", "nina", "hijo", "hija", "conyuge", "pareja", "postulante", "dependiente", "carga"];
+  if (compositionTokens.some((token) => normalized.includes(token))) {
+    return validFamilyMemberCount(numbers.reduce((sum, number) => sum + number, 0));
+  }
+  return validFamilyMemberCount(numbers[0]);
+}
+
+function validFamilyMemberCount(count) {
+  return Number.isInteger(count) && count > 0 && count < 100 ? count : null;
+}
+
+function isUnipersonalText(normalized) {
+  return [
+    "unipersonal",
+    "personaunica",
+    "personasola",
+    "solopostulante",
+    "solicitantesolo",
+    "solicitantesola",
+    "vive solo",
+    "vive sola",
+    "solo",
+    "sola",
+  ].some((token) => normalized.includes(normalize(token)));
+}
+
+function familyMemberWordCount(normalized) {
+  const words = {
+    uno: 1,
+    una: 1,
+    un: 1,
+    dos: 2,
+    tres: 3,
+    cuatro: 4,
+    cinco: 5,
+    seis: 6,
+    siete: 7,
+    ocho: 8,
+    nueve: 9,
+    diez: 10,
+    once: 11,
+    doce: 12,
+    trece: 13,
+    catorce: 14,
+    quince: 15,
+  };
+  for (const [word, count] of Object.entries(words)) {
+    if (
+      normalized === word ||
+      normalized.includes(`${word}integrantes`) ||
+      normalized.includes(`${word}personas`) ||
+      normalized.includes(`${word}miembros`) ||
+      normalized.includes(`integrantes${word}`) ||
+      normalized.includes(`personas${word}`) ||
+      normalized.includes(`miembros${word}`)
+    ) {
+      return count;
+    }
+  }
+  return null;
+}
+
 function parseAgeValue(value) {
   const age = parseInteger(value);
   return isPlausibleAge(age) ? age : null;
@@ -4376,7 +4633,7 @@ function hasEtnia(persona) {
 
 function isUnipersonal(persona) {
   const caracterizacion = persona?.caracterizacion || {};
-  const integrantes = parseInteger(caracterizacion.integrantes);
+  const integrantes = parseFamilyMemberCount(caracterizacion.integrantes) ?? parseFamilyMemberCount(caracterizacion.grupoFamiliar);
   if (integrantes === 1) return true;
   const text = normalize(
     [
@@ -4387,13 +4644,7 @@ function isUnipersonal(persona) {
       persona?.original?.["Tipo familia"],
     ].filter(Boolean).join(" ")
   );
-  return (
-    text.includes("unipersonal") ||
-    text.includes("personasola") ||
-    text.includes("solopostulante") ||
-    text.includes("sola") ||
-    text.includes("solo")
-  );
+  return isUnipersonalText(text);
 }
 
 function familyMemberCount(persona) {
@@ -4405,8 +4656,8 @@ function familyMemberCount(persona) {
     inferPersonOriginalValue(persona?.original, "grupoFamiliar"),
   ];
   for (const source of sources) {
-    const count = parseInteger(source);
-    if (count !== null && count > 0 && count < 100) return count;
+    const count = parseFamilyMemberCount(source);
+    if (count !== null) return count;
   }
   return isUnipersonal(persona) ? 1 : null;
 }
