@@ -821,6 +821,24 @@ tbody tr:hover {
   margin-top: 8px;
 }
 
+.family-members-cell {
+  display: inline-grid;
+  min-width: 72px;
+  gap: 2px;
+}
+
+.family-members-cell strong {
+  color: #0f172a;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.family-members-cell span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .person-flag {
   display: inline-flex;
   min-height: 22px;

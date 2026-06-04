@@ -1272,7 +1272,7 @@ function renderPersonasTable(query = "", estado = "", filtroRapido = "") {
             <th>Tipo vivienda</th>
             <th>Motivos</th>
             <th>RSH</th>
-            <th>Alertas</th>
+            <th>Integrantes</th>
           </tr>
         </thead>
         <tbody>
@@ -1293,7 +1293,7 @@ function renderPersonasTable(query = "", estado = "", filtroRapido = "") {
                   <td>${escapeHtml(personHousingType(persona) || "Sin dato")}</td>
                   <td>${reasonDetails(persona)}</td>
                   <td>${formatPercent(persona.rsh.porcentaje)}</td>
-                  <td>${persona.alertas.filter((alerta) => alerta.activa).length}</td>
+                  <td>${familyMembersCell(persona)}</td>
                 </tr>
               `
             )
@@ -2960,6 +2960,7 @@ function exportPersonasExcel(query = "", estado = "", filtroRapido = "") {
       "Teléfono",
       "Comité",
       "Tipo de vivienda",
+      "Integrantes grupo familiar",
       "Estado",
       "Motivo principal",
     ],
@@ -2969,6 +2970,7 @@ function exportPersonasExcel(query = "", estado = "", filtroRapido = "") {
       persona.telefono,
       persona.comite.nombre,
       personHousingType(persona) || "Sin dato",
+      familyMemberExportValue(persona),
       statusLabel(persona.estadoGeneral),
       primaryOperationalReason(persona),
     ])
@@ -4392,6 +4394,48 @@ function isUnipersonal(persona) {
     text.includes("sola") ||
     text.includes("solo")
   );
+}
+
+function familyMemberCount(persona) {
+  const caracterizacion = persona?.caracterizacion || {};
+  const sources = [
+    caracterizacion.integrantes,
+    caracterizacion.grupoFamiliar,
+    inferPersonOriginalValue(persona?.original, "integrantes"),
+    inferPersonOriginalValue(persona?.original, "grupoFamiliar"),
+  ];
+  for (const source of sources) {
+    const count = parseInteger(source);
+    if (count !== null && count > 0 && count < 100) return count;
+  }
+  return isUnipersonal(persona) ? 1 : null;
+}
+
+function familyGroupText(persona) {
+  return cleanString(
+    persona?.caracterizacion?.grupoFamiliar ||
+      inferPersonOriginalValue(persona?.original, "grupoFamiliar") ||
+      inferPersonOriginalValue(persona?.original, "integrantes")
+  );
+}
+
+function familyMembersCell(persona) {
+  const count = familyMemberCount(persona);
+  const groupText = familyGroupText(persona);
+  const detail = count !== null
+    ? isUnipersonal(persona) ? "Unipersonal" : count === 1 ? "integrante" : "integrantes"
+    : groupText || "No informado";
+  return `
+    <div class="family-members-cell">
+      <strong>${escapeHtml(count !== null ? count : "Sin dato")}</strong>
+      <span>${escapeHtml(detail)}</span>
+    </div>
+  `;
+}
+
+function familyMemberExportValue(persona) {
+  const count = familyMemberCount(persona);
+  return count !== null ? count : familyGroupText(persona) || "Sin dato";
 }
 
 function exceptionCriteria(persona) {
