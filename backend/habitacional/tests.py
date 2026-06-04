@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from .models import Alerta, Documento, ImportacionExcel, Persona
-from .services.excel_importer import importar_excel, importar_observaciones_excel
+from .services.excel_importer import construir_mapa_columnas, importar_excel, importar_observaciones_excel
 
 
 class ImportadorExcelTests(TestCase):
@@ -143,6 +143,43 @@ class ImportadorExcelTests(TestCase):
         self.assertEqual(Persona.objects.get(nombre="Persona Grupo Numerico").caracterizacion_social.integrantes, 4)
         self.assertEqual(Persona.objects.get(nombre="Persona Grupo Texto").caracterizacion_social.integrantes, 4)
         self.assertEqual(Persona.objects.get(nombre="Persona Unipersonal").caracterizacion_social.integrantes, 1)
+
+    def test_mapea_abreviaciones_de_grupo_familiar(self):
+        for encabezado in ["GRO FAM", "GPO FAM", "GRP FAM", "G FAMILIAR"]:
+            with self.subTest(encabezado=encabezado):
+                mapa = construir_mapa_columnas(["NOMBRE", "RUT", encabezado])
+                self.assertEqual(mapa["grupo_familiar"], encabezado)
+                self.assertEqual(mapa["integrantes"], encabezado)
+                self.assertNotEqual(mapa.get("tipo_familia"), encabezado)
+
+    def test_importa_integrantes_con_encabezado_gro_fam(self):
+        with TemporaryDirectory() as tmpdir:
+            archivo = Path(tmpdir) / "BASE COMITE GRO FAM.xlsx"
+            df = pd.DataFrame(
+                [
+                    ["NOMBRES", "CEDULA IDENTIDAD", "FEC NAC", "GRO FAM", "TIPO FAMILIA"],
+                    ["Persona Abreviacion", "77777777", "1990-01-01", 3, "NUCLEAR"],
+                    ["Persona Unipersonal Abreviacion", "88888888", "1991-01-01", 1, "UNIPERSONAL"],
+                ]
+            )
+            with pd.ExcelWriter(archivo, engine="openpyxl") as writer:
+                df.to_excel(writer, index=False, header=False, sheet_name="BASE")
+
+            importacion = ImportacionExcel.objects.create(
+                archivo=str(archivo),
+                nombre_archivo=archivo.name,
+            )
+
+            importar_excel(
+                importacion=importacion,
+                archivo_path=archivo,
+                comite_nombre="Comite Gro Fam",
+                comuna="Temuco",
+                ahorro_minimo=Decimal("10"),
+            )
+
+        self.assertEqual(Persona.objects.get(nombre="Persona Abreviacion").caracterizacion_social.integrantes, 3)
+        self.assertEqual(Persona.objects.get(nombre="Persona Unipersonal Abreviacion").caracterizacion_social.integrantes, 1)
 
     def test_ahorro_bajo_minimo_no_genera_alerta_ni_observacion(self):
         with TemporaryDirectory() as tmpdir:
