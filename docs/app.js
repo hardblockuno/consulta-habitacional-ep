@@ -713,9 +713,10 @@ function normalizeRukanSocio(source) {
   const grupoFamiliar = Array.isArray(source.grupoFamiliar)
     ? source.grupoFamiliar.map(normalizeRukanMember).filter(Boolean)
     : [];
+  const nombre = cleanPersonName(source.nombre || source.nombres);
   return {
     id: cleanString(source.id) || `rukan-${rut}`,
-    nombre: cleanPersonName(source.nombre || source.nombres),
+    nombre: isReliableRukanPersonName(nombre) ? nombre : "",
     rut,
     sexo: cleanString(source.sexo),
     fechaNacimiento: formatStoredDateValue(source.fechaNacimiento),
@@ -745,11 +746,12 @@ function normalizeRukanMember(source) {
   if (!source || typeof source !== "object") return null;
   const rut = normalizeRut(source.rut);
   const nombre = cleanPersonName(source.nombre);
-  if (!rut && !nombre) return null;
+  const reliableName = isReliableRukanPersonName(nombre) ? nombre : "";
+  if (!rut && !reliableName) return null;
   return {
     orden: parseInteger(source.orden),
     rut,
-    nombre,
+    nombre: reliableName,
     sexo: cleanString(source.sexo),
     parentesco: cleanString(source.parentesco),
     fechaNacimiento: formatStoredDateValue(source.fechaNacimiento),
@@ -3230,7 +3232,7 @@ function rukanSocioRowHtml(socio) {
   return `
     <tr>
       <td>
-        <strong>${escapeHtml(socio.nombre || "Sin nombre")}</strong>
+        <strong>${escapeHtml(socio.nombre || "Sin nombre confiable")}</strong>
         <p class="small muted">${escapeHtml([socio.sexo, socio.fechaNacimiento, socio.edad !== null ? `${socio.edad} anos` : ""].filter(Boolean).join(" · "))}</p>
         ${socio.discapacidad ? `<p class="small muted">Discapacidad: ${escapeHtml(socio.discapacidad)}</p>` : ""}
       </td>
@@ -3271,7 +3273,7 @@ function rukanFamilyDetails(socio) {
           .map(
             (member) => `
               <div class="rukan-family-item">
-                <strong>${escapeHtml(member.nombre || "Sin nombre")}</strong>
+                <strong>${escapeHtml(member.nombre || "Sin nombre confiable")}</strong>
                 <span>${escapeHtml([member.rut, member.parentesco, member.edad !== null ? `${member.edad} anos` : ""].filter(Boolean).join(" · "))}</span>
               </div>
             `
@@ -3633,7 +3635,7 @@ function parseRukanOcrText(text, { fileName = "", confidence = null } = {}) {
   const propiedades = extractRukanProperties(cleaned);
   const subsidios = extractRukanSubsidies(cleaned);
   const minvuConecta = extractRukanMinvu(cleaned);
-  const nombre = member?.nombre || person.nombre;
+  const nombre = firstReliableRukanName(member?.nombre, person.nombre);
   const fechaNacimiento = member?.fechaNacimiento || person.fechaNacimiento;
   const observations = buildRukanObservations({ family, propiedades, subsidios, minvuConecta, confidence, nombre, fechaNacimiento });
   const needsReview = !nombre || !fechaNacimiento || !family.length || (confidence !== null && confidence < 72);
@@ -3676,15 +3678,42 @@ function normalizeOcrText(text) {
 }
 
 function extractRukanConsultedRut(text) {
-  const direct = text.match(/rut\s+consultado\s*:?\s*([0-9.\s]{7,12}-?\s*[0-9kK])/i);
-  if (direct) return normalizeRut(direct[1]);
-  const ruts = extractRuts(text);
-  return ruts[0] || "";
+  const direct = text.match(/rut\s*consult\w*\s*:?\s*([0-9.\s]{7,12}-?\s*[0-9kK])/i);
+  if (direct) {
+    const rut = normalizeRut(direct[1]);
+    if (rut) return rut;
+  }
+  const occurrences = extractRutOccurrences(text);
+  if (!occurrences.length) return "";
+  const byRut = new Map();
+  occurrences.forEach((item) => {
+    if (!byRut.has(item.rut)) byRut.set(item.rut, { rut: item.rut, count: 0, score: 0 });
+    const entry = byRut.get(item.rut);
+    entry.count += 1;
+    const before = text.slice(Math.max(0, item.index - 180), item.index);
+    const after = text.slice(item.index, Math.min(text.length, item.index + 280));
+    const context = normalize(`${before} ${after}`);
+    let score = 10;
+    if (context.includes("rutconsultado") || context.includes("rutconsult")) score += 70;
+    if (context.includes("consultado") && /\b(FEMENINO|MASCULINO)\b/i.test(after)) score += 35;
+    if (/\b(FEMENINO|MASCULINO)\b/i.test(after)) score += 30;
+    if (/\b(SOLTER[AO]|CASAD[AO]|VIUD[AO]|DIVORCIAD[AO]|CONVIVIENTE)\b/i.test(after)) score += 12;
+    if (context.includes("tramocse") || context.includes("fechaencuesta") || context.includes("folio")) score += 18;
+    if (context.includes("integrantesdelhogar")) score += 15;
+    if (context.includes("listadodehijos") || context.includes("conyuge")) score -= 25;
+    entry.score += score;
+  });
+  return [...byRut.values()].sort((a, b) => b.score + b.count * 8 - (a.score + a.count * 8))[0]?.rut || "";
 }
 
 function extractRuts(text) {
-  const matches = cleanString(text).match(/\b\d{1,2}[.\s]?\d{3}[.\s]?\d{3}\s*-?\s*[0-9kK]\b/g) || [];
-  return [...new Set(matches.map(normalizeRut).filter(Boolean))];
+  return [...new Set(extractRutOccurrences(text).map((item) => item.rut))];
+}
+
+function extractRutOccurrences(text) {
+  return [...cleanString(text).matchAll(/\b\d{1,2}[.\s]?\d{3}[.\s]?\d{3}\s*-?\s*[0-9kK]\b/g)]
+    .map((match) => ({ raw: match[0], rut: normalizeRut(match[0]), index: match.index }))
+    .filter((item) => item.rut);
 }
 
 function parseRukanPersonData(text, rut) {
@@ -4138,6 +4167,37 @@ function cleanPersonName(value) {
     tokens.shift();
   }
   return compactNameTokens(tokens).join(" ");
+}
+
+function firstReliableRukanName(...values) {
+  return values.map(cleanPersonName).find(isReliableRukanPersonName) || "";
+}
+
+function isReliableRukanPersonName(value) {
+  const name = cleanString(value);
+  if (!name || normalize(name).includes("sinnombre")) return false;
+  const tokens = name.split(/\s+/).filter(Boolean);
+  if (tokens.length < 2 || tokens.length > 7) return false;
+  if (tokens.some(isRukanNameNoiseToken)) return false;
+  const strongTokens = tokens.filter((token) => token.length >= 3 && !["DEL", "LAS", "LOS"].includes(token)).length;
+  if (strongTokens < 2) return false;
+  const normalized = normalize(name);
+  const forbidden = [
+    "consulta",
+    "registro",
+    "identificacion",
+    "nacimiento",
+    "defuncion",
+    "discapacidad",
+    "integrantes",
+    "hogar",
+    "postulando",
+    "proyecto",
+    "tramocse",
+    "folio",
+    "fechaencuesta",
+  ];
+  return !forbidden.some((item) => normalized.includes(item));
 }
 
 function isRukanNameNoiseToken(token) {
