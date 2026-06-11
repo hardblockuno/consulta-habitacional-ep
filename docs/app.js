@@ -3706,16 +3706,17 @@ function parseRukanPersonBlock(block, rut) {
 }
 
 function parseRukanFamilyMembers(text, rutConsultado) {
-  const section = sectionBetween(text, /integrantes\s+del\s+hogar/i, /datos\s+vivienda|propiedades|subsidios|minvu\s+conecta/i) || text;
+  const section = extractRukanFamilySection(text);
   const compact = section.replace(/\n+/g, " ");
   const ruts = extractRuts(section);
   const members = [];
   ruts.forEach((rut, index) => {
-    const start = findRutIndex(compact, rut);
+    const match = findBestRukanRutMatchInfo(compact, rut);
+    const start = match?.index ?? -1;
     const nextSearchStart = Math.max(start + 4, 0);
-    const next = index < ruts.length - 1 ? findRutIndex(compact.slice(nextSearchStart), ruts[index + 1]) : -1;
+    const next = index < ruts.length - 1 ? findBestRukanRutMatchInfo(compact.slice(nextSearchStart), ruts[index + 1])?.index ?? -1 : -1;
     const end = next >= 0 && start >= 0 ? nextSearchStart + next : compact.length;
-    const raw = start >= 0 ? compact.slice(Math.max(0, start - 12), end) : textAroundRut(section, rut, 360);
+    const raw = start >= 0 ? compact.slice(Math.max(0, start - 120), end) : textAroundRut(section, rut, 360);
     const member = parseRukanMemberBlock(raw, rut, index + 1, rutConsultado);
     if (member.rut || member.nombre) members.push(member);
   });
@@ -3728,6 +3729,17 @@ function parseRukanFamilyMembers(text, rutConsultado) {
     unique.push(member);
   });
   return sortRukanMembers(unique, rutConsultado);
+}
+
+function extractRukanFamilySection(text) {
+  const starts = [...text.matchAll(/(?:integrantes?|lntegrantes?|irteqrantes?|integranles?)\s+del\s+hogar/gi)];
+  if (starts.length) {
+    const start = starts[starts.length - 1].index;
+    const rest = text.slice(start);
+    const end = rest.slice(20).search(/datos\s+vivienda|propiedades|subsidios|minvu\s+conecta|datos\s+del\s+grupo/i);
+    return end >= 0 ? rest.slice(0, end + 20) : rest;
+  }
+  return sectionBetween(text, /registro\s+social\s+de\s+hogares/i, /datos\s+vivienda|propiedades|subsidios|minvu\s+conecta/i) || text;
 }
 
 function parseRukanMemberBlock(block, rut, order, rutConsultado = "") {
@@ -3749,7 +3761,7 @@ function parseRukanMemberBlock(block, rut, order, rutConsultado = "") {
 
 function extractNameBetweenRutAndSex(block, rut, sexo) {
   const text = cleanString(block).replace(/\s+/g, " ");
-  const rutMatch = findRutMatchInfo(text, rut);
+  const rutMatch = findBestRukanRutMatchInfo(text, rut) || findRutMatchInfo(text, rut);
   const rutIndex = rutMatch?.index ?? -1;
   if (rutIndex < 0) return "";
   const afterRut = Math.max(0, rutIndex + rutMatch.raw.length);
@@ -3971,13 +3983,44 @@ function findRutMatchInfo(text, rut) {
   const target = normalizeRut(rut);
   if (!target) return null;
   const compactText = cleanString(text);
-  const rutMatches = [...compactText.matchAll(/\b\d{1,2}[.\s]?\d{3}[.\s]?\d{3}\s*-?\s*[0-9kK]\b/g)];
-  const match = rutMatches.find((item) => normalizeRut(item[0]) === target);
+  const rutMatches = rukanRutMatches(compactText, target);
+  const match = rutMatches[0];
   if (match) return { index: match.index, raw: match[0] };
   const compactRut = target.replace(/\./g, "");
   const patterns = [target, compactRut, target.replace("-", " - "), compactRut.replace("-", "")];
   const index = patterns.reduce((found, pattern) => (found >= 0 ? found : compactText.indexOf(pattern)), -1);
   return index >= 0 ? { index, raw: patterns.find((pattern) => compactText.indexOf(pattern) === index) || target } : null;
+}
+
+function findBestRukanRutMatchInfo(text, rut) {
+  const target = normalizeRut(rut);
+  if (!target) return null;
+  const compactText = cleanString(text);
+  const matches = rukanRutMatches(compactText, target);
+  if (!matches.length) return findRutMatchInfo(compactText, target);
+  const scored = matches.map((match) => {
+    const after = compactText.slice(match.index, Math.min(compactText.length, match.index + 260));
+    const before = compactText.slice(Math.max(0, match.index - 160), match.index);
+    const normalizedAfter = normalize(after);
+    const normalizedBefore = normalize(before);
+    let score = 0;
+    if (/\b(FEMENINO|MASCULINO)\b/i.test(after)) score += 60;
+    if (/\b(SOLTER[AO]|CASAD[AO]|VIUD[AO]|DIVORCIAD[AO])\b/i.test(after)) score += 15;
+    if (normalizedAfter.includes("jef") || normalizedAfter.includes("conyuge") || normalizedAfter.includes("hijo") || normalizedAfter.includes("niet")) score += 25;
+    if (normalizedBefore.includes("integrantesdelhogar")) score += 20;
+    if (normalizedBefore.includes("rutconsultado") && !/\b(FEMENINO|MASCULINO)\b/i.test(after)) score -= 30;
+    if (normalizedAfter.includes("tramocse") || normalizedAfter.includes("folio") || normalizedAfter.includes("fechaencuesta")) score -= 50;
+    if (normalizedBefore.includes("fechayhoradeconsulta")) score -= 20;
+    return { match, score };
+  });
+  scored.sort((a, b) => b.score - a.score || a.match.index - b.match.index);
+  return { index: scored[0].match.index, raw: scored[0].match[0] };
+}
+
+function rukanRutMatches(text, targetRut) {
+  return [...cleanString(text).matchAll(/\b\d{1,2}[.\s]?\d{3}[.\s]?\d{3}\s*-?\s*[0-9kK]\b/g)].filter(
+    (item) => normalizeRut(item[0]) === targetRut
+  );
 }
 
 function sectionBetween(text, startPattern, endPattern) {
@@ -4064,7 +4107,7 @@ function rukanDateCandidates(text) {
 
 function trimRukanNameCandidate(value) {
   return cleanString(value)
-    .replace(/^.*\b(NOMBRES?|DISCAPACIDAD|DISCAPAC\w*|DEFUNCION|DEFUNCI\w*|NACIMIENTO|NACIM\w*)\b/gi, " ")
+    .replace(/^.*\b(NOMBRES?|APELLIDOS?|DISCAPACIDAD|DISCAPAC\w*|DLECAPA\w*|DEFUNCION|DEFUNCI\w*|DOFUNCION|NACIMIENTO|NACIM\w*)\b/gi, " ")
     .replace(/\s+/g, " ");
 }
 
@@ -4080,17 +4123,152 @@ function ageFromStoredDate(value) {
 
 function cleanPersonName(value) {
   const cleaned = cleanString(value)
-    .replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]/g, " ")
-    .replace(/\b(Rut|Nombre|Nombres|Sexo|Femenino|Masculino|Chile|Nacionalidad|Estado|Civil|Pais|Fecha|Hora|Consulta|Consultado|Registro|Recistro|Importante|Informacion|Proporcionada|Servicio|Senicio|Identificacion|Nacimiento|Nacim\w*|Defuncion|Dofuncion|Discapacidad|Discapac\w*)\b/gi, " ")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Za-zÑñ' -]/g, " ")
     .replace(/^-+/, " ")
     .replace(/\s+/g, " ")
     .trim()
     .toUpperCase();
-  const tokens = cleaned.split(" ").filter(Boolean);
-  while (tokens.length > 2 && ["ME", "PA", "CI", "LO", "OE", "O", "A"].includes(tokens[tokens.length - 1])) {
+  const tokens = cleaned.split(" ").filter((token) => token && (token.length > 1 || token === "Y") && !isRukanNameNoiseToken(token));
+  while (tokens.length > 2 && isRukanTrailingNameNoise(tokens[tokens.length - 1])) {
     tokens.pop();
   }
-  return tokens.length > 8 ? tokens.slice(-8).join(" ") : tokens.join(" ");
+  while (tokens.length > 2 && (isRukanTrailingNameNoise(tokens[0]) || ["DE", "DEL", "LA", "LAS", "LOS"].includes(tokens[0]))) {
+    tokens.shift();
+  }
+  return compactNameTokens(tokens).join(" ");
+}
+
+function isRukanNameNoiseToken(token) {
+  const value = normalize(token);
+  const exact = [
+    "ME",
+    "PA",
+    "CI",
+    "LO",
+    "OE",
+    "OA",
+    "NO",
+    "SI",
+    "NE",
+    "RU",
+    "UF",
+    "N",
+    "NRO",
+    "RECTOMECIMIENO",
+    "DLECAPAIDAD",
+    "POR",
+    "EL",
+    "PAR",
+    "ROCE",
+    "ESTA",
+  ].map(normalize);
+  const prefixes = [
+    "rut",
+    "run",
+    "nombr",
+    "apellid",
+    "sexo",
+    "femen",
+    "mascul",
+    "chile",
+    "nacional",
+    "estado",
+    "civil",
+    "solter",
+    "casad",
+    "viud",
+    "divorciad",
+    "conviv",
+    "pais",
+    "pals",
+    "fecha",
+    "focha",
+    "fecna",
+    "fac",
+    "hora",
+    "consulta",
+    "consultad",
+    "registro",
+    "recistro",
+    "social",
+    "hogar",
+    "importante",
+    "inform",
+    "proporcion",
+    "servicio",
+    "senicio",
+    "sorvicio",
+    "identific",
+    "nacid",
+    "nacim",
+    "nucim",
+    "rectomec",
+    "defunc",
+    "dofunc",
+    "detunc",
+    "discap",
+    "dlecap",
+    "conyuge",
+    "listado",
+    "hijo",
+    "integrante",
+    "region",
+    "araucan",
+    "comuna",
+    "temuco",
+    "tramo",
+    "cse",
+    "folio",
+    "encuesta",
+    "parent",
+    "parant",
+    "reserva",
+    "proyect",
+    "proyact",
+    "integracion",
+    "damn",
+    "postul",
+    "postl",
+    "militar",
+    "sarvieio",
+    "wltar",
+    "seo",
+    "seno",
+    "pasa",
+    "melee",
+    "reveno",
+    "memer",
+    "oamroz",
+    "wombre",
+    "tombro",
+    "pocidod",
+    "recto",
+  ];
+  return exact.includes(value) || prefixes.some((prefix) => value.startsWith(prefix));
+}
+
+function isRukanTrailingNameNoise(token) {
+  return ["ME", "PA", "CI", "LO", "OE", "OA", "A", "Y", "NO", "SI", "NE", "RU", "DE", "DEL", "LA", "LAS", "LOS"].includes(
+    cleanString(token).toUpperCase()
+  );
+}
+
+function compactNameTokens(tokens) {
+  const cleaned = tokens.map((token) => cleanString(token).toUpperCase()).filter(Boolean);
+  if (cleaned.length <= 7) return cleaned;
+  const connectors = new Set(["DE", "DEL", "LA", "LAS", "LOS", "Y"]);
+  for (let size = Math.min(7, cleaned.length); size >= 3; size -= 1) {
+    for (let start = 0; start <= cleaned.length - size; start += 1) {
+      const window = cleaned.slice(start, start + size);
+      const strong = window.filter((token) => !connectors.has(token) && token.length > 2).length;
+      if (strong >= 3 && !connectors.has(window[0]) && !connectors.has(window[window.length - 1])) {
+        return window;
+      }
+    }
+  }
+  return cleaned.slice(-7);
 }
 
 function expandSex(value) {
