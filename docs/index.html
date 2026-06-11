@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Consulta Habitacional EP</title>
-    <link rel="stylesheet" href="./styles.css?v=20260604-integrantes" />
+    <link rel="stylesheet" href="./styles.css?v=20260611-rukan-base" />
   </head>
   <body>
     <aside class="sidebar">
@@ -32,6 +32,10 @@
         <button class="nav-item secondary-action" data-view="importar" title="Cargar base">
           <span class="icon" aria-hidden="true">UP</span>
           Importar base
+        </button>
+        <button class="nav-item" data-view="rukan" title="Base Rukan">
+          <span class="icon" aria-hidden="true">RK</span>
+          Base Rukan
         </button>
         <button class="nav-item" data-view="alertas" title="Alertas">
           <span class="icon" aria-hidden="true">!</span>
@@ -87,8 +91,16 @@
     </template>
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+    <script>
+      if (window.pdfjsLib) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+          "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+      }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-    <script src="./app.js?v=20260604-integrantes-grofam"></script>
+    <script src="./app.js?v=20260611-rukan-base"></script>
   </body>
 </html>

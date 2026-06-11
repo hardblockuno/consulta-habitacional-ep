@@ -339,6 +339,7 @@ function navigate(view, params = {}) {
     dashboard: renderDashboard,
     personas: () => renderPersonas(params),
     importar: renderImportar,
+    rukan: renderRukan,
     alertas: renderAlertas,
     gestion: renderGestion,
     reportes: renderReportes,
@@ -430,6 +431,7 @@ function normalizeWorkspace(workspace) {
     gestiones: workspace.gestiones,
     viviendas: workspace.viviendas,
     viviendaFuente: workspace.viviendaFuente,
+    rukanBase: workspace.rukanBase,
   });
   return {
     id: cleanString(workspace.id) || cryptoId(),
@@ -443,6 +445,7 @@ function normalizeWorkspace(workspace) {
     gestiones: normalized.gestiones,
     viviendas: normalized.viviendas,
     viviendaFuente: normalized.viviendaFuente,
+    rukanBase: normalized.rukanBase,
     actualizadoEn: cleanString(workspace.actualizadoEn) || new Date().toISOString(),
   };
 }
@@ -460,6 +463,7 @@ function createWorkspace({ nombre, comuna = "" }) {
     gestiones: {},
     viviendas: [],
     viviendaFuente: null,
+    rukanBase: normalizeRukanBase(),
     actualizadoEn: new Date().toISOString(),
   };
 }
@@ -516,6 +520,7 @@ function getWorkspaceState(workspace) {
     gestiones: workspace?.gestiones || {},
     viviendas: workspace?.viviendas || [],
     viviendaFuente: workspace?.viviendaFuente || null,
+    rukanBase: workspace?.rukanBase || null,
   });
 }
 
@@ -526,6 +531,7 @@ function syncStateToActiveWorkspace() {
   workspace.gestiones = normalizeGestionStore(state.gestiones);
   workspace.viviendas = normalizeHousingRows(state.viviendas || []);
   workspace.viviendaFuente = normalizeHousingSource(state.viviendaFuente);
+  workspace.rukanBase = normalizeRukanBase(state.rukanBase);
   workspace.actualizadoEn = new Date().toISOString();
 }
 
@@ -685,6 +691,86 @@ function normalizeLoadedState(data) {
     gestiones: normalizeGestionStore(data.gestiones),
     viviendas: normalizeHousingRows(data.viviendas || data.tiposVivienda || []),
     viviendaFuente: normalizeHousingSource(data.viviendaFuente),
+    rukanBase: normalizeRukanBase(data.rukanBase),
+  };
+}
+
+function normalizeRukanBase(source = {}) {
+  const socios = Array.isArray(source?.socios)
+    ? source.socios.map(normalizeRukanSocio).filter(Boolean).sort(compareRukanSocios)
+    : [];
+  return {
+    socios,
+    cargas: Array.isArray(source?.cargas) ? source.cargas.map(normalizeRukanLoad).filter(Boolean) : [],
+    actualizadoEn: cleanString(source?.actualizadoEn),
+  };
+}
+
+function normalizeRukanSocio(source) {
+  if (!source || typeof source !== "object") return null;
+  const rut = normalizeRut(source.rut || source.rutConsultado);
+  if (!rut) return null;
+  const grupoFamiliar = Array.isArray(source.grupoFamiliar)
+    ? source.grupoFamiliar.map(normalizeRukanMember).filter(Boolean)
+    : [];
+  return {
+    id: cleanString(source.id) || `rukan-${rut}`,
+    nombre: cleanPersonName(source.nombre || source.nombres),
+    rut,
+    sexo: cleanString(source.sexo),
+    fechaNacimiento: formatStoredDateValue(source.fechaNacimiento),
+    edad: parseAgeValue(source.edad) ?? ageFromStoredDate(source.fechaNacimiento),
+    estadoCivil: cleanString(source.estadoCivil),
+    discapacidad: cleanString(source.discapacidad),
+    rsh: parseInteger(source.rsh) ?? parseInteger(source.tramoRsh),
+    comuna: cleanString(source.comuna),
+    integrantes: parseFamilyMemberCount(source.integrantes) ?? (grupoFamiliar.length || null),
+    parentescoPostulante: cleanString(source.parentescoPostulante),
+    jefaturaHogar: cleanString(source.jefaturaHogar),
+    tipoFamilia: cleanString(source.tipoFamilia) || detectFamilyType(grupoFamiliar),
+    propiedades: cleanString(source.propiedades),
+    subsidios: cleanString(source.subsidios),
+    minvuConecta: cleanString(source.minvuConecta),
+    observaciones: cleanString(source.observaciones),
+    fechaActualizacion: formatStoredDateValue(source.fechaActualizacion) || new Date().toISOString().slice(0, 10),
+    estadoRevision: ["detectado", "por_revisar", "confirmado"].includes(source.estadoRevision) ? source.estadoRevision : "por_revisar",
+    archivo: cleanString(source.archivo),
+    confianza: Number.isFinite(Number(source.confianza)) ? Math.round(Number(source.confianza)) : null,
+    textoOcr: cleanString(source.textoOcr),
+    grupoFamiliar: sortRukanMembers(grupoFamiliar, rut),
+  };
+}
+
+function normalizeRukanMember(source) {
+  if (!source || typeof source !== "object") return null;
+  const rut = normalizeRut(source.rut);
+  const nombre = cleanPersonName(source.nombre);
+  if (!rut && !nombre) return null;
+  return {
+    orden: parseInteger(source.orden),
+    rut,
+    nombre,
+    sexo: cleanString(source.sexo),
+    parentesco: cleanString(source.parentesco),
+    fechaNacimiento: formatStoredDateValue(source.fechaNacimiento),
+    edad: parseAgeValue(source.edad) ?? ageFromStoredDate(source.fechaNacimiento),
+    estaPostulando: cleanString(source.estaPostulando || source.postulando),
+    propiedad: cleanString(source.propiedad),
+    subsidio: cleanString(source.subsidio),
+    observaciones: cleanString(source.observaciones),
+  };
+}
+
+function normalizeRukanLoad(source) {
+  if (!source || typeof source !== "object") return null;
+  return {
+    id: cleanString(source.id) || cryptoId(),
+    archivo: cleanString(source.archivo),
+    fecha: cleanString(source.fecha) || new Date().toISOString(),
+    rut: normalizeRut(source.rut),
+    nombre: cleanPersonName(source.nombre),
+    estado: cleanString(source.estado) || "procesado",
+    confianza: Number.isFinite(Number(source.confianza)) ? Math.round(Number(source.confianza)) : null,
   };
 }
 
@@ -2991,6 +3077,924 @@ function renderGestionTable(query = "", estado = "abiertos", prioridad = "") {
   container.querySelectorAll(".gestion-person-link").forEach((button) => {
     button.addEventListener("click", () => navigate("ficha", { rut: button.dataset.rut }));
   });
+}
+
+function renderRukan() {
+  state.rukanBase = normalizeRukanBase(state.rukanBase);
+  const workspace = getActiveWorkspace();
+  const socios = rukanSocios();
+  const loads = state.rukanBase.cargas || [];
+  const observations = rukanObservationRows();
+  setApp(`
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">Area Social</div>
+        <h2>Base Rukan</h2>
+        <p class="muted">${escapeHtml(workspaceDisplayName(workspace))}</p>
+      </div>
+      <div class="report-actions">
+        <button id="exportRukanBtn" class="button primary" type="button">Exportar Excel</button>
+        <button id="clearRukanBtn" class="button danger" type="button">Limpiar Base Rukan</button>
+      </div>
+    </div>
+    <section class="grid stats">
+      ${stat("Socios Rukan", socios.length)}
+      ${stat("Integrantes familiares", socios.reduce((sum, item) => sum + item.grupoFamiliar.length, 0), "cyan")}
+      ${stat("Por revisar", socios.filter((item) => item.estadoRevision !== "confirmado").length, "amber")}
+      ${stat("Observaciones", observations.length, "rose")}
+    </section>
+    <section class="panel rukan-import-panel" style="margin-top: 18px;">
+      <div class="report-export-head">
+        <div>
+          <h3>Cargar Rukan PDF</h3>
+          <p class="muted">Carga varios Rukan del comite. La lectura se realiza en este navegador mediante OCR y queda guardada en la base online local del comite.</p>
+        </div>
+      </div>
+      <form id="rukanForm" class="grid" style="margin-top: 14px;">
+        <div class="field-row" style="grid-template-columns: minmax(260px, 1fr) 220px;">
+          <label class="field">
+            <span>Archivos Rukan PDF</span>
+            <input id="rukanFiles" class="input" type="file" accept=".pdf,application/pdf" multiple />
+          </label>
+          <label class="field">
+            <span>Comite</span>
+            <input id="rukanComite" class="input" value="${escapeAttr(workspaceDisplayName(workspace))}" />
+          </label>
+        </div>
+        <div id="rukanMessage"></div>
+        <div class="toolbar-row">
+          <button class="button primary" type="submit">Procesar Rukan</button>
+          <span class="small muted">No solicita ClaveUnica ni envia datos a una base publica; el OCR corre desde la web y guarda en este navegador.</span>
+        </div>
+      </form>
+    </section>
+    <section class="panel" style="margin-top: 18px;">
+      <div class="report-export-head">
+        <div>
+          <h3>Base online Rukan</h3>
+          <p class="muted">Una fila por socio, ordenada alfabeticamente. El grupo familiar completo queda disponible en el detalle y en la exportacion Excel.</p>
+        </div>
+        <label class="field rukan-search-field">
+          <span>Buscar</span>
+          <input id="rukanSearch" class="input" placeholder="Nombre, RUT, comuna, observacion" />
+        </label>
+      </div>
+      <div id="rukanBaseResult" style="margin-top: 14px;"></div>
+    </section>
+    <section class="panel" style="margin-top: 18px;">
+      <h3>Ultimos Rukan procesados</h3>
+      ${loads.length
+        ? simpleTable(
+            ["Archivo", "Socio", "RUT", "Fecha", "Estado", "Confianza"],
+            loads.slice(0, 8).map((item) => [
+              item.archivo,
+              item.nombre || "Sin nombre",
+              item.rut || "Sin RUT",
+              formatDateTime(item.fecha),
+              item.estado,
+              item.confianza === null ? "Sin dato" : `${item.confianza}%`,
+            ])
+          )
+        : emptyHtml("Sin Rukan procesados")}
+    </section>
+  `);
+
+  document.getElementById("rukanForm").addEventListener("submit", handleRukanImport);
+  document.getElementById("exportRukanBtn").addEventListener("click", exportRukanExcel);
+  document.getElementById("clearRukanBtn").addEventListener("click", clearRukanBase);
+  document.getElementById("rukanSearch").addEventListener("input", (event) => renderRukanBaseTable(event.target.value));
+  renderRukanBaseTable();
+}
+
+function renderRukanBaseTable(query = "") {
+  const container = document.getElementById("rukanBaseResult");
+  if (!container) return;
+  const q = normalize(query);
+  const rows = rukanSocios().filter((socio) => {
+    if (!q) return true;
+    const text = [
+      socio.nombre,
+      socio.rut,
+      socio.sexo,
+      socio.estadoCivil,
+      socio.discapacidad,
+      socio.rsh,
+      socio.comuna,
+      socio.parentescoPostulante,
+      socio.jefaturaHogar,
+      socio.tipoFamilia,
+      socio.propiedades,
+      socio.subsidios,
+      socio.minvuConecta,
+      socio.observaciones,
+    ].join(" ");
+    return normalize(text).includes(q);
+  });
+  if (!rows.length) {
+    container.innerHTML = emptyHtml("Sin socios Rukan para mostrar");
+    return;
+  }
+  container.innerHTML = `
+    <div class="table-wrap rukan-table-wrap">
+      <table class="rukan-table">
+        <thead>
+          <tr>
+            <th>Nombres</th>
+            <th>RUT</th>
+            <th>RSH</th>
+            <th>Integrantes</th>
+            <th>Parentesco</th>
+            <th>Jefatura hogar</th>
+            <th>Tipo familia</th>
+            <th>Propiedades</th>
+            <th>Subsidios</th>
+            <th>MINVU</th>
+            <th>Revision</th>
+            <th>Grupo familiar</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(rukanSocioRowHtml).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+  container.querySelectorAll(".rukan-review-select").forEach((select) => {
+    select.addEventListener("change", () => updateRukanReview(select.dataset.rut, select.value));
+  });
+}
+
+function rukanSocioRowHtml(socio) {
+  return `
+    <tr>
+      <td>
+        <strong>${escapeHtml(socio.nombre || "Sin nombre")}</strong>
+        <p class="small muted">${escapeHtml([socio.sexo, socio.fechaNacimiento, socio.edad !== null ? `${socio.edad} anos` : ""].filter(Boolean).join(" · "))}</p>
+        ${socio.discapacidad ? `<p class="small muted">Discapacidad: ${escapeHtml(socio.discapacidad)}</p>` : ""}
+      </td>
+      <td>${escapeHtml(socio.rut)}</td>
+      <td>${socio.rsh === null || socio.rsh === undefined ? "Sin dato" : `${escapeHtml(socio.rsh)}%`}</td>
+      <td>${escapeHtml(socio.integrantes || socio.grupoFamiliar.length || "Sin dato")}</td>
+      <td>${escapeHtml(socio.parentescoPostulante || "Sin dato")}</td>
+      <td>${escapeHtml(socio.jefaturaHogar || "Sin dato")}</td>
+      <td>${escapeHtml(socio.tipoFamilia || "Por revisar")}</td>
+      <td>${rukanRiskCell(socio.propiedades)}</td>
+      <td>${rukanRiskCell(socio.subsidios)}</td>
+      <td>${escapeHtml(socio.minvuConecta || "Sin dato")}</td>
+      <td>
+        <select class="select rukan-review-select" data-rut="${escapeAttr(socio.rut)}">
+          ${rukanReviewOptions(socio.estadoRevision)}
+        </select>
+        <p class="small muted">${escapeHtml(socio.fechaActualizacion || "Sin fecha")}</p>
+      </td>
+      <td>${rukanFamilyDetails(socio)}</td>
+    </tr>
+  `;
+}
+
+function rukanRiskCell(value) {
+  const text = cleanString(value);
+  if (!text) return "Sin dato";
+  const risky = normalize(text).includes("vigente") || normalize(text).includes("detectad") || normalize(text).includes("habitacion");
+  return `<span class="rukan-risk ${risky ? "warning" : ""}">${escapeHtml(text)}</span>`;
+}
+
+function rukanFamilyDetails(socio) {
+  if (!socio.grupoFamiliar.length) return `<span class="small muted">Sin detalle</span>`;
+  return `
+    <details class="rukan-family-details">
+      <summary>${formatNumber(socio.grupoFamiliar.length)} integrantes</summary>
+      <div class="rukan-family-list">
+        ${socio.grupoFamiliar
+          .map(
+            (member) => `
+              <div class="rukan-family-item">
+                <strong>${escapeHtml(member.nombre || "Sin nombre")}</strong>
+                <span>${escapeHtml([member.rut, member.parentesco, member.edad !== null ? `${member.edad} anos` : ""].filter(Boolean).join(" · "))}</span>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+    </details>
+  `;
+}
+
+function rukanReviewOptions(selected) {
+  return [
+    ["por_revisar", "Por revisar"],
+    ["detectado", "Detectado"],
+    ["confirmado", "Confirmado"],
+  ]
+    .map(([value, label]) => `<option value="${value}" ${selected === value ? "selected" : ""}>${label}</option>`)
+    .join("");
+}
+
+function updateRukanReview(rut, estadoRevision) {
+  state.rukanBase = normalizeRukanBase(state.rukanBase);
+  const socio = state.rukanBase.socios.find((item) => item.rut === rut);
+  if (!socio) return;
+  socio.estadoRevision = estadoRevision;
+  state.rukanBase = normalizeRukanBase(state.rukanBase);
+  saveState();
+}
+
+function clearRukanBase() {
+  if (!confirm("Quieres eliminar la Base Rukan de este comite en este navegador?")) return;
+  state.rukanBase = normalizeRukanBase();
+  saveState();
+  renderRukan();
+}
+
+async function handleRukanImport(event) {
+  event.preventDefault();
+  const message = document.getElementById("rukanMessage");
+  const files = [...document.getElementById("rukanFiles").files].filter((file) => file.type === "application/pdf" || /\.pdf$/i.test(file.name));
+  const comiteNombre = cleanString(document.getElementById("rukanComite").value);
+  if (comiteNombre) ensureWorkspace(comiteNombre, getActiveWorkspace().comuna, true);
+  if (!files.length) {
+    message.innerHTML = notice("Selecciona uno o mas Rukan en PDF.", "error");
+    return;
+  }
+  if (!window.pdfjsLib) {
+    message.innerHTML = notice("No se pudo cargar el lector PDF. Revisa la conexion a internet y vuelve a intentar.", "error");
+    return;
+  }
+
+  message.innerHTML = notice(`Preparando OCR para ${formatNumber(files.length)} archivo(s)...`);
+  let processed = 0;
+  let omitted = 0;
+  for (const file of files) {
+    try {
+      const parsed = await processRukanPdf(file, (text) => {
+        message.innerHTML = notice(`${file.name}: ${text}`);
+      });
+      if (!parsed?.rut) {
+        omitted += 1;
+        registerRukanLoad({ archivo: file.name, estado: "sin_rut", confianza: parsed?.confianza });
+        continue;
+      }
+      upsertRukanSocio(parsed);
+      registerRukanLoad({
+        archivo: file.name,
+        rut: parsed.rut,
+        nombre: parsed.nombre,
+        estado: parsed.estadoRevision,
+        confianza: parsed.confianza,
+      });
+      processed += 1;
+      saveState();
+    } catch (error) {
+      omitted += 1;
+      registerRukanLoad({ archivo: file.name, estado: "error", confianza: null });
+      saveState();
+      console.error(error);
+    }
+  }
+  message.innerHTML = notice(`Rukan procesados: ${formatNumber(processed)} actualizados, ${formatNumber(omitted)} omitidos.`, processed ? "success" : "error");
+  renderRukan();
+}
+
+async function processRukanPdf(file, onProgress = () => {}) {
+  const buffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+  const texts = [];
+  const confidences = [];
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    onProgress(`leyendo pagina ${pageNumber} de ${pdf.numPages}`);
+    const page = await pdf.getPage(pageNumber);
+    const embeddedText = await extractPdfPageText(page);
+    if (embeddedText.length > 120) {
+      texts.push(embeddedText);
+      confidences.push(95);
+      continue;
+    }
+    const canvas = await renderPdfPageForOcr(page);
+    const result = await runRukanOcr(canvas, (status) => {
+      if (status) onProgress(`pagina ${pageNumber}: ${status}`);
+    });
+    texts.push(result.text);
+    if (Number.isFinite(result.confidence)) confidences.push(result.confidence);
+  }
+  const confidence = confidences.length ? Math.round(confidences.reduce((sum, item) => sum + item, 0) / confidences.length) : null;
+  return parseRukanOcrText(texts.join("\n\n"), { fileName: file.name, confidence });
+}
+
+async function extractPdfPageText(page) {
+  try {
+    const content = await page.getTextContent();
+    return cleanString((content.items || []).map((item) => item.str).join(" "));
+  } catch {
+    return "";
+  }
+}
+
+async function renderPdfPageForOcr(page) {
+  const viewport = page.getViewport({ scale: 2.25 });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.floor(viewport.width);
+  canvas.height = Math.floor(viewport.height);
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  await page.render({ canvasContext: context, viewport }).promise;
+  return enhanceCanvasForOcr(canvas);
+}
+
+function enhanceCanvasForOcr(source) {
+  const canvas = document.createElement("canvas");
+  canvas.width = source.width;
+  canvas.height = source.height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(source, 0, 0);
+  const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = image.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+    const adjusted = Math.max(0, Math.min(255, (gray - 150) * 1.65 + 150));
+    data[i] = adjusted;
+    data[i + 1] = adjusted;
+    data[i + 2] = adjusted;
+  }
+  ctx.putImageData(image, 0, 0);
+  return canvas;
+}
+
+async function runRukanOcr(canvas, onProgress = () => {}) {
+  if (!window.Tesseract) {
+    throw new Error("No se pudo cargar el motor OCR para leer PDF escaneados.");
+  }
+  const options = {
+    logger: (event) => {
+      if (!event?.status) return;
+      const pct = Number.isFinite(event.progress) ? ` ${Math.round(event.progress * 100)}%` : "";
+      onProgress(`${event.status}${pct}`);
+    },
+  };
+  try {
+    const result = await Tesseract.recognize(canvas, "spa", options);
+    return { text: result?.data?.text || "", confidence: result?.data?.confidence };
+  } catch {
+    const result = await Tesseract.recognize(canvas, "eng", options);
+    return { text: result?.data?.text || "", confidence: result?.data?.confidence };
+  }
+}
+
+function upsertRukanSocio(socio) {
+  if (!socio?.rut) return;
+  state.rukanBase = normalizeRukanBase(state.rukanBase);
+  const index = state.rukanBase.socios.findIndex((item) => item.rut === socio.rut);
+  if (index >= 0) {
+    state.rukanBase.socios[index] = normalizeRukanSocio({
+      ...state.rukanBase.socios[index],
+      ...socio,
+      grupoFamiliar: socio.grupoFamiliar?.length ? socio.grupoFamiliar : state.rukanBase.socios[index].grupoFamiliar,
+    });
+  } else {
+    state.rukanBase.socios.push(normalizeRukanSocio(socio));
+  }
+  state.rukanBase.socios = rukanSocios();
+  state.rukanBase.actualizadoEn = new Date().toISOString();
+}
+
+function registerRukanLoad(load) {
+  state.rukanBase = normalizeRukanBase(state.rukanBase);
+  state.rukanBase.cargas.unshift(normalizeRukanLoad(load));
+  state.rukanBase.cargas = state.rukanBase.cargas.slice(0, 40);
+}
+
+function rukanSocios() {
+  return normalizeRukanBase(state.rukanBase).socios;
+}
+
+function exportRukanExcel() {
+  if (!window.XLSX) {
+    alert("No se pudo cargar el generador Excel. Revisa la conexion a internet y vuelve a intentar.");
+    return;
+  }
+  const socios = rukanSocios();
+  if (!socios.length) {
+    alert("No hay Base Rukan para exportar.");
+    return;
+  }
+  const workbook = XLSX.utils.book_new();
+  appendSheet(workbook, "Base socios", rukanBaseHeaders(), socios.map(rukanBaseExportRow));
+  appendSheet(workbook, "Grupo familiar", rukanFamilyHeaders(), rukanFamilyExportRows(socios));
+  appendSheet(workbook, "Observaciones Rukan", rukanObservationHeaders(), rukanObservationRows(socios));
+  XLSX.writeFile(workbook, `${excelFileName("base-rukan")}.xlsx`);
+}
+
+function appendSheet(workbook, name, headers, rows) {
+  const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  worksheet["!cols"] = headers.map((header) => ({ wch: Math.min(Math.max(cleanString(header).length + 8, 14), 48) }));
+  XLSX.utils.book_append_sheet(workbook, worksheet, name);
+}
+
+function rukanBaseHeaders() {
+  return [
+    "Nombres",
+    "RUT",
+    "Sexo",
+    "Fecha nacimiento",
+    "Edad",
+    "Estado civil",
+    "Discapacidad",
+    "RSH",
+    "Comuna",
+    "Integrantes grupo familiar",
+    "Parentesco del postulante",
+    "Jefatura de hogar",
+    "Tipo familia detectado",
+    "Propiedades detectadas",
+    "Subsidios detectados",
+    "MINVU Conecta",
+    "Observaciones Rukan",
+    "Fecha de actualizacion Rukan",
+    "Estado de revision",
+  ];
+}
+
+function rukanBaseExportRow(socio) {
+  return [
+    socio.nombre,
+    socio.rut,
+    socio.sexo,
+    socio.fechaNacimiento,
+    socio.edad,
+    socio.estadoCivil,
+    socio.discapacidad,
+    socio.rsh === null || socio.rsh === undefined ? "" : `${socio.rsh}%`,
+    socio.comuna,
+    socio.integrantes || socio.grupoFamiliar.length,
+    socio.parentescoPostulante,
+    socio.jefaturaHogar,
+    socio.tipoFamilia,
+    socio.propiedades,
+    socio.subsidios,
+    socio.minvuConecta,
+    socio.observaciones,
+    socio.fechaActualizacion,
+    rukanReviewLabel(socio.estadoRevision),
+  ];
+}
+
+function rukanFamilyHeaders() {
+  return [
+    "Socio titular",
+    "RUT socio titular",
+    "Orden integrante",
+    "Nombre integrante",
+    "RUT integrante",
+    "Parentesco",
+    "Sexo",
+    "Fecha nacimiento",
+    "Edad",
+    "Esta postulando",
+    "Propiedad detectada",
+    "Subsidio detectado",
+    "Observaciones",
+  ];
+}
+
+function rukanFamilyExportRows(socios) {
+  return socios.flatMap((socio) =>
+    sortRukanMembers(socio.grupoFamiliar, socio.rut).map((member, index) => [
+      socio.nombre,
+      socio.rut,
+      index + 1,
+      member.nombre,
+      member.rut,
+      member.parentesco,
+      member.sexo,
+      member.fechaNacimiento,
+      member.edad,
+      member.estaPostulando,
+      member.propiedad,
+      member.subsidio,
+      member.observaciones,
+    ])
+  );
+}
+
+function rukanObservationHeaders() {
+  return ["Socio titular", "RUT socio titular", "Tipo observacion", "Detalle", "Fuente", "Estado"];
+}
+
+function rukanObservationRows(source = rukanSocios()) {
+  return source.flatMap((socio) => {
+    const items = splitRukanObservations(socio.observaciones);
+    return items.length
+      ? items.map((detail) => [socio.nombre, socio.rut, classifyRukanObservation(detail), detail, socio.archivo || "Rukan", rukanReviewLabel(socio.estadoRevision)])
+      : [];
+  });
+}
+
+function parseRukanOcrText(text, { fileName = "", confidence = null } = {}) {
+  const cleaned = normalizeOcrText(text);
+  const rut = extractRukanConsultedRut(cleaned);
+  const person = parseRukanPersonData(cleaned, rut);
+  const family = parseRukanFamilyMembers(cleaned, rut);
+  const member = family.find((item) => item.rut === rut);
+  const jefatura = family.find((item) => normalize(item.parentesco).includes("jefe"));
+  const rsh = extractRukanRsh(cleaned);
+  const comuna = extractRukanComuna(cleaned) || getActiveWorkspace().comuna;
+  const propiedades = extractRukanProperties(cleaned);
+  const subsidios = extractRukanSubsidies(cleaned);
+  const minvuConecta = extractRukanMinvu(cleaned);
+  const observations = buildRukanObservations({ family, propiedades, subsidios, minvuConecta, confidence });
+  return normalizeRukanSocio({
+    id: `rukan-${rut || cryptoId()}`,
+    archivo: fileName,
+    rut,
+    nombre: member?.nombre || person.nombre,
+    sexo: member?.sexo || person.sexo,
+    fechaNacimiento: member?.fechaNacimiento || person.fechaNacimiento,
+    edad: member?.edad ?? person.edad,
+    estadoCivil: person.estadoCivil,
+    discapacidad: person.discapacidad,
+    rsh,
+    comuna,
+    integrantes: family.length || null,
+    parentescoPostulante: member?.parentesco,
+    jefaturaHogar: jefatura ? [jefatura.nombre, jefatura.rut].filter(Boolean).join(" - ") : "",
+    tipoFamilia: detectFamilyType(family),
+    propiedades,
+    subsidios,
+    minvuConecta,
+    observaciones: observations.join("; "),
+    fechaActualizacion: new Date().toISOString().slice(0, 10),
+    estadoRevision: confidence !== null && confidence >= 72 && family.length ? "detectado" : "por_revisar",
+    confianza: confidence,
+    textoOcr: cleaned,
+    grupoFamiliar: family,
+  });
+}
+
+function normalizeOcrText(text) {
+  return cleanString(text)
+    .replace(/\r/g, "\n")
+    .replace(/[|]/g, " ")
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/\s+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n");
+}
+
+function extractRukanConsultedRut(text) {
+  const direct = text.match(/rut\s+consultado\s*:?\s*([0-9.\s]{7,12}-?\s*[0-9kK])/i);
+  if (direct) return normalizeRut(direct[1]);
+  const ruts = extractRuts(text);
+  return ruts[0] || "";
+}
+
+function extractRuts(text) {
+  const matches = cleanString(text).match(/\b\d{1,2}[.\s]?\d{3}[.\s]?\d{3}\s*-?\s*[0-9kK]\b/g) || [];
+  return [...new Set(matches.map(normalizeRut).filter(Boolean))];
+}
+
+function parseRukanPersonData(text, rut) {
+  return parseRukanPersonBlock(textAroundRut(text, rut, 500), rut);
+}
+
+function parseRukanPersonBlock(block, rut) {
+  const sexo = firstMatch(block, /\b(FEMENINO|MASCULINO|F|M)\b/i);
+  const estadoCivil = firstMatch(block, /\b(SOLTER[AO]|CASAD[AO]|DIVORCIAD[AO]|VIUD[AO]|CONVIVIENTE)\b/i);
+  const fechaNacimiento = firstDate(block);
+  return {
+    nombre: extractNameBetweenRutAndSex(block, rut, sexo),
+    sexo: expandSex(sexo),
+    fechaNacimiento,
+    edad: ageFromStoredDate(fechaNacimiento),
+    estadoCivil: estadoCivil ? estadoCivil.toUpperCase() : "",
+    discapacidad: extractDisability(block),
+  };
+}
+
+function parseRukanFamilyMembers(text, rutConsultado) {
+  const section = sectionBetween(text, /integrantes\s+del\s+hogar/i, /datos\s+vivienda|propiedades|subsidios|minvu\s+conecta/i) || text;
+  const compact = section.replace(/\n+/g, " ");
+  const ruts = extractRuts(section);
+  const members = [];
+  ruts.forEach((rut, index) => {
+    const start = findRutIndex(compact, rut);
+    const nextSearchStart = Math.max(start + 4, 0);
+    const next = index < ruts.length - 1 ? findRutIndex(compact.slice(nextSearchStart), ruts[index + 1]) : -1;
+    const end = next >= 0 && start >= 0 ? nextSearchStart + next : compact.length;
+    const raw = start >= 0 ? compact.slice(Math.max(0, start - 12), end) : textAroundRut(section, rut, 360);
+    const member = parseRukanMemberBlock(raw, rut, index + 1);
+    if (member.rut || member.nombre) members.push(member);
+  });
+  const unique = [];
+  const seen = new Set();
+  members.forEach((member) => {
+    const key = member.rut || normalize(member.nombre);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    unique.push(member);
+  });
+  return sortRukanMembers(unique, rutConsultado);
+}
+
+function parseRukanMemberBlock(block, rut, order) {
+  const sexo = firstMatch(block, /\b(FEMENINO|MASCULINO|F|M)\b/i);
+  const fechaNacimiento = firstDate(block);
+  const normalized = normalize(block);
+  return normalizeRukanMember({
+    orden: order,
+    rut,
+    nombre: extractNameBetweenRutAndSex(block, rut, sexo),
+    sexo: expandSex(sexo),
+    parentesco: extractRelationship(block, sexo, fechaNacimiento),
+    fechaNacimiento,
+    edad: ageFromStoredDate(fechaNacimiento),
+    estaPostulando: normalized.includes("estapostulandosi") ? "SI" : normalized.includes("estapostulandono") ? "NO" : "",
+  });
+}
+
+function extractNameBetweenRutAndSex(block, rut, sexo) {
+  const text = cleanString(block).replace(/\s+/g, " ");
+  const rutMatch = findRutMatchInfo(text, rut);
+  const rutIndex = rutMatch?.index ?? -1;
+  const sexIndex = sexo ? text.toUpperCase().indexOf(sexo.toUpperCase(), Math.max(rutIndex, 0)) : -1;
+  if (rutIndex < 0 || sexIndex < 0 || sexIndex <= rutIndex) return "";
+  return cleanPersonName(text.slice(rutIndex + rutMatch.raw.length, sexIndex));
+}
+
+function extractRelationship(block, sexo, fechaNacimiento) {
+  let text = cleanString(block).replace(/\s+/g, " ");
+  if (sexo) {
+    const sexIndex = text.toUpperCase().indexOf(sexo.toUpperCase());
+    if (sexIndex >= 0) text = text.slice(sexIndex + sexo.length);
+  }
+  if (fechaNacimiento) {
+    const dateIndex = text.indexOf(fechaNacimiento);
+    if (dateIndex >= 0) text = text.slice(0, dateIndex);
+  }
+  return cleanString(
+    text
+      .replace(/\b(FEMENINO|MASCULINO|F|M)\b/gi, " ")
+      .replace(/\b\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b/g, " ")
+      .replace(/\b(Servicio Militar|Esta Postulando|Reserva Proyectos de Integracion|Damnificado)\b/gi, " ")
+      .replace(/\b(SI|NO|S|N)\b/gi, " ")
+  );
+}
+
+function extractRukanRsh(text) {
+  const tramo = firstMatch(text, /tramo\s*cse[\s\S]{0,80}?(\d{1,3})\s*%/i, 1);
+  if (tramo) return parseInteger(tramo);
+  const ingreso = firstMatch(text, /rsh\s+de\s+ingreso[\s\S]{0,80}?(\d{1,3})\s*%/i, 1);
+  if (ingreso) return parseInteger(ingreso);
+  const anyPercent = firstMatch(text, /\b(\d{1,3})\s*%/i, 1);
+  return parseInteger(anyPercent);
+}
+
+function extractRukanComuna(text) {
+  const matches = [...text.matchAll(/comuna\s+([A-ZÁÉÍÓÚÑa-záéíóúñ ]{3,35})/gi)]
+    .map((match) => cleanString(match[1]).split(/\s{2,}|\n/)[0])
+    .map((value) => value.replace(/\b(Rut|Destino|Estado|Region|Provincia)\b.*$/i, "").trim())
+    .filter((value) => value && !normalize(value).includes("comuna"));
+  return matches.find(Boolean) || detectKnownComuna(text);
+}
+
+function detectKnownComuna(text) {
+  const known = [
+    "Angol",
+    "Carahue",
+    "Cholchol",
+    "Collipulli",
+    "Cunco",
+    "Curacautin",
+    "Curarrehue",
+    "Ercilla",
+    "Freire",
+    "Galvarino",
+    "Gorbea",
+    "Lautaro",
+    "Loncoche",
+    "Lonquimay",
+    "Los Sauces",
+    "Lumaco",
+    "Melipeuco",
+    "Nueva Imperial",
+    "Padre Las Casas",
+    "Perquenco",
+    "Pitrufquen",
+    "Pucon",
+    "Puren",
+    "Renaico",
+    "Saavedra",
+    "Temuco",
+    "Teodoro Schmidt",
+    "Tolten",
+    "Traiguen",
+    "Victoria",
+    "Vilcun",
+    "Villarrica",
+  ];
+  const normalized = normalize(text);
+  return known.find((comuna) => normalized.includes(normalize(comuna))) || "";
+}
+
+function extractRukanProperties(text) {
+  const normalized = normalize(text);
+  const parts = [];
+  if (normalized.includes("noseencuentranregistrosensii") || normalized.includes("noseencontraronregistrosensii")) {
+    parts.push("Postulante sin registros SII");
+  }
+  if (normalized.includes("destinodelapropiedad") || normalized.includes("habitacion")) {
+    parts.push("Integrante hogar con propiedad habitacion");
+  }
+  return parts.join("; ") || "Sin dato";
+}
+
+function extractRukanSubsidies(text) {
+  const normalized = normalize(text);
+  const parts = [];
+  const noActiveSubsidy = normalized.includes("nocuentaconsubsidiosvigentes") || normalized.includes("nocuentaconsubsidiovigente");
+  if (noActiveSubsidy) parts.push("Postulante sin subsidios vigentes");
+  const hasKnownProgram = normalized.includes("fondosolidario") || normalized.includes("programadeproteccion");
+  const hasActiveSubsidy = hasKnownProgram || (!noActiveSubsidy && normalized.includes("subsidio") && normalized.includes("vigente"));
+  if (hasActiveSubsidy) {
+    const programs = [];
+    if (normalized.includes("fondosolidario")) programs.push("Fondo Solidario");
+    if (normalized.includes("programadeproteccion")) programs.push("Proteccion Patrimonio Familiar");
+    parts.push(`Integrante hogar con subsidio vigente${programs.length ? ` (${programs.join(", ")})` : ""}`);
+  }
+  return parts.join("; ") || "Sin dato";
+}
+
+function extractRukanMinvu(text) {
+  const normalized = normalize(text);
+  const parts = [];
+  if (normalized.includes("tipoingresogrupal") || /\bGRUPAL\b/i.test(text)) parts.push("Ingreso grupal");
+  if (normalized.includes("tipoingresoindividual") || /\bINDIVIDUAL\b/i.test(text)) parts.push("Ingreso individual");
+  const dates = [...text.matchAll(/\b\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b/g)].map((match) => formatStoredDateValue(match[0])).filter(Boolean);
+  if (dates.length) parts.push(`Actualizacion ${dates[dates.length - 1]}`);
+  const rshIngreso = firstMatch(text, /rsh\s+de\s+ingreso[\s\S]{0,80}?(\d{1,3})\s*%/i, 1);
+  if (rshIngreso) parts.push(`RSH ingreso ${parseInteger(rshIngreso)}%`);
+  return parts.join("; ");
+}
+
+function buildRukanObservations({ family, propiedades, subsidios, minvuConecta, confidence }) {
+  const observations = [];
+  if (!family.length) observations.push("No se pudo leer grupo familiar completo");
+  if (confidence !== null && confidence < 72) observations.push("OCR con baja confianza: revisar manualmente");
+  if (normalize(propiedades).includes("integrantehogarconpropiedad")) observations.push("Revisar propiedad detectada en integrante del hogar");
+  if (normalize(subsidios).includes("integrantehogarconsubsidio")) observations.push("Revisar subsidio vigente en integrante del hogar");
+  if (!minvuConecta) observations.push("MINVU Conecta sin lectura clara");
+  return observations;
+}
+
+function splitRukanObservations(text) {
+  return cleanString(text)
+    .split(/;|\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function classifyRukanObservation(text) {
+  const value = normalize(text);
+  if (value.includes("propiedad")) return "Propiedad";
+  if (value.includes("subsidio")) return "Subsidio";
+  if (value.includes("ocr")) return "Lectura OCR";
+  if (value.includes("minvu")) return "MINVU Conecta";
+  if (value.includes("grupo")) return "Grupo familiar";
+  return "Revision";
+}
+
+function rukanReviewLabel(value) {
+  return {
+    detectado: "Detectado",
+    por_revisar: "Por revisar",
+    confirmado: "Confirmado",
+  }[value] || "Por revisar";
+}
+
+function detectFamilyType(members = []) {
+  if (!members.length) return "Por revisar";
+  if (members.length === 1) return "Unipersonal";
+  const text = normalize(members.map((member) => member.parentesco).join(" "));
+  const hasPartner = text.includes("conyuge") || text.includes("pareja") || text.includes("conviviente");
+  const hasChild = text.includes("hijo") || text.includes("hija");
+  const hasExtended = text.includes("niet") || text.includes("padre") || text.includes("madre") || text.includes("herman") || text.includes("abuelo") || text.includes("abuela");
+  if (hasExtended) return "Extensa";
+  if (hasPartner) return "Nuclear";
+  if (hasChild || text.includes("jefe")) return "Monoparental";
+  return "Por revisar";
+}
+
+function sortRukanMembers(members = [], socioRut = "") {
+  return [...members].sort((a, b) => {
+    const rank = rukanMemberRank(a, socioRut) - rukanMemberRank(b, socioRut);
+    if (rank) return rank;
+    const order = (parseInteger(a.orden) || 99) - (parseInteger(b.orden) || 99);
+    if (order) return order;
+    return compareText(a.nombre, b.nombre);
+  });
+}
+
+function rukanMemberRank(member, socioRut) {
+  const rut = normalizeRut(member.rut);
+  const relation = normalize(member.parentesco);
+  if (rut && rut === normalizeRut(socioRut)) return 0;
+  if (relation.includes("jefe")) return 1;
+  if (relation.includes("conyuge") || relation.includes("pareja") || relation.includes("conviviente")) return 2;
+  if (relation.includes("hijo") || relation.includes("hija")) return 3;
+  if (relation.includes("niet")) return 4;
+  if (relation.includes("padre") || relation.includes("madre")) return 5;
+  if (relation.includes("herman")) return 6;
+  return 9;
+}
+
+function compareRukanSocios(a, b) {
+  return compareText(a.nombre, b.nombre) || compareText(a.rut, b.rut);
+}
+
+function compareText(a, b) {
+  return cleanString(a).localeCompare(cleanString(b), "es", { sensitivity: "base" });
+}
+
+function textAroundRut(text, rut, radius = 360) {
+  const index = findRutIndex(text, rut);
+  if (index < 0) return text.slice(0, radius);
+  return text.slice(Math.max(0, index - radius), Math.min(text.length, index + radius));
+}
+
+function findRutIndex(text, rut) {
+  const match = findRutMatchInfo(text, rut);
+  return match ? match.index : -1;
+}
+
+function findRutMatchInfo(text, rut) {
+  const target = normalizeRut(rut);
+  if (!target) return null;
+  const compactText = cleanString(text);
+  const rutMatches = [...compactText.matchAll(/\b\d{1,2}[.\s]?\d{3}[.\s]?\d{3}\s*-?\s*[0-9kK]\b/g)];
+  const match = rutMatches.find((item) => normalizeRut(item[0]) === target);
+  if (match) return { index: match.index, raw: match[0] };
+  const compactRut = target.replace(/\./g, "");
+  const patterns = [target, compactRut, target.replace("-", " - "), compactRut.replace("-", "")];
+  const index = patterns.reduce((found, pattern) => (found >= 0 ? found : compactText.indexOf(pattern)), -1);
+  return index >= 0 ? { index, raw: patterns.find((pattern) => compactText.indexOf(pattern) === index) || target } : null;
+}
+
+function sectionBetween(text, startPattern, endPattern) {
+  const start = text.search(startPattern);
+  if (start < 0) return "";
+  const rest = text.slice(start);
+  const end = rest.slice(20).search(endPattern);
+  return end >= 0 ? rest.slice(0, end + 20) : rest;
+}
+
+function firstMatch(text, pattern, group = 0) {
+  const match = cleanString(text).match(pattern);
+  return cleanString(match?.[group]);
+}
+
+function firstDate(text) {
+  const raw = firstMatch(text, /\b\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b/);
+  return formatStoredDateValue(raw);
+}
+
+function formatStoredDateValue(value) {
+  const date = parseDateValue(value, { twoDigitYear: "birth" });
+  return date ? date.toISOString().slice(0, 10) : "";
+}
+
+function ageFromStoredDate(value) {
+  const date = parseDateValue(value, { twoDigitYear: "birth" });
+  return date ? calculateAge(date) : null;
+}
+
+function cleanPersonName(value) {
+  return cleanString(value)
+    .replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]/g, " ")
+    .replace(/\b(Rut|Nombre|Nombres|Sexo|Femenino|Masculino|Chile|Nacionalidad|Estado|Civil|Pais|Fecha|Nacimiento|Discapacidad)\b/gi, " ")
+    .replace(/^-+/, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+}
+
+function expandSex(value) {
+  const text = normalize(value);
+  if (text === "f" || text.includes("femenino")) return "FEMENINO";
+  if (text === "m" || text.includes("masculino")) return "MASCULINO";
+  return cleanString(value).toUpperCase();
+}
+
+function extractDisability(text) {
+  const around = textAroundKeyword(text, "Discapacidad", 90);
+  const normalized = normalize(around || text);
+  if (normalized.includes("discapacidadsi") || /\bSI\b/i.test(around)) return "SI";
+  if (normalized.includes("discapacidadno") || /\bNO\b/i.test(around)) return "NO";
+  return "";
+}
+
+function textAroundKeyword(text, keyword, radius = 100) {
+  const index = cleanString(text).toLowerCase().indexOf(cleanString(keyword).toLowerCase());
+  if (index < 0) return "";
+  return text.slice(index, index + radius);
 }
 
 function renderReportes() {
@@ -5412,6 +6416,7 @@ function importLegacyBackup(parsed, fileName) {
     gestiones: parsed.gestiones,
     viviendas: parsed.viviendas || parsed.tiposVivienda,
     viviendaFuente: parsed.viviendaFuente,
+    rukanBase: parsed.rukanBase,
   });
   const firstPersona = imported.personas[0];
   const workspaceName =
@@ -5426,6 +6431,7 @@ function importLegacyBackup(parsed, fileName) {
   workspace.gestiones = imported.gestiones;
   workspace.viviendas = imported.viviendas;
   workspace.viviendaFuente = imported.viviendaFuente;
+  workspace.rukanBase = imported.rukanBase;
   state = getWorkspaceState(workspace);
   saveWorkspaceStore();
 }
@@ -5433,7 +6439,7 @@ function importLegacyBackup(parsed, fileName) {
 function clearData() {
   const workspace = getActiveWorkspace();
   if (!confirm(`Quieres eliminar los datos del comité "${workspaceDisplayName(workspace)}" en este navegador?`)) return;
-  state = { personas: [], importaciones: [], gestiones: {}, viviendas: [], viviendaFuente: null };
+  state = { personas: [], importaciones: [], gestiones: {}, viviendas: [], viviendaFuente: null, rukanBase: normalizeRukanBase() };
   saveState();
   navigate("resumen");
 }
