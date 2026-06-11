@@ -3094,6 +3094,7 @@ function renderRukan() {
       </div>
       <div class="report-actions">
         <button id="exportRukanBtn" class="button primary" type="button">Exportar Excel</button>
+        <button id="reprocessRukanBtn" class="button secondary" type="button">Reprocesar OCR</button>
         <button id="clearRukanBtn" class="button danger" type="button">Limpiar Base Rukan</button>
       </div>
     </div>
@@ -3161,6 +3162,7 @@ function renderRukan() {
 
   document.getElementById("rukanForm").addEventListener("submit", handleRukanImport);
   document.getElementById("exportRukanBtn").addEventListener("click", exportRukanExcel);
+  document.getElementById("reprocessRukanBtn").addEventListener("click", reprocessRukanBase);
   document.getElementById("clearRukanBtn").addEventListener("click", clearRukanBase);
   document.getElementById("rukanSearch").addEventListener("input", (event) => renderRukanBaseTable(event.target.value));
   renderRukanBaseTable();
@@ -3297,6 +3299,36 @@ function updateRukanReview(rut, estadoRevision) {
   socio.estadoRevision = estadoRevision;
   state.rukanBase = normalizeRukanBase(state.rukanBase);
   saveState();
+}
+
+function reprocessRukanBase() {
+  state.rukanBase = normalizeRukanBase(state.rukanBase);
+  const socios = state.rukanBase.socios || [];
+  const withOcr = socios.filter((socio) => cleanString(socio.textoOcr));
+  if (!withOcr.length) {
+    alert("No hay texto OCR guardado para reprocesar. Vuelve a cargar los PDF Rukan.");
+    return;
+  }
+  const refreshed = withOcr.map((socio) => {
+    const parsed = parseRukanOcrText(socio.textoOcr, {
+      fileName: socio.archivo,
+      confidence: socio.confianza,
+    });
+    return normalizeRukanSocio({
+      ...socio,
+      ...parsed,
+      estadoRevision: socio.estadoRevision === "confirmado" ? "confirmado" : parsed.estadoRevision,
+      textoOcr: socio.textoOcr,
+      archivo: socio.archivo || parsed.archivo,
+      confianza: socio.confianza ?? parsed.confianza,
+    });
+  });
+  const withoutOcr = socios.filter((socio) => !cleanString(socio.textoOcr));
+  state.rukanBase.socios = [...refreshed, ...withoutOcr].filter(Boolean).sort(compareRukanSocios);
+  state.rukanBase.actualizadoEn = new Date().toISOString();
+  saveState();
+  renderRukan();
+  alert(`Base Rukan reprocesada: ${formatNumber(refreshed.length)} registro(s) actualizados.`);
 }
 
 function clearRukanBase() {
@@ -3601,14 +3633,17 @@ function parseRukanOcrText(text, { fileName = "", confidence = null } = {}) {
   const propiedades = extractRukanProperties(cleaned);
   const subsidios = extractRukanSubsidies(cleaned);
   const minvuConecta = extractRukanMinvu(cleaned);
-  const observations = buildRukanObservations({ family, propiedades, subsidios, minvuConecta, confidence });
+  const nombre = member?.nombre || person.nombre;
+  const fechaNacimiento = member?.fechaNacimiento || person.fechaNacimiento;
+  const observations = buildRukanObservations({ family, propiedades, subsidios, minvuConecta, confidence, nombre, fechaNacimiento });
+  const needsReview = !nombre || !fechaNacimiento || !family.length || (confidence !== null && confidence < 72);
   return normalizeRukanSocio({
     id: `rukan-${rut || cryptoId()}`,
     archivo: fileName,
     rut,
-    nombre: member?.nombre || person.nombre,
+    nombre,
     sexo: member?.sexo || person.sexo,
-    fechaNacimiento: member?.fechaNacimiento || person.fechaNacimiento,
+    fechaNacimiento,
     edad: member?.edad ?? person.edad,
     estadoCivil: person.estadoCivil,
     discapacidad: person.discapacidad,
@@ -3623,7 +3658,7 @@ function parseRukanOcrText(text, { fileName = "", confidence = null } = {}) {
     minvuConecta,
     observaciones: observations.join("; "),
     fechaActualizacion: new Date().toISOString().slice(0, 10),
-    estadoRevision: confidence !== null && confidence >= 72 && family.length ? "detectado" : "por_revisar",
+    estadoRevision: needsReview ? "por_revisar" : "detectado",
     confianza: confidence,
     textoOcr: cleaned,
     grupoFamiliar: family,
@@ -3657,9 +3692,9 @@ function parseRukanPersonData(text, rut) {
 }
 
 function parseRukanPersonBlock(block, rut) {
-  const sexo = firstMatch(block, /\b(FEMENINO|MASCULINO|F|M)\b/i);
+  const sexo = extractSexValue(block);
   const estadoCivil = firstMatch(block, /\b(SOLTER[AO]|CASAD[AO]|DIVORCIAD[AO]|VIUD[AO]|CONVIVIENTE)\b/i);
-  const fechaNacimiento = firstDate(block);
+  const fechaNacimiento = extractBirthDate(block, { requireAdult: true });
   return {
     nombre: extractNameBetweenRutAndSex(block, rut, sexo),
     sexo: expandSex(sexo),
@@ -3681,7 +3716,7 @@ function parseRukanFamilyMembers(text, rutConsultado) {
     const next = index < ruts.length - 1 ? findRutIndex(compact.slice(nextSearchStart), ruts[index + 1]) : -1;
     const end = next >= 0 && start >= 0 ? nextSearchStart + next : compact.length;
     const raw = start >= 0 ? compact.slice(Math.max(0, start - 12), end) : textAroundRut(section, rut, 360);
-    const member = parseRukanMemberBlock(raw, rut, index + 1);
+    const member = parseRukanMemberBlock(raw, rut, index + 1, rutConsultado);
     if (member.rut || member.nombre) members.push(member);
   });
   const unique = [];
@@ -3695,9 +3730,10 @@ function parseRukanFamilyMembers(text, rutConsultado) {
   return sortRukanMembers(unique, rutConsultado);
 }
 
-function parseRukanMemberBlock(block, rut, order) {
-  const sexo = firstMatch(block, /\b(FEMENINO|MASCULINO|F|M)\b/i);
-  const fechaNacimiento = firstDate(block);
+function parseRukanMemberBlock(block, rut, order, rutConsultado = "") {
+  const sexo = extractSexValue(block);
+  const isConsulted = normalizeRut(rut) === normalizeRut(rutConsultado);
+  const fechaNacimiento = extractBirthDate(block, { requireAdult: isConsulted });
   const normalized = normalize(block);
   return normalizeRukanMember({
     orden: order,
@@ -3715,9 +3751,13 @@ function extractNameBetweenRutAndSex(block, rut, sexo) {
   const text = cleanString(block).replace(/\s+/g, " ");
   const rutMatch = findRutMatchInfo(text, rut);
   const rutIndex = rutMatch?.index ?? -1;
-  const sexIndex = sexo ? text.toUpperCase().indexOf(sexo.toUpperCase(), Math.max(rutIndex, 0)) : -1;
-  if (rutIndex < 0 || sexIndex < 0 || sexIndex <= rutIndex) return "";
-  return cleanPersonName(text.slice(rutIndex + rutMatch.raw.length, sexIndex));
+  if (rutIndex < 0) return "";
+  const afterRut = Math.max(0, rutIndex + rutMatch.raw.length);
+  const sexMatch = findSexMatch(text, afterRut);
+  const dateMatch = findBirthDateMatch(text.slice(afterRut), { requireAdult: false });
+  const fallbackEnd = dateMatch ? afterRut + dateMatch.index : Math.min(text.length, afterRut + 180);
+  const end = sexMatch?.index && sexMatch.index > afterRut ? sexMatch.index : fallbackEnd;
+  return cleanPersonName(trimRukanNameCandidate(text.slice(afterRut, end)));
 }
 
 function extractRelationship(block, sexo, fechaNacimiento) {
@@ -3835,8 +3875,10 @@ function extractRukanMinvu(text) {
   return parts.join("; ");
 }
 
-function buildRukanObservations({ family, propiedades, subsidios, minvuConecta, confidence }) {
+function buildRukanObservations({ family, propiedades, subsidios, minvuConecta, confidence, nombre = "", fechaNacimiento = "" }) {
   const observations = [];
+  if (!nombre) observations.push("Nombre del socio no detectado con seguridad");
+  if (!fechaNacimiento) observations.push("Fecha de nacimiento no detectada con seguridad");
   if (!family.length) observations.push("No se pudo leer grupo familiar completo");
   if (confidence !== null && confidence < 72) observations.push("OCR con baja confianza: revisar manualmente");
   if (normalize(propiedades).includes("integrantehogarconpropiedad")) observations.push("Revisar propiedad detectada en integrante del hogar");
@@ -3951,9 +3993,79 @@ function firstMatch(text, pattern, group = 0) {
   return cleanString(match?.[group]);
 }
 
+function extractSexValue(text) {
+  const match = findSexMatch(text);
+  return match ? expandSex(match.raw) : "";
+}
+
+function findSexMatch(text, from = 0) {
+  const value = cleanString(text);
+  const matches = [...value.matchAll(/\b(FEMENINO|MASCULINO)\b/gi)];
+  const match = matches.find((item) => item.index >= from);
+  return match ? { raw: match[1], index: match.index } : null;
+}
+
 function firstDate(text) {
-  const raw = firstMatch(text, /\b\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b/);
-  return formatStoredDateValue(raw);
+  return extractBirthDate(text);
+}
+
+function extractBirthDate(text, options = {}) {
+  return findBirthDateMatch(text, options)?.date || "";
+}
+
+function findBirthDateMatch(text, { requireAdult = false } = {}) {
+  const candidates = rukanDateCandidates(text).filter((candidate) => {
+    if (candidate.nonBirthContext) return false;
+    if (candidate.dateObj > new Date()) return false;
+    if (candidate.age === null) return false;
+    if (candidate.age > 110) return false;
+    if (requireAdult && candidate.age < 14) return false;
+    if (!requireAdult && candidate.age === 0 && !candidate.birthContext) return false;
+    return true;
+  });
+  candidates.sort((a, b) => b.score - a.score || a.index - b.index);
+  return candidates[0] || null;
+}
+
+function rukanDateCandidates(text) {
+  const value = cleanString(text);
+  return [...value.matchAll(/\b\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b/g)]
+    .map((match) => {
+      const raw = match[0];
+      const dateObj = parseDateValue(raw, { twoDigitYear: "birth" });
+      if (!dateObj) return null;
+      const context = value.slice(Math.max(0, match.index - 90), Math.min(value.length, match.index + raw.length + 90));
+      const normalizedContext = normalize(context);
+      const birthContext =
+        normalizedContext.includes("fechanacimiento") ||
+        normalizedContext.includes("nacimiento") ||
+        normalizedContext.includes("nacim");
+      const nonBirthContext =
+        normalizedContext.includes("fechayhoradeconsulta") ||
+        normalizedContext.includes("horadeconsulta") ||
+        normalizedContext.includes("consulta") ||
+        normalizedContext.includes("actualizacion") ||
+        normalizedContext.includes("minvu") ||
+        normalizedContext.includes("encuesta") ||
+        normalizedContext.includes("ingreso");
+      return {
+        raw,
+        date: dateObj.toISOString().slice(0, 10),
+        dateObj,
+        age: calculateAge(dateObj),
+        index: match.index,
+        birthContext,
+        nonBirthContext,
+        score: (birthContext ? 40 : 0) - (nonBirthContext ? 100 : 0) - match.index / 10000,
+      };
+    })
+    .filter(Boolean);
+}
+
+function trimRukanNameCandidate(value) {
+  return cleanString(value)
+    .replace(/^.*\b(NOMBRES?|DISCAPACIDAD|DISCAPAC\w*|DEFUNCION|DEFUNCI\w*|NACIMIENTO|NACIM\w*)\b/gi, " ")
+    .replace(/\s+/g, " ");
 }
 
 function formatStoredDateValue(value) {
@@ -3967,13 +4079,18 @@ function ageFromStoredDate(value) {
 }
 
 function cleanPersonName(value) {
-  return cleanString(value)
+  const cleaned = cleanString(value)
     .replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]/g, " ")
-    .replace(/\b(Rut|Nombre|Nombres|Sexo|Femenino|Masculino|Chile|Nacionalidad|Estado|Civil|Pais|Fecha|Nacimiento|Discapacidad)\b/gi, " ")
+    .replace(/\b(Rut|Nombre|Nombres|Sexo|Femenino|Masculino|Chile|Nacionalidad|Estado|Civil|Pais|Fecha|Hora|Consulta|Consultado|Registro|Recistro|Importante|Informacion|Proporcionada|Servicio|Senicio|Identificacion|Nacimiento|Nacim\w*|Defuncion|Dofuncion|Discapacidad|Discapac\w*)\b/gi, " ")
     .replace(/^-+/, " ")
     .replace(/\s+/g, " ")
     .trim()
     .toUpperCase();
+  const tokens = cleaned.split(" ").filter(Boolean);
+  while (tokens.length > 2 && ["ME", "PA", "CI", "LO", "OE", "O", "A"].includes(tokens[tokens.length - 1])) {
+    tokens.pop();
+  }
+  return tokens.length > 8 ? tokens.slice(-8).join(" ") : tokens.join(" ");
 }
 
 function expandSex(value) {
