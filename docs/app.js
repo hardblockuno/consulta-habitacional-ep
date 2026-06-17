@@ -303,6 +303,13 @@ const HOUSING_CATEGORIES = [
   { key: "otra", label: "Otra" },
 ];
 
+const RUKAN_OCR_ZONES = [
+  { key: "top", label: "Encabezado Rukan", x: 0.08, y: 0.06, w: 0.45, h: 0.09 },
+  { key: "civil", label: "Registro Civil", x: 0.10, y: 0.15, w: 0.82, h: 0.30 },
+  { key: "rsh", label: "Registro Social de Hogares", x: 0.10, y: 0.43, w: 0.82, h: 0.19 },
+  { key: "family", label: "Integrantes del Hogar", x: 0.10, y: 0.56, w: 0.82, h: 0.20 },
+];
+
 let workspaceStore = loadWorkspaceStore();
 let state = getWorkspaceState(getActiveWorkspace());
 let rukanTool = loadRukanToolState();
@@ -3422,11 +3429,18 @@ async function processRukanPdf(file, onProgress = () => {}) {
       continue;
     }
     const canvas = await renderPdfPageForOcr(page);
-    const result = await runRukanOcr(canvas, (status) => {
-      if (status) onProgress(`pagina ${pageNumber}: ${status}`);
+    const zoneResults = await runRukanZoneOcr(canvas, pageNumber, onProgress);
+    const zoneTextLength = zoneResults.reduce((sum, item) => sum + cleanString(item.text).length, 0);
+    let fullResult = { text: "", confidence: null };
+    if (zoneTextLength < 220) {
+      fullResult = await runRukanOcr(canvas, (status) => {
+        if (status) onProgress(`pagina ${pageNumber}: OCR completo ${status}`);
+      });
+    }
+    texts.push(formatRukanOcrPageText(pageNumber, zoneResults, fullResult.text));
+    [...zoneResults.map((item) => item.confidence), fullResult.confidence].forEach((confidence) => {
+      if (Number.isFinite(confidence)) confidences.push(confidence);
     });
-    texts.push(result.text);
-    if (Number.isFinite(result.confidence)) confidences.push(result.confidence);
   }
   const confidence = confidences.length ? Math.round(confidences.reduce((sum, item) => sum + item, 0) / confidences.length) : null;
   return parseRukanOcrText(texts.join("\n\n"), { fileName: file.name, confidence });
@@ -3442,7 +3456,7 @@ async function extractPdfPageText(page) {
 }
 
 async function renderPdfPageForOcr(page) {
-  const viewport = page.getViewport({ scale: 2.25 });
+  const viewport = page.getViewport({ scale: 3.1 });
   const canvas = document.createElement("canvas");
   canvas.width = Math.floor(viewport.width);
   canvas.height = Math.floor(viewport.height);
@@ -3451,6 +3465,40 @@ async function renderPdfPageForOcr(page) {
   context.fillRect(0, 0, canvas.width, canvas.height);
   await page.render({ canvasContext: context, viewport }).promise;
   return enhanceCanvasForOcr(canvas);
+}
+
+async function runRukanZoneOcr(canvas, pageNumber, onProgress = () => {}) {
+  const results = [];
+  for (const zone of RUKAN_OCR_ZONES) {
+    onProgress(`pagina ${pageNumber}: leyendo ${zone.label}`);
+    const crop = cropCanvasByRatio(canvas, zone);
+    const result = await runRukanOcr(crop, (status) => {
+      if (status) onProgress(`pagina ${pageNumber}: ${zone.label} ${status}`);
+    });
+    results.push({ ...zone, text: result.text, confidence: result.confidence });
+  }
+  return results;
+}
+
+function cropCanvasByRatio(source, zone) {
+  const x = Math.max(0, Math.floor(source.width * zone.x));
+  const y = Math.max(0, Math.floor(source.height * zone.y));
+  const width = Math.min(source.width - x, Math.ceil(source.width * zone.w));
+  const height = Math.min(source.height - y, Math.ceil(source.height * zone.h));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.drawImage(source, x, y, width, height, 0, 0, width, height);
+  return canvas;
+}
+
+function formatRukanOcrPageText(pageNumber, zoneResults, fullText) {
+  const sections = [`[[RUKAN PAGINA ${pageNumber} - OCR COMPLETO]]\n${fullText || ""}`];
+  sections.push(...zoneResults.map((result) => `[[RUKAN PAGINA ${pageNumber} - ${result.label}]]\n${result.text || ""}`));
+  return sections.join("\n\n");
 }
 
 function enhanceCanvasForOcr(source) {
@@ -3735,8 +3783,8 @@ function normalizeOcrText(text) {
 }
 
 function extractRukanConsultedRut(text) {
-  const direct = text.match(/rut\s*consult\w*\s*:?\s*([0-9.\s]{7,12}-?\s*[0-9kK])/i);
-  if (direct) {
+  const directMatches = [...cleanString(text).matchAll(/rut\s*consult\w*\s*:?\s*([0-9.,\s]{7,14}[-\u2013]?\s*[0-9kK])/gi)];
+  for (const direct of directMatches) {
     const rut = normalizeRutStrict(direct[1]);
     if (rut) return rut;
   }
@@ -3756,8 +3804,9 @@ function extractRukanConsultedRut(text) {
     if (/\b(FEMENINO|MASCULINO)\b/i.test(after)) score += 30;
     if (/\b(SOLTER[AO]|CASAD[AO]|VIUD[AO]|DIVORCIAD[AO]|CONVIVIENTE)\b/i.test(after)) score += 12;
     if (context.includes("tramocse") || context.includes("fechaencuesta") || context.includes("folio")) score += 18;
-    if (context.includes("integrantesdelhogar")) score += 15;
-    if (context.includes("listadodehijos") || context.includes("conyuge")) score -= 25;
+    if (context.includes("rutconsultado") && context.includes("registrocivil")) score += 45;
+    if (context.includes("integrantesdelhogar")) score -= 35;
+    if (context.includes("listadodehijos") || context.includes("conyuge")) score -= 45;
     entry.score += score;
   });
   return [...byRut.values()].sort((a, b) => b.score + b.count * 8 - (a.score + a.count * 8))[0]?.rut || "";
@@ -3780,7 +3829,34 @@ function extractRawRutOccurrences(text) {
 }
 
 function parseRukanPersonData(text, rut) {
-  return parseRukanPersonBlock(textAroundRut(text, rut, 500), rut);
+  return parseRukanPersonBlock(bestRukanPersonBlock(text, rut), rut);
+}
+
+function bestRukanPersonBlock(text, rut) {
+  const target = normalizeRut(rut);
+  if (!target) return text.slice(0, 800);
+  const compact = cleanString(text).replace(/\n+/g, " ");
+  const matches = rukanRutMatches(compact, target);
+  if (!matches.length) return textAroundRut(compact, target, 600);
+  const scored = matches.map((match) => {
+    const block = compact.slice(Math.max(0, match.index - 260), Math.min(compact.length, match.index + 620));
+    const after = compact.slice(match.index, Math.min(compact.length, match.index + 380));
+    const before = compact.slice(Math.max(0, match.index - 260), match.index);
+    const context = normalize(`${before} ${after}`);
+    let score = 0;
+    if (context.includes("registrocivil")) score += 90;
+    if (context.includes("rutconsultado")) score += 75;
+    if (/\b(FEMENINO|MASCULINO)\b/i.test(after)) score += 35;
+    if (/\b(SOLTER[AO]|CASAD[AO]|VIUD[AO]|DIVORCIAD[AO]|CONVIVIENTE)\b/i.test(after)) score += 25;
+    if (normalize(after).includes("fechanacimiento") || normalize(after).includes("nacimiento")) score += 20;
+    if (context.includes("registrosocialdehogares")) score -= 55;
+    if (context.includes("integrantesdelhogar")) score -= 70;
+    if (context.includes("listadodehijos") || context.includes("conyuge")) score -= 45;
+    if (context.includes("tramocse") || context.includes("fechaencuesta") || context.includes("folio")) score -= 50;
+    return { block, score, index: match.index };
+  });
+  scored.sort((a, b) => b.score - a.score || a.index - b.index);
+  return scored[0]?.block || textAroundRut(compact, target, 600);
 }
 
 function parseRukanPersonBlock(block, rut) {
@@ -3809,7 +3885,7 @@ function parseRukanFamilyMembers(text, rutConsultado) {
     const nextSearchStart = Math.max(start + 4, 0);
     const next = index < ruts.length - 1 ? findBestRukanRutMatchInfo(compact.slice(nextSearchStart), ruts[index + 1])?.index ?? -1 : -1;
     const end = next >= 0 && start >= 0 ? nextSearchStart + next : compact.length;
-    const raw = start >= 0 ? compact.slice(Math.max(0, start - 120), end) : textAroundRut(section, rut, 360);
+    const raw = start >= 0 ? compact.slice(start, end) : textAroundRut(section, rut, 360);
     const member = parseRukanMemberBlock(raw, rut, index + 1, rutConsultado);
     if (member.rut || member.nombre) members.push(member);
   });
@@ -3919,6 +3995,8 @@ function extractRukanNameAnchors(text) {
 }
 
 function extractRelationship(block, sexo, fechaNacimiento) {
+  const known = detectKnownRukanRelationship(block);
+  if (known) return known;
   let text = cleanString(block).replace(/\s+/g, " ");
   if (sexo) {
     const sexIndex = text.toUpperCase().indexOf(sexo.toUpperCase());
@@ -3928,13 +4006,51 @@ function extractRelationship(block, sexo, fechaNacimiento) {
     const dateIndex = text.indexOf(fechaNacimiento);
     if (dateIndex >= 0) text = text.slice(0, dateIndex);
   }
-  return cleanString(
+  const cleaned = cleanString(
     text
       .replace(/\b(FEMENINO|MASCULINO|F|M)\b/gi, " ")
       .replace(/\b\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b/g, " ")
       .replace(/\b(Servicio Militar|Esta Postulando|Reserva Proyectos de Integracion|Damnificado)\b/gi, " ")
       .replace(/\b(SI|NO|S|N)\b/gi, " ")
   );
+  return isNoisyRukanRelationship(cleaned) ? "Por revisar" : cleaned;
+}
+
+function isNoisyRukanRelationship(value) {
+  const text = cleanString(value);
+  if (!text) return true;
+  if (text.length > 48) return true;
+  if (/\d{5,}|[\u2014_]{2,}|\b(P9|QE|PREV|FOLIO|TRAMO|RSH)\b/i.test(text)) return true;
+  return false;
+}
+
+function detectKnownRukanRelationship(block) {
+  const value = normalize(block);
+  if (!value) return "";
+  if (
+    value.includes("jefeadehogar") ||
+    value.includes("jefeahogar") ||
+    value.includes("jefedehogar") ||
+    value.includes("jefahogar") ||
+    value.includes("jefahoga") ||
+    value.includes("jefedehoga")
+  ) {
+    return "Jefe(a) de hogar";
+  }
+  if (value.includes("conyugeopareja") || value.includes("conyugeoparja") || value.includes("conyuge") || value.includes("pareja") || value.includes("parja")) {
+    return "Conyuge o pareja";
+  }
+  if (value.includes("hijosolodeljefe") || value.includes("hijasolodeljefe") || value.includes("solodeljefe")) {
+    return "Hijo(a) solo del Jefe(a)";
+  }
+  if (value.includes("hijodeambos") || value.includes("hijadeambos") || value.includes("hijao deambos") || value.includes("deambos")) {
+    return "Hijo(a) de ambos";
+  }
+  if (value.includes("hermano") || value.includes("hermana")) return "Hermano(a)";
+  if (value.includes("madre")) return "Madre";
+  if (value.includes("padre")) return "Padre";
+  if (value.includes("nieto") || value.includes("nieta")) return "Nieto(a)";
+  return "";
 }
 
 function extractRukanRsh(text) {
@@ -4363,6 +4479,7 @@ function isRukanNameNoiseToken(token) {
     "sexo",
     "femen",
     "mascul",
+    "vascul",
     "chile",
     "nacional",
     "estado",
@@ -4385,6 +4502,9 @@ function isRukanNameNoiseToken(token) {
     "recistro",
     "social",
     "hogar",
+    "hoga",
+    "jef",
+    "ambos",
     "importante",
     "inform",
     "proporcion",
