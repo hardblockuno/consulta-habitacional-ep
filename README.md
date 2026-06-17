@@ -25,16 +25,11 @@ Tambien puedes abrirla con doble clic en:
 Abrir Consulta Habitacional.bat
 ```
 
-Esa version no necesita Django, PostgreSQL ni npm. Importa Excel directamente en el navegador y guarda los datos en `localStorage` del navegador. Tambien permite exportar/importar un respaldo JSON para mover datos entre equipos.
+Ese acceso abre la web y levanta automaticamente el backend local necesario para la lectura Rukan con IA. La plataforma guarda los datos operativos en `localStorage` del navegador y permite exportar/importar un respaldo JSON para mover datos entre equipos.
 
 ### Rukan con extraccion IA
 
-La herramienta Rukan tiene dos modos:
-
-- OCR local: funciona solo con la web estatica y guarda la nomina en este navegador.
-- Extraccion con IA: envia cada PDF Rukan al backend local para que OpenAI devuelva un JSON estructurado con socio consultado e integrantes del hogar.
-
-Para usar IA sin exponer la clave en GitHub Pages:
+La herramienta Rukan usa IA automaticamente al procesar PDF. El flujo es:
 
 1. Copia `backend/.env.example` como `backend/.env`.
 2. En `backend/.env`, agrega tu clave:
@@ -47,14 +42,10 @@ OPENAI_MODEL=gpt-5-mini
 3. Abre con doble clic:
 
 ```text
-Abrir Consulta Habitacional IA.bat
+Abrir Consulta Habitacional.bat
 ```
 
-4. En la web, entra a `Nomina Rukan`, marca `Usar extraccion con IA` y deja el endpoint:
-
-```text
-http://127.0.0.1:8000/api/rukan/ia-extraer/
-```
+4. En la web, entra a `Nomina Rukan`, sube los PDF y presiona `Procesar Rukan con IA`.
 
 Nota de seguridad: la clave queda solo en `backend/.env`, archivo que no debe subirse a GitHub. La IA procesa los PDF enviados al backend configurado; usa este modo solo con autorizacion interna para tratar esos documentos.
 

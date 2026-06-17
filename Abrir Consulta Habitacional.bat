@@ -1,2 +1,2 @@
 @echo off
-start "" "%~dp0docs\index.html"
+call "%~dp0Abrir Consulta Habitacional IA.bat"

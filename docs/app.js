@@ -726,7 +726,7 @@ function saveRukanToolState() {
 }
 
 function loadRukanAiEndpoint() {
-  return cleanString(localStorage.getItem(RUKAN_AI_ENDPOINT_KEY)) || RUKAN_AI_DEFAULT_ENDPOINT;
+  return RUKAN_AI_DEFAULT_ENDPOINT;
 }
 
 function saveRukanAiEndpoint(value) {
@@ -3115,7 +3115,6 @@ function renderRukan() {
   const socios = rukanSocios();
   const loads = rukanTool.cargas || [];
   const relatives = socios.reduce((sum, item) => sum + rukanParientes(item).length, 0);
-  const aiEndpoint = loadRukanAiEndpoint();
   setApp(`
     <div class="page-head">
       <div>
@@ -3125,7 +3124,6 @@ function renderRukan() {
       </div>
       <div class="report-actions">
         <button id="exportRukanBtn" class="button primary" type="button">Exportar nomina Excel</button>
-        <button id="reprocessRukanBtn" class="button secondary" type="button">Reprocesar OCR</button>
         <button id="clearRukanBtn" class="button danger" type="button">Limpiar herramienta</button>
       </div>
     </div>
@@ -3150,20 +3148,13 @@ function renderRukan() {
           </label>
         </div>
         <div class="rukan-ai-box">
-          <label class="check-row">
-            <input id="rukanUseAi" type="checkbox" />
-            <span>Usar extraccion con IA para leer socio consultado e integrantes del hogar</span>
-          </label>
-          <label class="field">
-            <span>Endpoint IA local</span>
-            <input id="rukanAiEndpoint" class="input" value="${escapeAttr(aiEndpoint)}" placeholder="${escapeAttr(RUKAN_AI_DEFAULT_ENDPOINT)}" />
-          </label>
-          <p class="small muted">Requiere backend Django ejecutandose con OPENAI_API_KEY. Los PDF se envian al backend configurado para lectura con IA.</p>
+          <strong>Extraccion IA automatica</strong>
+          <p class="small muted">Al procesar, la plataforma lee cada Rukan con IA para identificar el socio consultado y sus integrantes del hogar.</p>
         </div>
         <div id="rukanMessage"></div>
         <div class="toolbar-row">
-          <button class="button primary" type="submit">Procesar Rukan</button>
-          <span class="small muted">No solicita ClaveUnica. OCR local guarda en este navegador; IA requiere backend privado configurado.</span>
+          <button class="button primary" type="submit">Procesar Rukan con IA</button>
+          <span class="small muted">No solicita ClaveUnica. Los resultados quedan guardados en este navegador.</span>
         </div>
       </form>
     </section>
@@ -3200,7 +3191,6 @@ function renderRukan() {
 
   document.getElementById("rukanForm").addEventListener("submit", handleRukanImport);
   document.getElementById("exportRukanBtn").addEventListener("click", exportRukanExcel);
-  document.getElementById("reprocessRukanBtn").addEventListener("click", reprocessRukanBase);
   document.getElementById("clearRukanBtn").addEventListener("click", clearRukanBase);
   document.getElementById("rukanSearch").addEventListener("input", (event) => renderRukanBaseTable(event.target.value));
   renderRukanBaseTable();
@@ -3393,26 +3383,19 @@ async function handleRukanImport(event) {
   event.preventDefault();
   const message = document.getElementById("rukanMessage");
   const files = [...document.getElementById("rukanFiles").files].filter((file) => file.type === "application/pdf" || /\.pdf$/i.test(file.name));
-  const useAi = Boolean(document.getElementById("rukanUseAi")?.checked);
-  const aiEndpoint = cleanString(document.getElementById("rukanAiEndpoint")?.value) || RUKAN_AI_DEFAULT_ENDPOINT;
+  const aiEndpoint = loadRukanAiEndpoint();
   saveRukanAiEndpoint(aiEndpoint);
   if (!files.length) {
     message.innerHTML = notice("Selecciona uno o mas Rukan en PDF.", "error");
     return;
   }
-  if (!useAi && !window.pdfjsLib) {
-    message.innerHTML = notice("No se pudo cargar el lector PDF. Revisa la conexion a internet y vuelve a intentar.", "error");
-    return;
-  }
 
-  message.innerHTML = notice(`Preparando ${useAi ? "extraccion con IA" : "OCR"} para ${formatNumber(files.length)} archivo(s)...`);
+  message.innerHTML = notice(`Preparando extraccion con IA para ${formatNumber(files.length)} archivo(s)...`);
   let processed = 0;
   let omitted = 0;
   for (const file of files) {
     try {
-      const parsed = useAi ? await processRukanPdfWithAI(file, aiEndpoint, (text) => {
-        message.innerHTML = notice(`${file.name}: ${text}`);
-      }) : await processRukanPdf(file, (text) => {
+      const parsed = await processRukanPdfWithAI(file, aiEndpoint, (text) => {
         message.innerHTML = notice(`${file.name}: ${text}`);
       });
       if (!parsed?.rut) {
@@ -3433,7 +3416,7 @@ async function handleRukanImport(event) {
       saveRukanToolState();
     } catch (error) {
       omitted += 1;
-      registerRukanLoad({ archivo: file.name, estado: useAi ? "error_ia" : "error", confianza: null });
+      registerRukanLoad({ archivo: file.name, estado: "error_ia", confianza: null });
       saveRukanToolState();
       message.innerHTML = notice(`${file.name}: ${error.message || "no se pudo procesar"}`, "error");
       console.error(error);
@@ -3454,12 +3437,15 @@ async function processRukanPdfWithAI(file, endpoint, onProgress = () => {}) {
       body: formData,
     });
   } catch (error) {
-    throw new Error("No se pudo conectar con el backend IA. Revisa que Django este ejecutandose y que CORS permita la web.");
+    throw new Error("No se pudo conectar con la IA. Abre la plataforma con Abrir Consulta Habitacional.bat y espera a que se abra la ventana de API.");
   }
 
   const payload = await parseJsonResponse(response);
   if (!response.ok) {
-    throw new Error(payload.detail || `Backend IA respondio con estado ${response.status}`);
+    if (cleanString(payload.detail).includes("OPENAI_API_KEY")) {
+      throw new Error("Falta configurar OPENAI_API_KEY en backend/.env para activar la lectura automatica con IA.");
+    }
+    throw new Error(payload.detail || `La IA respondio con estado ${response.status}`);
   }
 
   const parsed = normalizeRukanSocio({
