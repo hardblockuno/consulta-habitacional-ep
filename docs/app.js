@@ -1,5 +1,6 @@
 const STORAGE_KEY = "consultaHabitacionalEP:v1";
 const WORKSPACES_KEY = "consultaHabitacionalEP:workspaces:v1";
+const RUKAN_TOOL_KEY = "consultaHabitacionalEP:rukanTool:v1";
 const DEFAULT_WORKSPACE_NAME = "Comité sin nombre";
 const MAYORIA_EDAD = 18;
 const HIJO_PROXIMO_18_DIAS = 90;
@@ -304,6 +305,7 @@ const HOUSING_CATEGORIES = [
 
 let workspaceStore = loadWorkspaceStore();
 let state = getWorkspaceState(getActiveWorkspace());
+let rukanTool = loadRukanToolState();
 let currentView = "resumen";
 let pendingManualImport = null;
 saveWorkspaceStore({ updateUi: false });
@@ -431,7 +433,6 @@ function normalizeWorkspace(workspace) {
     gestiones: workspace.gestiones,
     viviendas: workspace.viviendas,
     viviendaFuente: workspace.viviendaFuente,
-    rukanBase: workspace.rukanBase,
   });
   return {
     id: cleanString(workspace.id) || cryptoId(),
@@ -445,7 +446,6 @@ function normalizeWorkspace(workspace) {
     gestiones: normalized.gestiones,
     viviendas: normalized.viviendas,
     viviendaFuente: normalized.viviendaFuente,
-    rukanBase: normalized.rukanBase,
     actualizadoEn: cleanString(workspace.actualizadoEn) || new Date().toISOString(),
   };
 }
@@ -463,7 +463,6 @@ function createWorkspace({ nombre, comuna = "" }) {
     gestiones: {},
     viviendas: [],
     viviendaFuente: null,
-    rukanBase: normalizeRukanBase(),
     actualizadoEn: new Date().toISOString(),
   };
 }
@@ -520,7 +519,6 @@ function getWorkspaceState(workspace) {
     gestiones: workspace?.gestiones || {},
     viviendas: workspace?.viviendas || [],
     viviendaFuente: workspace?.viviendaFuente || null,
-    rukanBase: workspace?.rukanBase || null,
   });
 }
 
@@ -531,7 +529,6 @@ function syncStateToActiveWorkspace() {
   workspace.gestiones = normalizeGestionStore(state.gestiones);
   workspace.viviendas = normalizeHousingRows(state.viviendas || []);
   workspace.viviendaFuente = normalizeHousingSource(state.viviendaFuente);
-  workspace.rukanBase = normalizeRukanBase(state.rukanBase);
   workspace.actualizadoEn = new Date().toISOString();
 }
 
@@ -614,7 +611,8 @@ function safeWorkspaceView(view) {
 }
 
 function normalizeLoadedState(data) {
-  const personas = (data.personas || []).map((persona) => {
+  const { rukanBase, ...stateData } = data || {};
+  const personas = (stateData.personas || []).map((persona) => {
     const caracterizacion = { ...(persona.caracterizacion || {}) };
     caracterizacion.hijos = normalizeHijos(
       caracterizacion.hijos || extractHijosFromEntries(Object.entries(persona.original || {}))
@@ -686,12 +684,11 @@ function normalizeLoadedState(data) {
     };
   });
   return {
-    ...data,
+    ...stateData,
     personas,
-    gestiones: normalizeGestionStore(data.gestiones),
-    viviendas: normalizeHousingRows(data.viviendas || data.tiposVivienda || []),
-    viviendaFuente: normalizeHousingSource(data.viviendaFuente),
-    rukanBase: normalizeRukanBase(data.rukanBase),
+    gestiones: normalizeGestionStore(stateData.gestiones),
+    viviendas: normalizeHousingRows(stateData.viviendas || stateData.tiposVivienda || []),
+    viviendaFuente: normalizeHousingSource(stateData.viviendaFuente),
   };
 }
 
@@ -704,6 +701,19 @@ function normalizeRukanBase(source = {}) {
     cargas: Array.isArray(source?.cargas) ? source.cargas.map(normalizeRukanLoad).filter(Boolean) : [],
     actualizadoEn: cleanString(source?.actualizadoEn),
   };
+}
+
+function loadRukanToolState() {
+  try {
+    return normalizeRukanBase(JSON.parse(localStorage.getItem(RUKAN_TOOL_KEY) || "{}"));
+  } catch {
+    return normalizeRukanBase();
+  }
+}
+
+function saveRukanToolState() {
+  rukanTool = normalizeRukanBase(rukanTool);
+  localStorage.setItem(RUKAN_TOOL_KEY, JSON.stringify(rukanTool));
 }
 
 function normalizeRukanSocio(source) {
@@ -747,12 +757,13 @@ function normalizeRukanMember(source) {
   const rut = normalizeRut(source.rut);
   const nombre = cleanPersonName(source.nombre);
   const reliableName = isReliableRukanPersonName(nombre) ? nombre : "";
-  if (!rut && !reliableName) return null;
+  if (!reliableName) return null;
   return {
     orden: parseInteger(source.orden),
     rut,
     nombre: reliableName,
     sexo: cleanString(source.sexo),
+    estadoCivil: cleanString(source.estadoCivil),
     parentesco: cleanString(source.parentesco),
     fechaNacimiento: formatStoredDateValue(source.fechaNacimiento),
     edad: parseAgeValue(source.edad) ?? ageFromStoredDate(source.fechaNacimiento),
@@ -3082,46 +3093,41 @@ function renderGestionTable(query = "", estado = "abiertos", prioridad = "") {
 }
 
 function renderRukan() {
-  state.rukanBase = normalizeRukanBase(state.rukanBase);
-  const workspace = getActiveWorkspace();
+  rukanTool = normalizeRukanBase(rukanTool);
   const socios = rukanSocios();
-  const loads = state.rukanBase.cargas || [];
-  const observations = rukanObservationRows();
+  const loads = rukanTool.cargas || [];
+  const relatives = socios.reduce((sum, item) => sum + rukanParientes(item).length, 0);
   setApp(`
     <div class="page-head">
       <div>
         <div class="eyebrow">Area Social</div>
-        <h2>Base Rukan</h2>
-        <p class="muted">${escapeHtml(workspaceDisplayName(workspace))}</p>
+        <h2>Herramienta Rukan</h2>
+        <p class="muted">Genera una nomina de oficina desde Rukan PDF, independiente de los comites cargados.</p>
       </div>
       <div class="report-actions">
-        <button id="exportRukanBtn" class="button primary" type="button">Exportar Excel</button>
+        <button id="exportRukanBtn" class="button primary" type="button">Exportar nomina Excel</button>
         <button id="reprocessRukanBtn" class="button secondary" type="button">Reprocesar OCR</button>
-        <button id="clearRukanBtn" class="button danger" type="button">Limpiar Base Rukan</button>
+        <button id="clearRukanBtn" class="button danger" type="button">Limpiar herramienta</button>
       </div>
     </div>
     <section class="grid stats">
-      ${stat("Socios Rukan", socios.length)}
-      ${stat("Integrantes familiares", socios.reduce((sum, item) => sum + item.grupoFamiliar.length, 0), "cyan")}
+      ${stat("Socios consultados", socios.length)}
+      ${stat("Parientes detectados", relatives, "cyan")}
       ${stat("Por revisar", socios.filter((item) => item.estadoRevision !== "confirmado").length, "amber")}
-      ${stat("Observaciones", observations.length, "rose")}
+      ${stat("Rukan cargados", loads.length, "rose")}
     </section>
     <section class="panel rukan-import-panel" style="margin-top: 18px;">
       <div class="report-export-head">
         <div>
           <h3>Cargar Rukan PDF</h3>
-          <p class="muted">Carga varios Rukan del comite. La lectura se realiza en este navegador mediante OCR y queda guardada en la base online local del comite.</p>
+          <p class="muted">Carga varios Rukan y la plataforma armara una nomina alfabetica por socio consultado, con sus parientes al costado.</p>
         </div>
       </div>
       <form id="rukanForm" class="grid" style="margin-top: 14px;">
-        <div class="field-row" style="grid-template-columns: minmax(260px, 1fr) 220px;">
+        <div class="field-row" style="grid-template-columns: minmax(260px, 1fr);">
           <label class="field">
             <span>Archivos Rukan PDF</span>
             <input id="rukanFiles" class="input" type="file" accept=".pdf,application/pdf" multiple />
-          </label>
-          <label class="field">
-            <span>Comite</span>
-            <input id="rukanComite" class="input" value="${escapeAttr(workspaceDisplayName(workspace))}" />
           </label>
         </div>
         <div id="rukanMessage"></div>
@@ -3134,12 +3140,12 @@ function renderRukan() {
     <section class="panel" style="margin-top: 18px;">
       <div class="report-export-head">
         <div>
-          <h3>Base online Rukan</h3>
-          <p class="muted">Una fila por socio, ordenada alfabeticamente. El grupo familiar completo queda disponible en el detalle y en la exportacion Excel.</p>
+          <h3>Nomina Rukan</h3>
+          <p class="muted">Una fila por socio consultado. Los parientes detectados se ordenan hacia el costado en el formato de trabajo de oficina.</p>
         </div>
         <label class="field rukan-search-field">
           <span>Buscar</span>
-          <input id="rukanSearch" class="input" placeholder="Nombre, RUT, comuna, observacion" />
+          <input id="rukanSearch" class="input" placeholder="Socio, RUT, pariente u observacion" />
         </label>
       </div>
       <div id="rukanBaseResult" style="margin-top: 14px;"></div>
@@ -3179,46 +3185,24 @@ function renderRukanBaseTable(query = "") {
     const text = [
       socio.nombre,
       socio.rut,
-      socio.sexo,
-      socio.estadoCivil,
-      socio.discapacidad,
-      socio.rsh,
-      socio.comuna,
-      socio.parentescoPostulante,
-      socio.jefaturaHogar,
-      socio.tipoFamilia,
-      socio.propiedades,
-      socio.subsidios,
-      socio.minvuConecta,
       socio.observaciones,
+      ...rukanParientes(socio).flatMap((member) => [member.nombre, member.rut, member.parentesco, member.estadoCivil, member.fechaNacimiento]),
     ].join(" ");
     return normalize(text).includes(q);
   });
   if (!rows.length) {
-    container.innerHTML = emptyHtml("Sin socios Rukan para mostrar");
+    container.innerHTML = emptyHtml("Sin socios consultados para mostrar");
     return;
   }
+  const maxParientes = rukanOfficeMaxParientes(rows);
   container.innerHTML = `
     <div class="table-wrap rukan-table-wrap">
       <table class="rukan-table">
         <thead>
-          <tr>
-            <th>Nombres</th>
-            <th>RUT</th>
-            <th>RSH</th>
-            <th>Integrantes</th>
-            <th>Parentesco</th>
-            <th>Jefatura hogar</th>
-            <th>Tipo familia</th>
-            <th>Propiedades</th>
-            <th>Subsidios</th>
-            <th>MINVU</th>
-            <th>Revision</th>
-            <th>Grupo familiar</th>
-          </tr>
+          <tr>${rukanOfficeHeaders(maxParientes).map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr>
         </thead>
         <tbody>
-          ${rows.map(rukanSocioRowHtml).join("")}
+          ${rows.map((socio) => rukanSocioOfficeRowHtml(socio, maxParientes)).join("")}
         </tbody>
       </table>
     </div>
@@ -3226,6 +3210,42 @@ function renderRukanBaseTable(query = "") {
   container.querySelectorAll(".rukan-review-select").forEach((select) => {
     select.addEventListener("change", () => updateRukanReview(select.dataset.rut, select.value));
   });
+}
+
+function rukanSocioOfficeRowHtml(socio, maxParientes) {
+  return `<tr>${rukanOfficePreviewCells(socio, maxParientes).map((cell) => `<td>${cell}</td>`).join("")}</tr>`;
+}
+
+function rukanOfficePreviewCells(socio, maxParientes) {
+  const parientes = rukanParientes(socio);
+  const cells = [
+    `
+      <strong>${escapeHtml(socio.nombre || "Sin nombre confiable")}</strong>
+      <p class="small muted">${escapeHtml(socio.rut || "Sin RUT")}</p>
+    `,
+    escapeHtml(socio.rut || ""),
+  ];
+  for (let index = 0; index < maxParientes; index += 1) {
+    const member = parientes[index] || {};
+    cells.push(
+      escapeHtml(member.nombre || ""),
+      escapeHtml(member.rut || ""),
+      escapeHtml(member.estadoCivil || ""),
+      escapeHtml(member.fechaNacimiento || ""),
+      member.edad === null || member.edad === undefined ? "" : escapeHtml(member.edad),
+      escapeHtml(member.parentesco || "")
+    );
+  }
+  cells.push(
+    escapeHtml(socio.archivo || ""),
+    escapeHtml(socio.observaciones || ""),
+    `
+    <select class="select rukan-review-select" data-rut="${escapeAttr(socio.rut)}">
+      ${rukanReviewOptions(socio.estadoRevision)}
+    </select>
+  `
+  );
+  return cells;
 }
 
 function rukanSocioRowHtml(socio) {
@@ -3295,17 +3315,16 @@ function rukanReviewOptions(selected) {
 }
 
 function updateRukanReview(rut, estadoRevision) {
-  state.rukanBase = normalizeRukanBase(state.rukanBase);
-  const socio = state.rukanBase.socios.find((item) => item.rut === rut);
+  rukanTool = normalizeRukanBase(rukanTool);
+  const socio = rukanTool.socios.find((item) => item.rut === rut);
   if (!socio) return;
   socio.estadoRevision = estadoRevision;
-  state.rukanBase = normalizeRukanBase(state.rukanBase);
-  saveState();
+  saveRukanToolState();
 }
 
 function reprocessRukanBase() {
-  state.rukanBase = normalizeRukanBase(state.rukanBase);
-  const socios = state.rukanBase.socios || [];
+  rukanTool = normalizeRukanBase(rukanTool);
+  const socios = rukanTool.socios || [];
   const withOcr = socios.filter((socio) => cleanString(socio.textoOcr));
   if (!withOcr.length) {
     alert("No hay texto OCR guardado para reprocesar. Vuelve a cargar los PDF Rukan.");
@@ -3326,17 +3345,17 @@ function reprocessRukanBase() {
     });
   });
   const withoutOcr = socios.filter((socio) => !cleanString(socio.textoOcr));
-  state.rukanBase.socios = [...refreshed, ...withoutOcr].filter(Boolean).sort(compareRukanSocios);
-  state.rukanBase.actualizadoEn = new Date().toISOString();
-  saveState();
+  rukanTool.socios = [...refreshed, ...withoutOcr].filter(Boolean).sort(compareRukanSocios);
+  rukanTool.actualizadoEn = new Date().toISOString();
+  saveRukanToolState();
   renderRukan();
-  alert(`Base Rukan reprocesada: ${formatNumber(refreshed.length)} registro(s) actualizados.`);
+  alert(`Herramienta Rukan reprocesada: ${formatNumber(refreshed.length)} registro(s) actualizados.`);
 }
 
 function clearRukanBase() {
-  if (!confirm("Quieres eliminar la Base Rukan de este comite en este navegador?")) return;
-  state.rukanBase = normalizeRukanBase();
-  saveState();
+  if (!confirm("Quieres eliminar la nomina Rukan guardada en este navegador?")) return;
+  rukanTool = normalizeRukanBase();
+  saveRukanToolState();
   renderRukan();
 }
 
@@ -3344,8 +3363,6 @@ async function handleRukanImport(event) {
   event.preventDefault();
   const message = document.getElementById("rukanMessage");
   const files = [...document.getElementById("rukanFiles").files].filter((file) => file.type === "application/pdf" || /\.pdf$/i.test(file.name));
-  const comiteNombre = cleanString(document.getElementById("rukanComite").value);
-  if (comiteNombre) ensureWorkspace(comiteNombre, getActiveWorkspace().comuna, true);
   if (!files.length) {
     message.innerHTML = notice("Selecciona uno o mas Rukan en PDF.", "error");
     return;
@@ -3366,6 +3383,7 @@ async function handleRukanImport(event) {
       if (!parsed?.rut) {
         omitted += 1;
         registerRukanLoad({ archivo: file.name, estado: "sin_rut", confianza: parsed?.confianza });
+        saveRukanToolState();
         continue;
       }
       upsertRukanSocio(parsed);
@@ -3377,11 +3395,11 @@ async function handleRukanImport(event) {
         confianza: parsed.confianza,
       });
       processed += 1;
-      saveState();
+      saveRukanToolState();
     } catch (error) {
       omitted += 1;
       registerRukanLoad({ archivo: file.name, estado: "error", confianza: null });
-      saveState();
+      saveRukanToolState();
       console.error(error);
     }
   }
@@ -3476,29 +3494,64 @@ async function runRukanOcr(canvas, onProgress = () => {}) {
 
 function upsertRukanSocio(socio) {
   if (!socio?.rut) return;
-  state.rukanBase = normalizeRukanBase(state.rukanBase);
-  const index = state.rukanBase.socios.findIndex((item) => item.rut === socio.rut);
+  rukanTool = normalizeRukanBase(rukanTool);
+  const index = rukanTool.socios.findIndex((item) => item.rut === socio.rut);
   if (index >= 0) {
-    state.rukanBase.socios[index] = normalizeRukanSocio({
-      ...state.rukanBase.socios[index],
+    rukanTool.socios[index] = normalizeRukanSocio({
+      ...rukanTool.socios[index],
       ...socio,
-      grupoFamiliar: socio.grupoFamiliar?.length ? socio.grupoFamiliar : state.rukanBase.socios[index].grupoFamiliar,
+      grupoFamiliar: socio.grupoFamiliar?.length ? socio.grupoFamiliar : rukanTool.socios[index].grupoFamiliar,
     });
   } else {
-    state.rukanBase.socios.push(normalizeRukanSocio(socio));
+    rukanTool.socios.push(normalizeRukanSocio(socio));
   }
-  state.rukanBase.socios = rukanSocios();
-  state.rukanBase.actualizadoEn = new Date().toISOString();
+  rukanTool.socios = rukanSocios();
+  rukanTool.actualizadoEn = new Date().toISOString();
 }
 
 function registerRukanLoad(load) {
-  state.rukanBase = normalizeRukanBase(state.rukanBase);
-  state.rukanBase.cargas.unshift(normalizeRukanLoad(load));
-  state.rukanBase.cargas = state.rukanBase.cargas.slice(0, 40);
+  rukanTool = normalizeRukanBase(rukanTool);
+  rukanTool.cargas.unshift(normalizeRukanLoad(load));
+  rukanTool.cargas = rukanTool.cargas.slice(0, 40);
 }
 
 function rukanSocios() {
-  return normalizeRukanBase(state.rukanBase).socios;
+  return normalizeRukanBase(rukanTool).socios;
+}
+
+function rukanParientes(socio) {
+  const socioRut = normalizeRut(socio?.rut);
+  const socioNombre = normalize(socio?.nombre);
+  return sortRukanMembers(socio?.grupoFamiliar || [], socioRut).filter((member) => {
+    const memberRut = normalizeRut(member.rut);
+    if (socioRut && memberRut === socioRut) return false;
+    if (!memberRut && socioNombre && normalize(member.nombre) === socioNombre) return false;
+    return true;
+  });
+}
+
+function rukanOfficeMaxParientes(socios = rukanSocios()) {
+  return Math.max(3, ...socios.map((socio) => rukanParientes(socio).length));
+}
+
+function rukanOfficeHeaders(maxParientes = 3) {
+  const headers = ["SOCIO CONSULTADO", "RUT SOCIO"];
+  for (let index = 1; index <= maxParientes; index += 1) {
+    headers.push(`PARIENTE ${index}`, `RUT ${index}`, "ESTADO CIVIL", `FEC NAC ${index}`, `EDAD ${index}`, `PARENTESCO ${index}`);
+  }
+  headers.push("ARCHIVO RUKAN", "OBSERVACIONES RUKAN", "ESTADO REVISION");
+  return headers;
+}
+
+function rukanOfficeExportRow(socio, maxParientes) {
+  const parientes = rukanParientes(socio);
+  const row = [socio.nombre, socio.rut];
+  for (let index = 0; index < maxParientes; index += 1) {
+    const member = parientes[index] || {};
+    row.push(member.nombre || "", member.rut || "", member.estadoCivil || "", member.fechaNacimiento || "", member.edad ?? "", member.parentesco || "");
+  }
+  row.push(socio.archivo || "", socio.observaciones || "", rukanReviewLabel(socio.estadoRevision));
+  return row;
 }
 
 function exportRukanExcel() {
@@ -3508,14 +3561,16 @@ function exportRukanExcel() {
   }
   const socios = rukanSocios();
   if (!socios.length) {
-    alert("No hay Base Rukan para exportar.");
+    alert("No hay nomina Rukan para exportar.");
     return;
   }
+  const maxParientes = rukanOfficeMaxParientes(socios);
   const workbook = XLSX.utils.book_new();
+  appendSheet(workbook, "Nomina oficina", rukanOfficeHeaders(maxParientes), socios.map((socio) => rukanOfficeExportRow(socio, maxParientes)));
   appendSheet(workbook, "Base socios", rukanBaseHeaders(), socios.map(rukanBaseExportRow));
   appendSheet(workbook, "Grupo familiar", rukanFamilyHeaders(), rukanFamilyExportRows(socios));
   appendSheet(workbook, "Observaciones Rukan", rukanObservationHeaders(), rukanObservationRows(socios));
-  XLSX.writeFile(workbook, `${excelFileName("base-rukan")}.xlsx`);
+  XLSX.writeFile(workbook, `${excelFileName("nomina-rukan-area-social")}.xlsx`);
 }
 
 function appendSheet(workbook, name, headers, rows) {
@@ -3581,6 +3636,7 @@ function rukanFamilyHeaders() {
     "RUT integrante",
     "Parentesco",
     "Sexo",
+    "Estado civil",
     "Fecha nacimiento",
     "Edad",
     "Esta postulando",
@@ -3600,6 +3656,7 @@ function rukanFamilyExportRows(socios) {
       member.rut,
       member.parentesco,
       member.sexo,
+      member.estadoCivil,
       member.fechaNacimiento,
       member.edad,
       member.estaPostulando,
@@ -3631,11 +3688,11 @@ function parseRukanOcrText(text, { fileName = "", confidence = null } = {}) {
   const member = family.find((item) => item.rut === rut);
   const jefatura = family.find((item) => normalize(item.parentesco).includes("jefe"));
   const rsh = extractRukanRsh(cleaned);
-  const comuna = extractRukanComuna(cleaned) || getActiveWorkspace().comuna;
+  const comuna = extractRukanComuna(cleaned);
   const propiedades = extractRukanProperties(cleaned);
   const subsidios = extractRukanSubsidies(cleaned);
   const minvuConecta = extractRukanMinvu(cleaned);
-  const nombre = firstReliableRukanName(member?.nombre, person.nombre);
+  const nombre = firstReliableRukanName(member?.nombre, person.nombre, extractBestRukanNameCandidate(cleaned, rut));
   const fechaNacimiento = member?.fechaNacimiento || person.fechaNacimiento;
   const observations = buildRukanObservations({ family, propiedades, subsidios, minvuConecta, confidence, nombre, fechaNacimiento });
   const needsReview = !nombre || !fechaNacimiento || !family.length || (confidence !== null && confidence < 72);
@@ -3680,7 +3737,7 @@ function normalizeOcrText(text) {
 function extractRukanConsultedRut(text) {
   const direct = text.match(/rut\s*consult\w*\s*:?\s*([0-9.\s]{7,12}-?\s*[0-9kK])/i);
   if (direct) {
-    const rut = normalizeRut(direct[1]);
+    const rut = normalizeRutStrict(direct[1]);
     if (rut) return rut;
   }
   const occurrences = extractRutOccurrences(text);
@@ -3712,6 +3769,12 @@ function extractRuts(text) {
 
 function extractRutOccurrences(text) {
   return [...cleanString(text).matchAll(/\b\d{1,2}[.\s]?\d{3}[.\s]?\d{3}\s*-?\s*[0-9kK]\b/g)]
+    .map((match) => ({ raw: match[0], rut: normalizeRutStrict(match[0]), index: match.index }))
+    .filter((item) => item.rut);
+}
+
+function extractRawRutOccurrences(text) {
+  return [...cleanString(text).matchAll(/\b\d{1,2}[.\s]?\d{3}[.\s]?\d{3}\s*-?\s*[0-9kK]\b/g)]
     .map((match) => ({ raw: match[0], rut: normalizeRut(match[0]), index: match.index }))
     .filter((item) => item.rut);
 }
@@ -3736,6 +3799,7 @@ function parseRukanPersonBlock(block, rut) {
 
 function parseRukanFamilyMembers(text, rutConsultado) {
   const section = extractRukanFamilySection(text);
+  if (!cleanString(section)) return [];
   const compact = section.replace(/\n+/g, " ");
   const ruts = extractRuts(section);
   const members = [];
@@ -3768,19 +3832,21 @@ function extractRukanFamilySection(text) {
     const end = rest.slice(20).search(/datos\s+vivienda|propiedades|subsidios|minvu\s+conecta|datos\s+del\s+grupo/i);
     return end >= 0 ? rest.slice(0, end + 20) : rest;
   }
-  return sectionBetween(text, /registro\s+social\s+de\s+hogares/i, /datos\s+vivienda|propiedades|subsidios|minvu\s+conecta/i) || text;
+  return "";
 }
 
 function parseRukanMemberBlock(block, rut, order, rutConsultado = "") {
   const sexo = extractSexValue(block);
   const isConsulted = normalizeRut(rut) === normalizeRut(rutConsultado);
   const fechaNacimiento = extractBirthDate(block, { requireAdult: isConsulted });
+  const estadoCivil = firstMatch(block, /\b(SOLTER[AO]|CASAD[AO]|DIVORCIAD[AO]|VIUD[AO]|CONVIVIENTE)\b/i);
   const normalized = normalize(block);
   return normalizeRukanMember({
     orden: order,
     rut,
     nombre: extractNameBetweenRutAndSex(block, rut, sexo),
     sexo: expandSex(sexo),
+    estadoCivil: estadoCivil ? estadoCivil.toUpperCase() : "",
     parentesco: extractRelationship(block, sexo, fechaNacimiento),
     fechaNacimiento,
     edad: ageFromStoredDate(fechaNacimiento),
@@ -3795,10 +3861,61 @@ function extractNameBetweenRutAndSex(block, rut, sexo) {
   if (rutIndex < 0) return "";
   const afterRut = Math.max(0, rutIndex + rutMatch.raw.length);
   const sexMatch = findSexMatch(text, afterRut);
+  if (sexMatch && sexMatch.index - afterRut > 150) return "";
   const dateMatch = findBirthDateMatch(text.slice(afterRut), { requireAdult: false });
   const fallbackEnd = dateMatch ? afterRut + dateMatch.index : Math.min(text.length, afterRut + 180);
   const end = sexMatch?.index && sexMatch.index > afterRut ? sexMatch.index : fallbackEnd;
-  return cleanPersonName(trimRukanNameCandidate(text.slice(afterRut, end)));
+  const rawName = text.slice(afterRut, end);
+  if (normalize(rawName).match(/tramocse|folio|fechaencuesta|integrantesdelhogar|registrosocial|subsidio|programa/)) return "";
+  return cleanPersonName(trimRukanNameCandidate(rawName));
+}
+
+function extractBestRukanNameCandidate(text, finalRut = "") {
+  const targetRut = normalizeRut(finalRut);
+  const compact = cleanString(text).replace(/\n+/g, " ");
+  const candidates = extractRukanNameAnchors(compact)
+    .map((item) => {
+      const start = item.index + item.raw.length;
+      const after = compact.slice(start, Math.min(compact.length, start + 220));
+      const sexMatch = findSexMatch(after);
+      if (!sexMatch) return null;
+      const rawName = after.slice(0, sexMatch.index);
+      const name = cleanPersonName(trimRukanNameCandidate(rawName));
+      if (!isReliableRukanPersonName(name)) return null;
+      const before = compact.slice(Math.max(0, item.index - 180), item.index);
+      const context = normalize(`${before} ${after}`);
+      const isTargetRut = targetRut && item.rut === targetRut;
+      const isConsultedRow = context.includes("rutconsultado") || context.includes("rutconsult") || context.includes("registrocivil");
+      if (!isTargetRut && !isConsultedRow) return null;
+      let score = 0;
+      if (isTargetRut) score += 45;
+      if (context.includes("rutconsultado") || context.includes("rutconsult")) score += 80;
+      if (context.includes("registrocivil")) score += 40;
+      if (context.includes("integrantesdelhogar")) score += 30;
+      if (context.includes("listadodehijos") || context.includes("conyuge")) score -= 40;
+      if (context.includes("jefedehogar") || context.includes("jefa") || context.includes("jefe")) score -= 45;
+      if (context.includes("subsidio") || context.includes("programa")) score -= 80;
+      return { name, score };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score);
+  return candidates[0]?.name || "";
+}
+
+function extractRukanNameAnchors(text) {
+  const seen = new Set();
+  const anchors = [];
+  extractRawRutOccurrences(text).forEach((item) => {
+    const key = `${item.index}-${item.raw}`;
+    seen.add(key);
+    anchors.push(item);
+  });
+  [...cleanString(text).matchAll(/\b\d{1,2}[.\s]?\d{3}[.\s]?\d{3}\b/g)].forEach((match) => {
+    const key = `${match.index}-${match[0]}`;
+    if (seen.has(key)) return;
+    anchors.push({ raw: match[0], rut: "", index: match.index });
+  });
+  return anchors.sort((a, b) => a.index - b.index);
 }
 
 function extractRelationship(block, sexo, fechaNacimiento) {
@@ -4213,7 +4330,9 @@ function isRukanNameNoiseToken(token) {
     "SI",
     "NE",
     "RU",
+    "RUE",
     "UF",
+    "CHLE",
     "N",
     "NRO",
     "RECTOMECIMIENO",
@@ -4221,8 +4340,20 @@ function isRukanNameNoiseToken(token) {
     "POR",
     "EL",
     "PAR",
+    "PARA",
     "ROCE",
     "ESTA",
+    "PET",
+    "MORE",
+    "NIRO",
+    "SUSO",
+    "TR",
+    "PER",
+    "CAU",
+    "GEN",
+    "AAA",
+    "TEO",
+    "AUTRES",
   ].map(normalize);
   const prefixes = [
     "rut",
@@ -4287,6 +4418,23 @@ function isRukanNameNoiseToken(token) {
     "reserva",
     "proyect",
     "proyact",
+    "program",
+    "progra",
+    "subsid",
+    "especial",
+    "regular",
+    "pagad",
+    "region",
+    "memo",
+    "observ",
+    "benefici",
+    "teoson",
+    "rapanp",
+    "tomuc",
+    "viento",
+    "prada",
+    "epecap",
+    "nores",
     "integracion",
     "damn",
     "postul",
@@ -5737,6 +5885,13 @@ function normalizeRut(value) {
   return `${Number(body)}-${dv}`;
 }
 
+function normalizeRutStrict(value) {
+  const rut = normalizeRut(value);
+  if (!rut) return "";
+  const [body, dv] = rut.split("-");
+  return calculateDv(body) === cleanString(dv).toUpperCase() ? rut : "";
+}
+
 function calculateDv(body) {
   let sum = 0;
   let factor = 2;
@@ -6771,7 +6926,6 @@ function importLegacyBackup(parsed, fileName) {
     gestiones: parsed.gestiones,
     viviendas: parsed.viviendas || parsed.tiposVivienda,
     viviendaFuente: parsed.viviendaFuente,
-    rukanBase: parsed.rukanBase,
   });
   const firstPersona = imported.personas[0];
   const workspaceName =
@@ -6786,7 +6940,6 @@ function importLegacyBackup(parsed, fileName) {
   workspace.gestiones = imported.gestiones;
   workspace.viviendas = imported.viviendas;
   workspace.viviendaFuente = imported.viviendaFuente;
-  workspace.rukanBase = imported.rukanBase;
   state = getWorkspaceState(workspace);
   saveWorkspaceStore();
 }
@@ -6794,7 +6947,7 @@ function importLegacyBackup(parsed, fileName) {
 function clearData() {
   const workspace = getActiveWorkspace();
   if (!confirm(`Quieres eliminar los datos del comité "${workspaceDisplayName(workspace)}" en este navegador?`)) return;
-  state = { personas: [], importaciones: [], gestiones: {}, viviendas: [], viviendaFuente: null, rukanBase: normalizeRukanBase() };
+  state = { personas: [], importaciones: [], gestiones: {}, viviendas: [], viviendaFuente: null };
   saveState();
   navigate("resumen");
 }
