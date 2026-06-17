@@ -1,6 +1,8 @@
 const STORAGE_KEY = "consultaHabitacionalEP:v1";
 const WORKSPACES_KEY = "consultaHabitacionalEP:workspaces:v1";
 const RUKAN_TOOL_KEY = "consultaHabitacionalEP:rukanTool:v1";
+const RUKAN_AI_ENDPOINT_KEY = "consultaHabitacionalEP:rukanAiEndpoint:v1";
+const RUKAN_AI_DEFAULT_ENDPOINT = "http://127.0.0.1:8000/api/rukan/ia-extraer/";
 const DEFAULT_WORKSPACE_NAME = "Comité sin nombre";
 const MAYORIA_EDAD = 18;
 const HIJO_PROXIMO_18_DIAS = 90;
@@ -721,6 +723,15 @@ function loadRukanToolState() {
 function saveRukanToolState() {
   rukanTool = normalizeRukanBase(rukanTool);
   localStorage.setItem(RUKAN_TOOL_KEY, JSON.stringify(rukanTool));
+}
+
+function loadRukanAiEndpoint() {
+  return cleanString(localStorage.getItem(RUKAN_AI_ENDPOINT_KEY)) || RUKAN_AI_DEFAULT_ENDPOINT;
+}
+
+function saveRukanAiEndpoint(value) {
+  const endpoint = cleanString(value);
+  if (endpoint) localStorage.setItem(RUKAN_AI_ENDPOINT_KEY, endpoint);
 }
 
 function normalizeRukanSocio(source) {
@@ -3104,6 +3115,7 @@ function renderRukan() {
   const socios = rukanSocios();
   const loads = rukanTool.cargas || [];
   const relatives = socios.reduce((sum, item) => sum + rukanParientes(item).length, 0);
+  const aiEndpoint = loadRukanAiEndpoint();
   setApp(`
     <div class="page-head">
       <div>
@@ -3137,10 +3149,21 @@ function renderRukan() {
             <input id="rukanFiles" class="input" type="file" accept=".pdf,application/pdf" multiple />
           </label>
         </div>
+        <div class="rukan-ai-box">
+          <label class="check-row">
+            <input id="rukanUseAi" type="checkbox" />
+            <span>Usar extraccion con IA para leer socio consultado e integrantes del hogar</span>
+          </label>
+          <label class="field">
+            <span>Endpoint IA local</span>
+            <input id="rukanAiEndpoint" class="input" value="${escapeAttr(aiEndpoint)}" placeholder="${escapeAttr(RUKAN_AI_DEFAULT_ENDPOINT)}" />
+          </label>
+          <p class="small muted">Requiere backend Django ejecutandose con OPENAI_API_KEY. Los PDF se envian al backend configurado para lectura con IA.</p>
+        </div>
         <div id="rukanMessage"></div>
         <div class="toolbar-row">
           <button class="button primary" type="submit">Procesar Rukan</button>
-          <span class="small muted">No solicita ClaveUnica ni envia datos a una base publica; el OCR corre desde la web y guarda en este navegador.</span>
+          <span class="small muted">No solicita ClaveUnica. OCR local guarda en este navegador; IA requiere backend privado configurado.</span>
         </div>
       </form>
     </section>
@@ -3370,21 +3393,26 @@ async function handleRukanImport(event) {
   event.preventDefault();
   const message = document.getElementById("rukanMessage");
   const files = [...document.getElementById("rukanFiles").files].filter((file) => file.type === "application/pdf" || /\.pdf$/i.test(file.name));
+  const useAi = Boolean(document.getElementById("rukanUseAi")?.checked);
+  const aiEndpoint = cleanString(document.getElementById("rukanAiEndpoint")?.value) || RUKAN_AI_DEFAULT_ENDPOINT;
+  saveRukanAiEndpoint(aiEndpoint);
   if (!files.length) {
     message.innerHTML = notice("Selecciona uno o mas Rukan en PDF.", "error");
     return;
   }
-  if (!window.pdfjsLib) {
+  if (!useAi && !window.pdfjsLib) {
     message.innerHTML = notice("No se pudo cargar el lector PDF. Revisa la conexion a internet y vuelve a intentar.", "error");
     return;
   }
 
-  message.innerHTML = notice(`Preparando OCR para ${formatNumber(files.length)} archivo(s)...`);
+  message.innerHTML = notice(`Preparando ${useAi ? "extraccion con IA" : "OCR"} para ${formatNumber(files.length)} archivo(s)...`);
   let processed = 0;
   let omitted = 0;
   for (const file of files) {
     try {
-      const parsed = await processRukanPdf(file, (text) => {
+      const parsed = useAi ? await processRukanPdfWithAI(file, aiEndpoint, (text) => {
+        message.innerHTML = notice(`${file.name}: ${text}`);
+      }) : await processRukanPdf(file, (text) => {
         message.innerHTML = notice(`${file.name}: ${text}`);
       });
       if (!parsed?.rut) {
@@ -3405,13 +3433,56 @@ async function handleRukanImport(event) {
       saveRukanToolState();
     } catch (error) {
       omitted += 1;
-      registerRukanLoad({ archivo: file.name, estado: "error", confianza: null });
+      registerRukanLoad({ archivo: file.name, estado: useAi ? "error_ia" : "error", confianza: null });
       saveRukanToolState();
+      message.innerHTML = notice(`${file.name}: ${error.message || "no se pudo procesar"}`, "error");
       console.error(error);
     }
   }
   message.innerHTML = notice(`Rukan procesados: ${formatNumber(processed)} actualizados, ${formatNumber(omitted)} omitidos.`, processed ? "success" : "error");
   renderRukan();
+}
+
+async function processRukanPdfWithAI(file, endpoint, onProgress = () => {}) {
+  onProgress("enviando PDF al backend IA");
+  const formData = new FormData();
+  formData.append("archivo", file, file.name);
+  let response;
+  try {
+    response = await fetch(endpoint, {
+      method: "POST",
+      body: formData,
+    });
+  } catch (error) {
+    throw new Error("No se pudo conectar con el backend IA. Revisa que Django este ejecutandose y que CORS permita la web.");
+  }
+
+  const payload = await parseJsonResponse(response);
+  if (!response.ok) {
+    throw new Error(payload.detail || `Backend IA respondio con estado ${response.status}`);
+  }
+
+  const parsed = normalizeRukanSocio({
+    ...payload,
+    archivo: payload.archivo || file.name,
+    estadoRevision: payload.estadoRevision || "por_revisar",
+    confianza: payload.confianza ?? null,
+  });
+  if (!parsed?.rut) {
+    throw new Error("La IA no devolvio un RUT consultado utilizable para este Rukan.");
+  }
+  onProgress("extraccion IA recibida");
+  return parsed;
+}
+
+async function parseJsonResponse(response) {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { detail: text.slice(0, 300) };
+  }
 }
 
 async function processRukanPdf(file, onProgress = () => {}) {

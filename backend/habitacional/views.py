@@ -19,6 +19,11 @@ from .services.excel_importer import (
     importar_excel,
     importar_observaciones_excel,
 )
+from .services.rukan_ai import (
+    RukanAIConfigurationError,
+    RukanAIError,
+    extraer_rukan_con_ia,
+)
 
 
 class PersonaViewSet(viewsets.ReadOnlyModelViewSet):
@@ -169,6 +174,27 @@ class ImportarObservacionesExcelAPIView(APIView):
 
         serializer = ImportacionExcelSerializer(resultado)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class RukanAIExtractionAPIView(APIView):
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser]
+
+    def post(self, request):
+        archivo = request.FILES.get("archivo")
+        if not archivo:
+            return Response(
+                {"detail": "Debes adjuntar un PDF Rukan en el campo 'archivo'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            resultado = extraer_rukan_con_ia(archivo, archivo.name)
+        except RukanAIConfigurationError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except RukanAIError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(resultado, status=status.HTTP_200_OK)
 
 
 class DashboardResumenAPIView(APIView):

@@ -96,7 +96,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 CORS_ALLOWED_ORIGINS = [
     origin.strip()
-    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+    for origin in os.getenv(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173,https://hardblockuno.github.io,null",
+    ).split(",")
     if origin.strip()
 ]
 CORS_ALLOW_ALL_ORIGINS = os.getenv("CORS_ALLOW_ALL_ORIGINS", "0") == "1"
@@ -109,3 +112,8 @@ REST_FRAMEWORK = {
 }
 
 AHORRO_MINIMO_UF = os.getenv("AHORRO_MINIMO_UF", "10")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5-mini")
+OPENAI_RESPONSES_URL = os.getenv("OPENAI_RESPONSES_URL", "https://api.openai.com/v1/responses")
+OPENAI_TIMEOUT_SECONDS = int(os.getenv("OPENAI_TIMEOUT_SECONDS", "90"))
+RUKAN_AI_MAX_BYTES = int(os.getenv("RUKAN_AI_MAX_BYTES", str(12 * 1024 * 1024)))

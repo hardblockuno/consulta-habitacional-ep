@@ -480,6 +480,31 @@ textarea {
   background: #f8fcff;
 }
 
+.rukan-ai-box {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  background: #eef2ff;
+  padding: 12px;
+}
+
+.check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.check-row input {
+  width: 18px;
+  height: 18px;
+  margin-top: 0;
+}
+
 .rukan-search-field {
   width: min(320px, 100%);
 }
