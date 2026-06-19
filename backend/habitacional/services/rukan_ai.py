@@ -18,6 +18,10 @@ class RukanAIConfigurationError(RukanAIError):
     """Raised when AI extraction is not configured."""
 
 
+class RukanAIQuotaError(RukanAIError):
+    """Raised when the configured OpenAI account has no available API quota."""
+
+
 RUKAN_AI_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -208,6 +212,12 @@ def request_rukan_ai(image_bytes, mime_type, file_name):
             response_body = response.read().decode("utf-8")
     except HTTPError as exc:
         error_body = exc.read().decode("utf-8", errors="replace")
+        if exc.code == 429 and is_openai_quota_error(error_body):
+            raise RukanAIQuotaError(
+                "La cuenta de OpenAI no tiene cuota disponible para procesar Rukan. "
+                "Revisa la facturacion o el saldo de la API en https://platform.openai.com/settings/organization/billing/overview "
+                "y vuelve a intentar."
+            ) from exc
         raise RukanAIError(f"OpenAI respondio con error {exc.code}: {summarize_openai_error(error_body)}") from exc
     except URLError as exc:
         raise RukanAIError(f"No se pudo conectar con OpenAI: {exc.reason}") from exc
@@ -250,6 +260,17 @@ def summarize_openai_error(error_body):
     except json.JSONDecodeError:
         pass
     return error_body[:400]
+
+
+def is_openai_quota_error(error_body):
+    try:
+        error = json.loads(error_body).get("error", {})
+        if error.get("code") == "insufficient_quota":
+            return True
+        message = clean_string(error.get("message")).lower()
+    except json.JSONDecodeError:
+        message = clean_string(error_body).lower()
+    return "exceeded your current quota" in message or "insufficient quota" in message
 
 
 def normalize_ai_extraction(payload, file_name=""):

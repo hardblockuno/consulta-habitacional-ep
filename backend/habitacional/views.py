@@ -22,6 +22,7 @@ from .services.excel_importer import (
 from .services.rukan_ai import (
     RukanAIConfigurationError,
     RukanAIError,
+    RukanAIQuotaError,
     extraer_rukan_con_ia,
 )
 
@@ -191,6 +192,8 @@ class RukanAIExtractionAPIView(APIView):
             resultado = extraer_rukan_con_ia(archivo, archivo.name)
         except RukanAIConfigurationError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except RukanAIQuotaError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_429_TOO_MANY_REQUESTS)
         except RukanAIError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 

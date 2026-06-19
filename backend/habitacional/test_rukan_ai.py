@@ -1,10 +1,12 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
+from urllib.error import HTTPError
 
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
-from .services.rukan_ai import normalize_ai_extraction
+from .services.rukan_ai import RukanAIQuotaError, normalize_ai_extraction, request_rukan_ai
 
 
 class RukanAITests(TestCase):
@@ -69,3 +71,15 @@ class RukanAITests(TestCase):
         self.assertEqual(result["integrantes"], 1)
         self.assertEqual(result["grupoFamiliar"][0]["fechaNacimiento"], "1980-02-01")
         self.assertEqual(result["estadoRevision"], "detectado")
+
+    @override_settings(OPENAI_API_KEY="sk-prueba-no-real")
+    def test_traduce_cuota_insuficiente_de_openai(self):
+        error_body = b'{"error":{"code":"insufficient_quota","message":"You exceeded your current quota"}}'
+        error = HTTPError("https://api.openai.com/v1/responses", 429, "Too Many Requests", None, None)
+        error.read = lambda: error_body
+
+        with patch("habitacional.services.rukan_ai.urlopen", side_effect=error):
+            with self.assertRaises(RukanAIQuotaError) as raised:
+                request_rukan_ai(b"image", "image/jpeg", "rukan.pdf")
+
+        self.assertIn("cuota disponible", str(raised.exception))
