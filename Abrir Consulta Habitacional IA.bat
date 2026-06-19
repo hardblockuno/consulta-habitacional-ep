@@ -10,14 +10,34 @@ if not exist "%BACKEND%\.env" (
 
 if not exist "%PYTHON%" (
   where py >nul 2>nul
-  if %errorlevel%==0 (
-    py -m venv "%BACKEND%\.venv"
-  ) else (
+  if errorlevel 1 (
     python -m venv "%BACKEND%\.venv"
+  ) else (
+    py -m venv "%BACKEND%\.venv"
   )
 )
 
+if not exist "%PYTHON%" (
+  echo No se pudo crear el entorno de Python. Instala Python y vuelve a intentar.
+  pause
+  exit /b 1
+)
+
+"%PYTHON%" "%BACKEND%\configurar_ia_rukan.py"
+if errorlevel 1 (
+  echo.
+  echo La plataforma necesita una clave de OpenAI para la lectura automatica de Rukan.
+  echo Puedes volver a intentarlo abriendo "Configurar IA Rukan.bat".
+  pause
+  exit /b 1
+)
+
 "%PYTHON%" -m pip install -r "%BACKEND%\requirements.txt"
+if errorlevel 1 (
+  echo No se pudieron instalar las dependencias de la plataforma.
+  pause
+  exit /b 1
+)
 
 start "Consulta Habitacional API IA" cmd /k "cd /d ""%BACKEND%"" && set USE_SQLITE=1 && "".venv\Scripts\python.exe"" manage.py migrate && "".venv\Scripts\python.exe"" manage.py runserver 127.0.0.1:8000"
 timeout /t 3 >nul

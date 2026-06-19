@@ -29,23 +29,18 @@ Ese acceso abre la web y levanta automaticamente el backend local necesario para
 
 ### Rukan con extraccion IA
 
-La herramienta Rukan usa IA automaticamente al procesar PDF. El flujo es:
+La herramienta Rukan usa IA automaticamente al procesar PDF. No necesitas editar archivos de configuracion.
 
-1. Copia `backend/.env.example` como `backend/.env`.
-2. En `backend/.env`, agrega tu clave:
-
-```text
-OPENAI_API_KEY=tu_clave_openai
-OPENAI_MODEL=gpt-5-mini
-```
-
-3. Abre con doble clic:
+1. Abre con doble clic:
 
 ```text
 Abrir Consulta Habitacional.bat
 ```
 
-4. En la web, entra a `Nomina Rukan`, sube los PDF y presiona `Procesar Rukan con IA`.
+2. En la primera apertura aparecera una ventana. Presiona `Abrir pagina para crear una clave`, inicia sesion en tu cuenta de OpenAI, crea una clave de API y pegala en el campo protegido. Se guarda una sola vez en este computador.
+3. En la web, entra a `Nomina Rukan`, sube los PDF y presiona `Procesar Rukan con IA`.
+
+Para cambiar la clave mas adelante, abre con doble clic `Configurar IA Rukan.bat`.
 
 Nota de seguridad: la clave queda solo en `backend/.env`, archivo que no debe subirse a GitHub. La IA procesa los PDF enviados al backend configurado; usa este modo solo con autorizacion interna para tratar esos documentos.
 

@@ -3443,7 +3443,7 @@ async function processRukanPdfWithAI(file, endpoint, onProgress = () => {}) {
   const payload = await parseJsonResponse(response);
   if (!response.ok) {
     if (cleanString(payload.detail).includes("OPENAI_API_KEY")) {
-      throw new Error("Falta configurar OPENAI_API_KEY en backend/.env para activar la lectura automatica con IA.");
+      throw new Error("La IA aun no esta configurada. Cierra esta pagina y abre Abrir Consulta Habitacional.bat: aparecera una ventana para pegar la clave una sola vez.");
     }
     throw new Error(payload.detail || `La IA respondio con estado ${response.status}`);
   }
