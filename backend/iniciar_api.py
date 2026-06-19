@@ -21,6 +21,7 @@ def configurar_registro() -> logging.Logger:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(
         filename=log_path,
+        filemode="w",
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(message)s",
     )
@@ -32,6 +33,14 @@ def main() -> int:
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
     sys.path.insert(0, str(BASE_DIR))
     logger = configurar_registro()
+
+    # pythonw no crea stdout/stderr. Django necesita ambos streams para iniciar
+    # runserver, aunque la aplicacion se ejecute silenciosamente.
+    null_output = open(os.devnull, "w", encoding="utf-8")
+    if sys.stdout is None:
+        sys.stdout = null_output
+    if sys.stderr is None:
+        sys.stderr = null_output
 
     try:
         from django.core.management import execute_from_command_line

@@ -38,7 +38,7 @@ def main() -> int:
     args = parser.parse_args()
     if esperar_api(max(1, args.segundos)):
         return 0
-    print("La API local no inicio. Revisa la ventana 'Consulta Habitacional API IA'.")
+    print("La API local no inicio. Vuelve a abrir Consulta Habitacional.bat.")
     return 1
 
 
