@@ -40,7 +40,7 @@ Abrir Consulta Habitacional.bat
 2. En la primera apertura aparecera una ventana. Presiona `Abrir pagina para crear una clave`, inicia sesion en tu cuenta de OpenAI, crea una clave de API y pegala en el campo protegido. Se guarda una sola vez en este computador.
 3. En la web, entra a `Nomina Rukan`, sube los PDF y presiona `Procesar Rukan con IA`.
 
-Para cambiar la clave mas adelante, abre con doble clic `Configurar IA Rukan.bat`.
+La unica forma de inicio es `Abrir Consulta Habitacional.bat`. Para cambiar la clave mas adelante, abre con doble clic `Configurar IA Rukan.bat`.
 
 No abras solo `docs/index.html` ni el enlace de GitHub Pages para procesar Rukan: abre siempre `Abrir Consulta Habitacional.bat` y manten abierta la ventana `Consulta Habitacional API IA`. El sistema ahora comprueba que ese servicio este listo antes de abrir la web.
 
@@ -61,7 +61,7 @@ Iniciar Trabajo.bat
 Guardar Cambios.bat
 ```
 
-Usa `Iniciar Trabajo.bat` antes de empezar. Este archivo ejecuta `git pull` y luego abre la version estatica en `docs/index.html`.
+Usa `Iniciar Trabajo.bat` antes de empezar. Este archivo ejecuta `git pull` y luego abre la plataforma completa mediante `Abrir Consulta Habitacional.bat`.
 
 Usa `Guardar Cambios.bat` al terminar. Este archivo muestra el estado, pide un mensaje de commit y ejecuta:
 

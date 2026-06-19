@@ -20,9 +20,8 @@ if errorlevel 1 (
 
 echo.
 echo Abriendo Consulta Habitacional...
-start "" "%~dp0docs\index.html"
-timeout /t 3 /nobreak >nul
-exit /b 0
+call "%~dp0Abrir Consulta Habitacional.bat"
+exit /b %errorlevel%
 
 :find_git
 where git >nul 2>nul
