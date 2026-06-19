@@ -21,8 +21,7 @@ El proyecto es una plataforma de consulta habitacional para una Entidad Patrocin
 - Backend Django + Django REST Framework en `backend/`.
 - Frontend React + Vite + Tailwind en `frontend/`.
 - Version estatica directa para GitHub Pages en `docs/`.
-- Archivo de apertura rapida `Abrir Consulta Habitacional.bat`.
-- Accesos de trabajo entre PCs: `Iniciar Trabajo.bat` y `Guardar Cambios.bat`.
+- Archivo unico de apertura local `Consulta Habitacional.bat`.
 
 La version que se usa de forma mas simple hoy es la estatica en `docs/`. Importa archivos Excel en el navegador y guarda datos en `localStorage`.
 
@@ -61,13 +60,13 @@ Lee README.md y CONTEXTO_CODEX.md. Quiero seguir trabajando en este proyecto des
 Opcion de doble clic:
 
 ```text
-Abrir Consulta Habitacional.bat
+Consulta Habitacional.bat
 ```
 
 Opcion recomendada cuando se trabaja entre PCs:
 
 ```text
-Iniciar Trabajo.bat
+Consulta Habitacional.bat
 ```
 
 Este acceso ejecuta `git pull` y luego abre la version estatica.
@@ -89,8 +88,8 @@ http://localhost:8765
 
 Opcion practica:
 
-1. Antes de empezar, doble clic en `Iniciar Trabajo.bat`.
-2. Al terminar, doble clic en `Guardar Cambios.bat`.
+1. Antes de empezar, doble clic en `Consulta Habitacional.bat`.
+2. Al terminar, guarda los cambios de codigo desde Codex o con Git cuando corresponda.
 3. Escribir un mensaje corto para el commit cuando lo pida.
 
 Opcion manual antes de empezar en un PC:

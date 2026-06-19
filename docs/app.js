@@ -3391,9 +3391,9 @@ async function updateRukanConnectionStatus() {
       status.textContent = "Servicio IA local conectado. Puedes procesar los Rukan.";
       return;
     }
-    status.textContent = "El servicio IA local respondio, pero necesita actualizarse. Cierra versiones anteriores y abre Abrir Consulta Habitacional.bat.";
+    status.textContent = "El servicio IA local respondio, pero necesita actualizarse. Cierra versiones anteriores y abre Consulta Habitacional.bat.";
   } catch {
-    status.textContent = "Servicio IA local no disponible. Cierra esta pagina y abre Abrir Consulta Habitacional.bat; manten abierta la ventana de API.";
+    status.textContent = "Servicio IA local no disponible. Cierra esta pagina y abre Consulta Habitacional.bat.";
   }
 }
 
@@ -3466,13 +3466,13 @@ async function processRukanPdfWithAI(file, endpoint, onProgress = () => {}) {
       body: formData,
     });
   } catch (error) {
-    throw new Error("No se pudo conectar con la IA. Abre la plataforma con Abrir Consulta Habitacional.bat y espera a que se abra la ventana de API.");
+    throw new Error("No se pudo conectar con la IA. Cierra esta pagina y abre Consulta Habitacional.bat.");
   }
 
   const payload = await parseJsonResponse(response);
   if (!response.ok) {
     if (cleanString(payload.detail).includes("OPENAI_API_KEY")) {
-      throw new Error("La IA aun no esta configurada. Cierra esta pagina y abre Abrir Consulta Habitacional.bat: aparecera una ventana para pegar la clave una sola vez.");
+      throw new Error("La IA aun no esta configurada. Cierra esta pagina y abre Consulta Habitacional.bat: aparecera una ventana para pegar la clave una sola vez.");
     }
     throw new Error(payload.detail || `La IA respondio con estado ${response.status}`);
   }

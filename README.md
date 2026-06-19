@@ -22,7 +22,7 @@ Start-Process .\docs\index.html
 Tambien puedes abrirla con doble clic en:
 
 ```text
-Abrir Consulta Habitacional.bat
+Consulta Habitacional.bat
 ```
 
 Ese acceso abre la web y levanta automaticamente el backend local necesario para la lectura Rukan con IA. La plataforma guarda los datos operativos en `localStorage` del navegador y permite exportar/importar un respaldo JSON para mover datos entre equipos.
@@ -34,15 +34,15 @@ La herramienta Rukan usa IA automaticamente al procesar PDF. No necesitas editar
 1. Abre con doble clic:
 
 ```text
-Abrir Consulta Habitacional.bat
+Consulta Habitacional.bat
 ```
 
 2. En la primera apertura aparecera una ventana. Presiona `Abrir pagina para crear una clave`, inicia sesion en tu cuenta de OpenAI, crea una clave de API y pegala en el campo protegido. Se guarda una sola vez en este computador.
 3. En la web, entra a `Nomina Rukan`, sube los PDF y presiona `Procesar Rukan con IA`.
 
-La unica forma de inicio es `Abrir Consulta Habitacional.bat`. Para cambiar la clave mas adelante, abre con doble clic `Configurar IA Rukan.bat`.
+La unica forma de inicio es `Consulta Habitacional.bat`. En el primer uso, el mismo archivo abre una ventana para configurar la clave de IA; despues funciona con un solo doble clic.
 
-No abras solo `docs/index.html` ni el enlace de GitHub Pages para procesar Rukan: abre siempre `Abrir Consulta Habitacional.bat` y manten abierta la ventana `Consulta Habitacional API IA`. El sistema ahora comprueba que ese servicio este listo antes de abrir la web.
+No abras solo `docs/index.html` ni el enlace de GitHub Pages para procesar Rukan: abre siempre `Consulta Habitacional.bat`. El iniciador deja la API funcionando en segundo plano y abre Edge cuando ya esta lista.
 
 Nota de seguridad: la clave queda solo en `backend/.env`, archivo que no debe subirse a GitHub. La IA procesa los PDF enviados al backend configurado; usa este modo solo con autorizacion interna para tratar esos documentos.
 
@@ -52,26 +52,9 @@ La pantalla de carga permite dos tipos de archivo:
 - Observaciones y correcciones: se carga despues de la base principal, cruza por RUT/RUN y agrega observaciones internas o actualiza datos como telefono, direccion, etnia, integrantes, RSH, MINVU Conecta o vencimiento de cedula cuando el Excel trae esas columnas.
 - Tipos de vivienda: la base principal puede traer una columna por postulante como `TIPO VIVIENDA`, `TIPO DE VIVIENDA`, `CLASIFICACION VIVIENDA`, `VIVIENDA ASIGNADA` o equivalente. La web la guarda en cada persona y usa la hoja `Financiamiento` solo como detalle complementario cuando exista.
 
-### Accesos rapidos para trabajar entre PCs
+### Uso local
 
-Para evitar repetir comandos manualmente, hay dos archivos de doble clic:
-
-```text
-Iniciar Trabajo.bat
-Guardar Cambios.bat
-```
-
-Usa `Iniciar Trabajo.bat` antes de empezar. Este archivo ejecuta `git pull` y luego abre la plataforma completa mediante `Abrir Consulta Habitacional.bat`.
-
-Usa `Guardar Cambios.bat` al terminar. Este archivo muestra el estado, pide un mensaje de commit y ejecuta:
-
-```powershell
-git add .
-git commit -m "mensaje escrito"
-git push
-```
-
-Si hay datos sensibles o archivos personales, revisa antes de guardar. La carpeta `Bases datos Comites 2026/` esta ignorada por Git.
+El proyecto se abre con un unico archivo: `Consulta Habitacional.bat`. Para trabajar desde otro computador, clona el repositorio, instala Python y usa ese mismo archivo. Los cambios de codigo se pueden subir a GitHub desde Codex o con Git cuando sea necesario.
 
 Para publicarla despues en GitHub Pages:
 
