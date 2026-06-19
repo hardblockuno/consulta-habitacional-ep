@@ -1,16 +1,22 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from urllib.error import HTTPError
 
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
-from .services.rukan_ai import RukanAIQuotaError, normalize_ai_extraction, request_rukan_ai
+from .services.rukan_ai import (
+    RukanAIQuotaError,
+    normalize_ai_extraction,
+    request_rukan_ai,
+    request_rukan_ollama,
+    rukan_ai_status,
+)
 
 
 class RukanAITests(TestCase):
-    @override_settings(OPENAI_API_KEY="")
+    @override_settings(RUKAN_AI_PROVIDER="openai", OPENAI_API_KEY="")
     def test_endpoint_ia_rukan_informa_si_falta_clave(self):
         client = APIClient()
         with TemporaryDirectory() as tmpdir:
@@ -83,3 +89,29 @@ class RukanAITests(TestCase):
                 request_rukan_ai(b"image", "image/jpeg", "rukan.pdf")
 
         self.assertIn("cuota disponible", str(raised.exception))
+
+    @override_settings(RUKAN_AI_PROVIDER="ollama", RUKAN_OLLAMA_MODEL="qwen2.5vl:3b")
+    def test_envia_imagen_a_ollama_local_con_formato_json(self):
+        response = MagicMock()
+        response.read.return_value = b'{"response":"{\\"archivo\\":\\"rukan.pdf\\",\\"confianza\\":90,\\"socio\\":{},\\"grupo_familiar\\":[],\\"observaciones\\":[]}"}'
+        response.__enter__.return_value = response
+
+        with patch("habitacional.services.rukan_ai.urlopen", return_value=response) as urlopen_mock:
+            result = request_rukan_ollama(b"image", "image/jpeg", "rukan.pdf")
+
+        self.assertEqual(result["archivo"], "rukan.pdf")
+        request = urlopen_mock.call_args.args[0]
+        self.assertEqual(request.full_url, "http://127.0.0.1:11434/api/generate")
+        self.assertIn(b'"images": ["aW1hZ2U="]', request.data)
+
+    @override_settings(RUKAN_AI_PROVIDER="ollama", RUKAN_OLLAMA_MODEL="qwen2.5vl:3b")
+    def test_informa_cuando_el_modelo_local_esta_listo(self):
+        response = MagicMock()
+        response.read.return_value = b'{"models":[{"name":"qwen2.5vl:3b"}]}'
+        response.__enter__.return_value = response
+
+        with patch("habitacional.services.rukan_ai.urlopen", return_value=response):
+            result = rukan_ai_status()
+
+        self.assertTrue(result["available"])
+        self.assertEqual(result["provider"], "ollama")

@@ -22,6 +22,10 @@ class RukanAIQuotaError(RukanAIError):
     """Raised when the configured OpenAI account has no available API quota."""
 
 
+class RukanAILocalError(RukanAIConfigurationError):
+    """Raised when the local Ollama service or its model is unavailable."""
+
+
 RUKAN_AI_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -102,8 +106,8 @@ RUKAN_AI_SCHEMA = {
 
 
 def extraer_rukan_con_ia(uploaded_file, file_name=""):
-    api_key = getattr(settings, "OPENAI_API_KEY", "")
-    if not api_key:
+    provider = get_rukan_ai_provider()
+    if provider == "openai" and not getattr(settings, "OPENAI_API_KEY", ""):
         raise RukanAIConfigurationError(
             "Configura OPENAI_API_KEY en backend/.env para usar la extraccion Rukan con IA."
         )
@@ -116,15 +120,83 @@ def extraer_rukan_con_ia(uploaded_file, file_name=""):
         )
 
     image_bytes, mime_type = extract_first_pdf_image(pdf_bytes)
-    ai_payload = request_rukan_ai(
-        image_bytes=image_bytes,
-        mime_type=mime_type,
-        file_name=file_name or getattr(uploaded_file, "name", ""),
-    )
+    source_name = file_name or getattr(uploaded_file, "name", "")
+    if provider == "ollama":
+        ai_payload = request_rukan_ollama(
+            image_bytes=image_bytes,
+            mime_type=mime_type,
+            file_name=source_name,
+        )
+    else:
+        ai_payload = request_rukan_ai(
+            image_bytes=image_bytes,
+            mime_type=mime_type,
+            file_name=source_name,
+        )
     return normalize_ai_extraction(
         ai_payload,
-        file_name=file_name or getattr(uploaded_file, "name", ""),
+        file_name=source_name,
     )
+
+
+def get_rukan_ai_provider():
+    provider = clean_string(getattr(settings, "RUKAN_AI_PROVIDER", "ollama")).lower()
+    if provider not in {"ollama", "openai"}:
+        raise RukanAIConfigurationError("RUKAN_AI_PROVIDER debe ser 'ollama' u 'openai'.")
+    return provider
+
+
+def rukan_ai_status():
+    provider = get_rukan_ai_provider()
+    if provider == "openai":
+        available = bool(getattr(settings, "OPENAI_API_KEY", ""))
+        return {
+            "provider": "openai",
+            "available": available,
+            "model": getattr(settings, "OPENAI_MODEL", "gpt-5-mini"),
+            "message": (
+                "IA OpenAI lista para procesar Rukan."
+                if available
+                else "Falta configurar la clave de OpenAI."
+            ),
+        }
+
+    model = getattr(settings, "RUKAN_OLLAMA_MODEL", "qwen2.5vl:3b")
+    try:
+        response = urlopen(ollama_request("/api/tags"), timeout=4)
+        with response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, OSError):
+        return {
+            "provider": "ollama",
+            "available": False,
+            "model": model,
+            "message": "Falta iniciar Ollama local. Abre Consulta Habitacional.bat para prepararlo.",
+        }
+    except json.JSONDecodeError:
+        return {
+            "provider": "ollama",
+            "available": False,
+            "model": model,
+            "message": "Ollama local respondio con un formato no valido.",
+        }
+
+    installed = {
+        clean_string(item.get("name") or item.get("model"))
+        for item in payload.get("models", [])
+        if isinstance(item, dict)
+    }
+    available = model in installed
+    return {
+        "provider": "ollama",
+        "available": available,
+        "model": model,
+        "message": (
+            f"IA local lista ({model}). Los Rukan se procesan en este computador."
+            if available
+            else f"Falta descargar el modelo local {model}. Abre Consulta Habitacional.bat para prepararlo."
+        ),
+    }
 
 
 def extract_first_pdf_image(pdf_bytes):
@@ -165,8 +237,8 @@ def extract_first_pdf_image(pdf_bytes):
     return data, mime_type
 
 
-def request_rukan_ai(image_bytes, mime_type, file_name):
-    prompt = (
+def rukan_extraction_prompt():
+    return (
         "Extrae informacion desde este formato Rukan chileno escaneado. "
         "Devuelve solo los datos visibles y no inventes informacion. "
         "La persona socia/postulante SIEMPRE es la persona de 'Rut consultado' o 'RUT Consultado' "
@@ -177,6 +249,66 @@ def request_rukan_ai(image_bytes, mime_type, file_name):
         "Si un dato no es visible, usa string vacio. Para confianza usa 0 a 100. "
         "En observaciones, explica campos dudosos o ilegibles y si corresponde revisar manualmente."
     )
+
+
+def request_rukan_ollama(image_bytes, mime_type, file_name):
+    body = {
+        "model": getattr(settings, "RUKAN_OLLAMA_MODEL", "qwen2.5vl:3b"),
+        "prompt": f"Archivo: {file_name}\n\n{rukan_extraction_prompt()}",
+        "images": [base64.b64encode(image_bytes).decode("ascii")],
+        "stream": False,
+        "format": RUKAN_AI_SCHEMA,
+        "options": {"temperature": 0},
+    }
+    request = ollama_request("/api/generate", data=json.dumps(body).encode("utf-8"), method="POST")
+    try:
+        with urlopen(request, timeout=getattr(settings, "RUKAN_OLLAMA_TIMEOUT_SECONDS", 180)) as response:
+            response_body = response.read().decode("utf-8")
+    except HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="replace")
+        if exc.code == 404:
+            raise RukanAILocalError(
+                "No se encontro el modelo local de Ollama. Abre Consulta Habitacional.bat para descargarlo."
+            ) from exc
+        raise RukanAIError(f"Ollama local respondio con error {exc.code}: {error_body[:300]}") from exc
+    except URLError as exc:
+        raise RukanAILocalError(
+            "Ollama local no esta disponible. Abre Consulta Habitacional.bat y completa su preparacion."
+        ) from exc
+    except TimeoutError as exc:
+        raise RukanAIError("La IA local excedio el tiempo de espera. Prueba con menos Rukan a la vez.") from exc
+
+    try:
+        response_data = json.loads(response_body)
+        output_text = clean_string(response_data.get("response"))
+    except json.JSONDecodeError as exc:
+        raise RukanAIError("Ollama local devolvio una respuesta no valida.") from exc
+    if not output_text:
+        raise RukanAIError("La IA local no devolvio datos estructurados para este Rukan.")
+    try:
+        return json.loads(output_text)
+    except json.JSONDecodeError as exc:
+        raise RukanAIError("La IA local devolvio texto, pero no corresponde al formato esperado.") from exc
+
+
+def ollama_request(path, data=None, method="GET"):
+    base_url = clean_string(getattr(settings, "RUKAN_OLLAMA_URL", "http://127.0.0.1:11434")).rstrip("/")
+    return Request(
+        f"{base_url}{path}",
+        data=data,
+        headers={"Content-Type": "application/json"} if data is not None else {},
+        method=method,
+    )
+
+
+def request_rukan_ai(image_bytes, mime_type, file_name):
+    api_key = getattr(settings, "OPENAI_API_KEY", "")
+    if not api_key:
+        raise RukanAIConfigurationError(
+            "Configura OPENAI_API_KEY en backend/.env para usar la extraccion Rukan con IA."
+        )
+
+    prompt = rukan_extraction_prompt()
     encoded = base64.b64encode(image_bytes).decode("ascii")
     body = {
         "model": getattr(settings, "OPENAI_MODEL", "gpt-5-mini"),

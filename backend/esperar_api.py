@@ -8,7 +8,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
-RUKAN_AI_URL = "http://127.0.0.1:8000/api/rukan/ia-extraer/"
+RUKAN_AI_URL = "http://127.0.0.1:8000/api/rukan/ia-estado/"
 
 
 def api_disponible(url: str = RUKAN_AI_URL) -> bool:
@@ -16,10 +16,7 @@ def api_disponible(url: str = RUKAN_AI_URL) -> bool:
     try:
         with urlopen(request, timeout=1):
             return True
-    except HTTPError as error:
-        # El endpoint existe y solo acepta POST, por lo que GET devuelve 405.
-        return error.code == 405
-    except URLError:
+    except (HTTPError, URLError):
         return False
 
 

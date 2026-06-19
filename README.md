@@ -27,9 +27,9 @@ Consulta Habitacional.bat
 
 Ese acceso abre la web y levanta automaticamente el backend local necesario para la lectura Rukan con IA. La plataforma guarda los datos operativos en `localStorage` del navegador y permite exportar/importar un respaldo JSON para mover datos entre equipos.
 
-### Rukan con extraccion IA
+### Rukan con IA local gratuita
 
-La herramienta Rukan usa IA automaticamente al procesar PDF. No necesitas editar archivos de configuracion.
+La herramienta Rukan procesa PDF con IA local gratuita mediante Ollama. Los documentos no se envian a OpenAI ni consumen creditos por archivo.
 
 1. Abre con doble clic:
 
@@ -37,14 +37,15 @@ La herramienta Rukan usa IA automaticamente al procesar PDF. No necesitas editar
 Consulta Habitacional.bat
 ```
 
-2. En la primera apertura aparecera una ventana. Presiona `Abrir pagina para crear una clave`, inicia sesion en tu cuenta de OpenAI, crea una clave de API y pegala en el campo protegido. Se guarda una sola vez en este computador.
-3. En la web, entra a `Nomina Rukan`, sube los PDF y presiona `Procesar Rukan con IA`.
+2. La primera vez, el iniciador abre la descarga oficial de Ollama. Instalalo y vuelve a abrir `Consulta Habitacional.bat`.
+3. El iniciador descarga una sola vez el modelo visual local `qwen2.5vl:3b`.
+4. En la web, entra a `Nomina Rukan`, sube los PDF y presiona `Procesar Rukan con IA`.
 
-La unica forma de inicio es `Consulta Habitacional.bat`. En el primer uso, el mismo archivo abre una ventana para configurar la clave de IA; despues funciona con un solo doble clic.
+La unica forma de inicio es `Consulta Habitacional.bat`. Tras la preparacion inicial de Ollama y el modelo, funciona con un solo doble clic.
 
 No abras solo `docs/index.html` ni el enlace de GitHub Pages para procesar Rukan: abre siempre `Consulta Habitacional.bat`. El iniciador deja la API funcionando en segundo plano y abre Edge cuando ya esta lista.
 
-Nota de seguridad: la clave queda solo en `backend/.env`, archivo que no debe subirse a GitHub. La IA procesa los PDF enviados al backend configurado; usa este modo solo con autorizacion interna para tratar esos documentos.
+Nota de privacidad: la IA local procesa los PDF dentro de este computador. El modelo puede cometer errores de lectura, por lo que los resultados deben conservar estado de revision humana.
 
 La pantalla de carga permite dos tipos de archivo:
 
@@ -153,6 +154,7 @@ La app queda en `http://localhost:5173` y consume `http://localhost:8000/api`.
 - `POST /api/importar/excel/`
 - `POST /api/importar/observaciones/`
 - `POST /api/rukan/ia-extraer/`
+- `GET /api/rukan/ia-estado/`
 - `GET /api/dashboard/resumen/`
 - `GET /api/alertas/`
 - `GET /api/reportes/resumen/`

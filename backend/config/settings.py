@@ -112,6 +112,10 @@ REST_FRAMEWORK = {
 }
 
 AHORRO_MINIMO_UF = os.getenv("AHORRO_MINIMO_UF", "10")
+RUKAN_AI_PROVIDER = os.getenv("RUKAN_AI_PROVIDER", "ollama").strip().lower()
+RUKAN_OLLAMA_URL = os.getenv("RUKAN_OLLAMA_URL", "http://127.0.0.1:11434")
+RUKAN_OLLAMA_MODEL = os.getenv("RUKAN_OLLAMA_MODEL", "qwen2.5vl:3b")
+RUKAN_OLLAMA_TIMEOUT_SECONDS = int(os.getenv("RUKAN_OLLAMA_TIMEOUT_SECONDS", "180"))
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5-mini")
 OPENAI_RESPONSES_URL = os.getenv("OPENAI_RESPONSES_URL", "https://api.openai.com/v1/responses")

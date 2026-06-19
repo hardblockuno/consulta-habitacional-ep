@@ -12,6 +12,13 @@ SPEC.loader.exec_module(configurar_ia_rukan)
 
 
 class ConfiguradorIARukanTests(SimpleTestCase):
+    def test_ollama_local_no_requiere_clave(self):
+        with TemporaryDirectory() as tmpdir:
+            env_file = Path(tmpdir) / ".env"
+            env_file.write_text("RUKAN_AI_PROVIDER=ollama\nOPENAI_API_KEY=\n", encoding="utf-8")
+
+            self.assertTrue(configurar_ia_rukan.configuracion_ia_lista(env_file))
+
     def test_guarda_solo_la_clave_y_conserva_las_otras_variables(self):
         with TemporaryDirectory() as tmpdir:
             env_file = Path(tmpdir) / ".env"

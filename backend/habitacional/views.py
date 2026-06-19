@@ -24,6 +24,7 @@ from .services.rukan_ai import (
     RukanAIError,
     RukanAIQuotaError,
     extraer_rukan_con_ia,
+    rukan_ai_status,
 )
 
 
@@ -198,6 +199,17 @@ class RukanAIExtractionAPIView(APIView):
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(resultado, status=status.HTTP_200_OK)
+
+
+class RukanAIStatusAPIView(APIView):
+    def get(self, request):
+        try:
+            return Response(rukan_ai_status())
+        except RukanAIConfigurationError as exc:
+            return Response(
+                {"provider": "unknown", "available": False, "message": str(exc)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
 
 class DashboardResumenAPIView(APIView):

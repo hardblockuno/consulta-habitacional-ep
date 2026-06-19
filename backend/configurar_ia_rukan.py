@@ -22,6 +22,7 @@ ENV_FILE = BACKEND_DIR / ".env"
 ENV_EXAMPLE_FILE = BACKEND_DIR / ".env.example"
 OPENAI_KEY_PAGE = "https://platform.openai.com/api-keys"
 KEY_PATTERN = re.compile(r"^(\s*OPENAI_API_KEY\s*=).*$", re.IGNORECASE)
+PROVIDER_PATTERN = re.compile(r"^\s*RUKAN_AI_PROVIDER\s*=\s*(.+?)\s*$", re.IGNORECASE)
 
 
 def api_key_configurada(env_file: Path = ENV_FILE) -> bool:
@@ -34,6 +35,20 @@ def api_key_configurada(env_file: Path = ENV_FILE) -> bool:
         if KEY_PATTERN.match(line):
             return bool(line.partition("=")[2].strip())
     return False
+
+
+def proveedor_ia(env_file: Path = ENV_FILE) -> str:
+    if env_file.exists():
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            match = PROVIDER_PATTERN.match(line)
+            if match:
+                return match.group(1).strip().lower()
+    return os.getenv("RUKAN_AI_PROVIDER", "ollama").strip().lower()
+
+
+def configuracion_ia_lista(env_file: Path = ENV_FILE) -> bool:
+    """Ollama local no necesita clave; OpenAI si requiere una."""
+    return proveedor_ia(env_file) != "openai" or api_key_configurada(env_file)
 
 
 def guardar_api_key(api_key: str, env_file: Path = ENV_FILE) -> None:
@@ -66,7 +81,7 @@ def guardar_api_key(api_key: str, env_file: Path = ENV_FILE) -> None:
 
 def abrir_asistente(forzar: bool = False) -> bool:
     """Muestra un formulario grafico solo si aun no hay una clave configurada."""
-    if not forzar and api_key_configurada():
+    if not forzar and configuracion_ia_lista():
         return True
 
     root = tk.Tk()

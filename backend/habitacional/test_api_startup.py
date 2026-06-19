@@ -1,7 +1,6 @@
 import importlib.util
 from pathlib import Path
-from unittest.mock import patch
-from urllib.error import HTTPError
+from unittest.mock import MagicMock, patch
 
 from django.test import SimpleTestCase
 
@@ -13,7 +12,8 @@ SPEC.loader.exec_module(esperar_api)
 
 
 class EsperarApiTests(SimpleTestCase):
-    def test_considera_disponible_el_endpoint_que_responde_405_a_get(self):
-        error = HTTPError(esperar_api.RUKAN_AI_URL, 405, "Method Not Allowed", None, None)
-        with patch.object(esperar_api, "urlopen", side_effect=error):
+    def test_considera_disponible_el_endpoint_de_estado_que_responde_get(self):
+        response = MagicMock()
+        response.__enter__.return_value = response
+        with patch.object(esperar_api, "urlopen", return_value=response):
             self.assertTrue(esperar_api.api_disponible())

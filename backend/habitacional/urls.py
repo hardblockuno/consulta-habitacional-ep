@@ -9,6 +9,7 @@ from .views import (
     PersonaViewSet,
     ReportesResumenAPIView,
     RukanAIExtractionAPIView,
+    RukanAIStatusAPIView,
 )
 
 router = DefaultRouter()
@@ -24,6 +25,7 @@ urlpatterns = [
         name="importar-observaciones",
     ),
     path("rukan/ia-extraer/", RukanAIExtractionAPIView.as_view(), name="rukan-ia-extraer"),
+    path("rukan/ia-estado/", RukanAIStatusAPIView.as_view(), name="rukan-ia-estado"),
     path("dashboard/resumen/", DashboardResumenAPIView.as_view(), name="dashboard-resumen"),
     path("reportes/resumen/", ReportesResumenAPIView.as_view(), name="reportes-resumen"),
 ]

@@ -42,6 +42,28 @@ if errorlevel 1 (
   )
 )
 
+where ollama >nul 2>nul
+if errorlevel 1 (
+  echo.
+  echo Para usar la IA local gratuita se requiere instalar Ollama una sola vez.
+  echo Se abrira la descarga oficial. Instalalo y vuelve a abrir este archivo.
+  start "" "https://ollama.com/download/windows"
+  pause
+  exit /b 1
+)
+
+ollama list | findstr /I /C:"qwen2.5vl:3b" >nul
+if errorlevel 1 (
+  echo.
+  echo Descargando el modelo local gratuito. Esto ocurre una sola vez y puede tardar varios minutos.
+  ollama pull qwen2.5vl:3b
+  if errorlevel 1 (
+    echo No se pudo descargar el modelo local. Verifica tu conexion y vuelve a abrir este archivo.
+    pause
+    exit /b 1
+  )
+)
+
 "%PYTHON%" "%BACKEND%\esperar_api.py" --segundos 1 >nul 2>nul
 if errorlevel 1 (
   if not exist "%PYTHONW%" set "PYTHONW=%PYTHON%"

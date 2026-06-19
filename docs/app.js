@@ -3,6 +3,7 @@ const WORKSPACES_KEY = "consultaHabitacionalEP:workspaces:v1";
 const RUKAN_TOOL_KEY = "consultaHabitacionalEP:rukanTool:v1";
 const RUKAN_AI_ENDPOINT_KEY = "consultaHabitacionalEP:rukanAiEndpoint:v1";
 const RUKAN_AI_DEFAULT_ENDPOINT = "http://127.0.0.1:8000/api/rukan/ia-extraer/";
+const RUKAN_AI_STATUS_ENDPOINT = "http://127.0.0.1:8000/api/rukan/ia-estado/";
 const DEFAULT_WORKSPACE_NAME = "Comité sin nombre";
 const MAYORIA_EDAD = 18;
 const HIJO_PROXIMO_18_DIAS = 90;
@@ -3148,8 +3149,8 @@ function renderRukan() {
           </label>
         </div>
         <div class="rukan-ai-box">
-          <strong>Extraccion IA automatica</strong>
-          <p class="small muted">Al procesar, la plataforma lee cada Rukan con IA para identificar el socio consultado y sus integrantes del hogar.</p>
+          <strong>Extraccion IA local sin costo</strong>
+          <p class="small muted">Al procesar, la plataforma lee cada Rukan en este computador para identificar el socio consultado y sus integrantes del hogar.</p>
           <p id="rukanConnectionState" class="small muted">Comprobando servicio IA local...</p>
         </div>
         <div id="rukanMessage"></div>
@@ -3385,13 +3386,14 @@ async function updateRukanConnectionStatus() {
   const status = document.getElementById("rukanConnectionState");
   if (!status) return;
   try {
-    const response = await fetch(RUKAN_AI_DEFAULT_ENDPOINT, { method: "GET" });
+    const response = await fetch(RUKAN_AI_STATUS_ENDPOINT, { method: "GET" });
     if (!document.getElementById("rukanConnectionState")) return;
-    if (response.status === 405) {
-      status.textContent = "Servicio IA local conectado. Puedes procesar los Rukan.";
+    const payload = await parseJsonResponse(response);
+    if (response.ok && payload.available) {
+      status.textContent = payload.message || "IA local lista. Puedes procesar los Rukan.";
       return;
     }
-    status.textContent = "El servicio IA local respondio, pero necesita actualizarse. Cierra versiones anteriores y abre Consulta Habitacional.bat.";
+    status.textContent = payload.message || "La IA local necesita prepararse. Cierra esta pagina y abre Consulta Habitacional.bat.";
   } catch {
     status.textContent = "Servicio IA local no disponible. Cierra esta pagina y abre Consulta Habitacional.bat.";
   }
