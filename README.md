@@ -42,6 +42,8 @@ Abrir Consulta Habitacional.bat
 
 Para cambiar la clave mas adelante, abre con doble clic `Configurar IA Rukan.bat`.
 
+No abras solo `docs/index.html` ni el enlace de GitHub Pages para procesar Rukan: abre siempre `Abrir Consulta Habitacional.bat` y manten abierta la ventana `Consulta Habitacional API IA`. El sistema ahora comprueba que ese servicio este listo antes de abrir la web.
+
 Nota de seguridad: la clave queda solo en `backend/.env`, archivo que no debe subirse a GitHub. La IA procesa los PDF enviados al backend configurado; usa este modo solo con autorizacion interna para tratar esos documentos.
 
 La pantalla de carga permite dos tipos de archivo:

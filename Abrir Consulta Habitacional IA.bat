@@ -40,5 +40,13 @@ if errorlevel 1 (
 )
 
 start "Consulta Habitacional API IA" cmd /k "cd /d ""%BACKEND%"" && set USE_SQLITE=1 && "".venv\Scripts\python.exe"" manage.py migrate && "".venv\Scripts\python.exe"" manage.py runserver 127.0.0.1:8000"
-timeout /t 3 >nul
+"%PYTHON%" "%BACKEND%\esperar_api.py" --segundos 35
+if errorlevel 1 (
+  echo.
+  echo La web no se abrira porque la API local no pudo iniciar.
+  echo Revisa la ventana "Consulta Habitacional API IA" para ver el motivo.
+  pause
+  exit /b 1
+)
+
 start "" "%ROOT%docs\index.html"

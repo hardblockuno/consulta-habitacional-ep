@@ -3150,6 +3150,7 @@ function renderRukan() {
         <div class="rukan-ai-box">
           <strong>Extraccion IA automatica</strong>
           <p class="small muted">Al procesar, la plataforma lee cada Rukan con IA para identificar el socio consultado y sus integrantes del hogar.</p>
+          <p id="rukanConnectionState" class="small muted">Comprobando servicio IA local...</p>
         </div>
         <div id="rukanMessage"></div>
         <div class="toolbar-row">
@@ -3194,6 +3195,7 @@ function renderRukan() {
   document.getElementById("clearRukanBtn").addEventListener("click", clearRukanBase);
   document.getElementById("rukanSearch").addEventListener("input", (event) => renderRukanBaseTable(event.target.value));
   renderRukanBaseTable();
+  void updateRukanConnectionStatus();
 }
 
 function renderRukanBaseTable(query = "") {
@@ -3379,6 +3381,22 @@ function clearRukanBase() {
   renderRukan();
 }
 
+async function updateRukanConnectionStatus() {
+  const status = document.getElementById("rukanConnectionState");
+  if (!status) return;
+  try {
+    const response = await fetch(RUKAN_AI_DEFAULT_ENDPOINT, { method: "GET" });
+    if (!document.getElementById("rukanConnectionState")) return;
+    if (response.status === 405) {
+      status.textContent = "Servicio IA local conectado. Puedes procesar los Rukan.";
+      return;
+    }
+    status.textContent = "El servicio IA local respondio, pero necesita actualizarse. Cierra versiones anteriores y abre Abrir Consulta Habitacional.bat.";
+  } catch {
+    status.textContent = "Servicio IA local no disponible. Cierra esta pagina y abre Abrir Consulta Habitacional.bat; manten abierta la ventana de API.";
+  }
+}
+
 async function handleRukanImport(event) {
   event.preventDefault();
   const message = document.getElementById("rukanMessage");
@@ -3393,6 +3411,7 @@ async function handleRukanImport(event) {
   message.innerHTML = notice(`Preparando extraccion con IA para ${formatNumber(files.length)} archivo(s)...`);
   let processed = 0;
   let omitted = 0;
+  const errors = [];
   for (const file of files) {
     try {
       const parsed = await processRukanPdfWithAI(file, aiEndpoint, (text) => {
@@ -3416,14 +3435,24 @@ async function handleRukanImport(event) {
       saveRukanToolState();
     } catch (error) {
       omitted += 1;
+      errors.push(`${file.name}: ${error.message || "no se pudo procesar"}`);
       registerRukanLoad({ archivo: file.name, estado: "error_ia", confianza: null });
       saveRukanToolState();
       message.innerHTML = notice(`${file.name}: ${error.message || "no se pudo procesar"}`, "error");
       console.error(error);
     }
   }
-  message.innerHTML = notice(`Rukan procesados: ${formatNumber(processed)} actualizados, ${formatNumber(omitted)} omitidos.`, processed ? "success" : "error");
+  const resultText = [
+    `Rukan procesados: ${formatNumber(processed)} actualizados, ${formatNumber(omitted)} omitidos.`,
+    errors.length ? `Detalle: ${errors[0]}` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const resultType = processed ? "success" : "error";
+  message.innerHTML = notice(resultText, resultType);
   renderRukan();
+  const refreshedMessage = document.getElementById("rukanMessage");
+  if (refreshedMessage) refreshedMessage.innerHTML = notice(resultText, resultType);
 }
 
 async function processRukanPdfWithAI(file, endpoint, onProgress = () => {}) {
