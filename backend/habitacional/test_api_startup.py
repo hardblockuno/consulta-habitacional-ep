@@ -17,3 +17,11 @@ class EsperarApiTests(SimpleTestCase):
         response.__enter__.return_value = response
         with patch.object(esperar_api, "urlopen", return_value=response):
             self.assertTrue(esperar_api.api_disponible())
+
+    def test_requiere_el_proveedor_local_indicado(self):
+        response = MagicMock()
+        response.read.return_value = b'{"provider":"tesseract"}'
+        response.__enter__.return_value = response
+        with patch.object(esperar_api, "urlopen", return_value=response):
+            self.assertTrue(esperar_api.api_disponible(provider="tesseract"))
+            self.assertFalse(esperar_api.api_disponible(provider="ollama"))

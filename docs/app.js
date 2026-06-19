@@ -3149,13 +3149,13 @@ function renderRukan() {
           </label>
         </div>
         <div class="rukan-ai-box">
-          <strong>Extraccion IA local sin costo</strong>
-          <p class="small muted">Al procesar, la plataforma lee cada Rukan en este computador para identificar el socio consultado y sus integrantes del hogar.</p>
-          <p id="rukanConnectionState" class="small muted">Comprobando servicio IA local...</p>
+          <strong>Lectura automatica local sin costo</strong>
+          <p class="small muted">Al procesar, la plataforma lee las tablas del Rukan en este computador para identificar el socio consultado y sus integrantes del hogar.</p>
+          <p id="rukanConnectionState" class="small muted">Comprobando lectura local...</p>
         </div>
         <div id="rukanMessage"></div>
         <div class="toolbar-row">
-          <button class="button primary" type="submit">Procesar Rukan con IA</button>
+          <button class="button primary" type="submit">Procesar Rukan</button>
           <span class="small muted">No solicita ClaveUnica. Los resultados quedan guardados en este navegador.</span>
         </div>
       </form>
@@ -3390,12 +3390,12 @@ async function updateRukanConnectionStatus() {
     if (!document.getElementById("rukanConnectionState")) return;
     const payload = await parseJsonResponse(response);
     if (response.ok && payload.available) {
-      status.textContent = payload.message || "IA local lista. Puedes procesar los Rukan.";
+      status.textContent = payload.message || "Lectura local lista. Puedes procesar los Rukan.";
       return;
     }
-    status.textContent = payload.message || "La IA local necesita prepararse. Cierra esta pagina y abre Consulta Habitacional.bat.";
+    status.textContent = payload.message || "La lectura local necesita prepararse. Cierra esta pagina y abre Consulta Habitacional.bat.";
   } catch {
-    status.textContent = "Servicio IA local no disponible. Cierra esta pagina y abre Consulta Habitacional.bat.";
+    status.textContent = "Servicio de lectura local no disponible. Cierra esta pagina y abre Consulta Habitacional.bat.";
   }
 }
 
@@ -3410,7 +3410,7 @@ async function handleRukanImport(event) {
     return;
   }
 
-  message.innerHTML = notice(`Preparando extraccion con IA para ${formatNumber(files.length)} archivo(s)...`);
+  message.innerHTML = notice(`Preparando lectura automatica para ${formatNumber(files.length)} archivo(s)...`);
   let processed = 0;
   let omitted = 0;
   const errors = [];
@@ -3458,7 +3458,7 @@ async function handleRukanImport(event) {
 }
 
 async function processRukanPdfWithAI(file, endpoint, onProgress = () => {}) {
-  onProgress("enviando PDF al backend IA");
+  onProgress("enviando PDF al lector local");
   const formData = new FormData();
   formData.append("archivo", file, file.name);
   let response;
@@ -3468,15 +3468,15 @@ async function processRukanPdfWithAI(file, endpoint, onProgress = () => {}) {
       body: formData,
     });
   } catch (error) {
-    throw new Error("No se pudo conectar con la IA. Cierra esta pagina y abre Consulta Habitacional.bat.");
+    throw new Error("No se pudo conectar con el lector local. Cierra esta pagina y abre Consulta Habitacional.bat.");
   }
 
   const payload = await parseJsonResponse(response);
   if (!response.ok) {
     if (cleanString(payload.detail).includes("OPENAI_API_KEY")) {
-      throw new Error("La IA aun no esta configurada. Cierra esta pagina y abre Consulta Habitacional.bat: aparecera una ventana para pegar la clave una sola vez.");
+      throw new Error("La lectura local aun no esta preparada. Cierra esta pagina y abre Consulta Habitacional.bat.");
     }
-    throw new Error(payload.detail || `La IA respondio con estado ${response.status}`);
+    throw new Error(payload.detail || `El lector local respondio con estado ${response.status}`);
   }
 
   const parsed = normalizeRukanSocio({
@@ -3488,7 +3488,7 @@ async function processRukanPdfWithAI(file, endpoint, onProgress = () => {}) {
   if (!parsed?.rut) {
     throw new Error("La IA no devolvio un RUT consultado utilizable para este Rukan.");
   }
-  onProgress("extraccion IA recibida");
+  onProgress("lectura automatica recibida");
   return parsed;
 }
 

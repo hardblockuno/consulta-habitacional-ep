@@ -1,8 +1,4 @@
-"""Asistente local para guardar la clave de OpenAI usada por Rukan.
-
-Este archivo se ejecuta solo en el computador de la persona usuaria. La clave
-se guarda en backend/.env, que esta excluido de Git y no llega al navegador.
-"""
+"""Prepara la lectura local de Rukan y conserva OpenAI como alternativa."""
 
 from __future__ import annotations
 
@@ -43,7 +39,33 @@ def proveedor_ia(env_file: Path = ENV_FILE) -> str:
             match = PROVIDER_PATTERN.match(line)
             if match:
                 return match.group(1).strip().lower()
-    return os.getenv("RUKAN_AI_PROVIDER", "ollama").strip().lower()
+    return os.getenv("RUKAN_AI_PROVIDER", "tesseract").strip().lower()
+
+
+def habilitar_ocr_local(env_file: Path = ENV_FILE) -> None:
+    """Migra la configuracion local anterior de Ollama al OCR liviano."""
+    if not env_file.exists() and ENV_EXAMPLE_FILE.exists():
+        env_file.write_text(ENV_EXAMPLE_FILE.read_text(encoding="utf-8"), encoding="utf-8")
+
+    lines = env_file.read_text(encoding="utf-8").splitlines() if env_file.exists() else []
+    replaced = False
+    updated_lines = []
+    for line in lines:
+        match = PROVIDER_PATTERN.match(line)
+        if match and match.group(1).strip().lower() in {"", "ollama"}:
+            updated_lines.append("RUKAN_AI_PROVIDER=tesseract")
+            replaced = True
+        else:
+            updated_lines.append(line)
+
+    if not any(PROVIDER_PATTERN.match(line) for line in updated_lines):
+        if updated_lines and updated_lines[-1].strip():
+            updated_lines.append("")
+        updated_lines.append("RUKAN_AI_PROVIDER=tesseract")
+        replaced = True
+
+    if replaced:
+        env_file.write_text("\n".join(updated_lines) + "\n", encoding="utf-8")
 
 
 def configuracion_ia_lista(env_file: Path = ENV_FILE) -> bool:
@@ -166,6 +188,7 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
+        habilitar_ocr_local()
         return 0 if abrir_asistente(forzar=args.forzar) else 1
     except Exception as error:  # pragma: no cover - fallback for Windows GUI errors
         print(f"No fue posible abrir el asistente de IA: {error}", file=sys.stderr)
