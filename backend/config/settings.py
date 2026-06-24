@@ -4,7 +4,13 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env")
+ENV_FILE = Path(os.getenv("CONSULTA_ENV_FILE", BASE_DIR / ".env"))
+load_dotenv(ENV_FILE)
+
+# En la version instalable, el codigo queda protegido bajo Program Files y
+# los datos operativos se mantienen en el perfil de la persona usuaria.
+APP_DATA_DIR = Path(os.getenv("CONSULTA_APP_DATA", BASE_DIR)).expanduser()
+APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-consulta-habitacional-ep")
 DEBUG = os.getenv("DEBUG", "1") == "1"
@@ -61,7 +67,7 @@ if os.getenv("USE_SQLITE", "0") == "1":
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
+            "NAME": APP_DATA_DIR / "consulta_habitacional.sqlite3",
         }
     }
 else:
@@ -90,7 +96,7 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = APP_DATA_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

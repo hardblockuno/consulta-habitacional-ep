@@ -46,6 +46,16 @@ No abras solo `docs/index.html` ni el enlace de GitHub Pages para procesar Rukan
 
 Nota de privacidad: la lectura local procesa los PDF dentro de este computador. La lectura puede cometer errores, por lo que los resultados deben conservar estado de revision humana.
 
+### Instalador de Windows
+
+La version instalable se genera con `build_installer.ps1`. El resultado es `build/installer/ConsultaHabitacionalEP-Setup.exe` e incluye la interfaz, la API local, SQLite y Tesseract OCR con espanol e ingles.
+
+La instalacion guarda la base local, respaldos y registro tecnico en `%LOCALAPPDATA%\ConsultaHabitacionalEP`; desinstalar el programa no elimina esos datos. Para construir el instalador se requiere Inno Setup 6 y se ejecuta:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build_installer.ps1
+```
+
 La pantalla de carga permite dos tipos de archivo:
 
 - Base principal del comite: crea o actualiza personas por RUT/RUN.
