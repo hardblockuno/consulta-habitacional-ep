@@ -10,7 +10,6 @@ services:
     startCommand: "gunicorn config.wsgi:application"
     healthCheckPath: "/"
     envVars:
-      # Pega aqui la connection string de Neon (ej: postgresql://user:pass@ep-xyz.us-east-2.aws.neon.tech/neondb?sslmode=require)
       - key: DATABASE_URL
         sync: false
       - key: SECRET_KEY
@@ -24,8 +23,6 @@ services:
   - type: web
     name: consulta-habitacional-web
     runtime: static
-    region: oregon
-    plan: free
     rootDir: frontend
     buildCommand: "npm install && npm run build"
     staticPublishPath: "./dist"
