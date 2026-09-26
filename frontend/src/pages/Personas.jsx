@@ -10,8 +10,9 @@ export default function Personas() {
   const searchInputRef = useRef(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState("");
-  const [estado, setEstado] = useState("");
+  const [estado, setEstado] = useState(searchParams.get("estado") || "");
   const [filtro, setFiltro] = useState(searchParams.get("filtro") || "");
+  const [comite, setComite] = useState(searchParams.get("comite") || "");
   const [personas, setPersonas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -21,7 +22,12 @@ export default function Personas() {
     setLoading(true);
     api
       .get(query ? "/personas/buscar/" : "/personas/", {
-        params: { q: query || undefined, estado: estado || undefined, filtro: filtro || undefined },
+        params: {
+          q: query || undefined,
+          estado: estado || undefined,
+          filtro: filtro || undefined,
+          comite: comite || undefined,
+        },
         signal: controller.signal,
       })
       .then((response) => {
@@ -33,7 +39,7 @@ export default function Personas() {
       })
       .finally(() => setLoading(false));
     return () => controller.abort();
-  }, [query, estado, filtro]);
+  }, [query, estado, filtro, comite]);
 
   useEffect(() => {
     if (window.matchMedia("(min-width: 700px)").matches) {
@@ -43,33 +49,77 @@ export default function Personas() {
 
   useEffect(() => {
     setFiltro(searchParams.get("filtro") || "");
+    setEstado(searchParams.get("estado") || "");
+    setComite(searchParams.get("comite") || "");
   }, [searchParams]);
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold uppercase text-cyan-700">Consulta rápida</p>
-          <h1 className="mt-1 text-2xl font-semibold text-slate-950">Buscar persona</h1>
+          <p className="text-sm font-semibold uppercase text-cyan-700">Consulta y padrón</p>
+          <h1 className="mt-1 text-2xl font-semibold text-slate-950">
+            {comite ? `Padrón de socios: ${comite}` : "Buscar persona en padrón"}
+          </h1>
+          {comite && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="rounded bg-cyan-100 px-2 py-0.5 text-xs font-semibold text-cyan-800">
+                Filtrado por: {comite}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setComite("");
+                  const p = new URLSearchParams(searchParams);
+                  p.delete("comite");
+                  setSearchParams(p);
+                }}
+                className="text-xs font-semibold text-cyan-700 hover:underline"
+              >
+                (Quitar filtro de comité)
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="grid gap-3 md:grid-cols-[1fr_220px_260px]">
+        <div className="grid gap-3 md:grid-cols-[1fr_180px_200px_160px]">
           <label className="relative block">
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input
               ref={searchInputRef}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="RUT o nombre"
+              placeholder="RUT, nombre o comité"
               autoComplete="off"
               className="h-11 w-full rounded-lg border border-slate-300 bg-white pl-10 pr-3 text-sm outline-none ring-cyan-700 transition focus:border-cyan-700 focus:ring-2"
             />
           </label>
+          <input
+            type="text"
+            value={comite}
+            onChange={(event) => {
+              const val = event.target.value;
+              setComite(val);
+              const p = new URLSearchParams(searchParams);
+              if (val) p.set("comite", val);
+              else p.delete("comite");
+              setSearchParams(p);
+            }}
+            placeholder="Filtrar comité..."
+            className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none ring-cyan-700 transition focus:border-cyan-700 focus:ring-2"
+          />
           <select
             value={estado}
-            onChange={(event) => setEstado(event.target.value)}
+            onChange={(event) => {
+              const val = event.target.value;
+              setEstado(val);
+              const p = new URLSearchParams(searchParams);
+              if (val) p.set("estado", val);
+              else p.delete("estado");
+              setSearchParams(p);
+            }}
             className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none ring-cyan-700 transition focus:border-cyan-700 focus:ring-2"
           >
             <option value="">Todos los estados</option>
@@ -82,16 +132,19 @@ export default function Personas() {
             onChange={(event) => {
               const value = event.target.value;
               setFiltro(value);
-              setSearchParams(value ? { filtro: value } : {});
+              const p = new URLSearchParams(searchParams);
+              if (value) p.set("filtro", value);
+              else p.delete("filtro");
+              setSearchParams(p);
             }}
             className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none ring-cyan-700 transition focus:border-cyan-700 focus:ring-2"
           >
             <option value="">Todos</option>
-            <option value="cedulas_revision">Cédulas vencidas o por vencer</option>
+            <option value="cedulas_revision">Cédulas por vencer</option>
             <option value="adultos_mayores">Adultos mayores</option>
             <option value="discapacidad">Discapacidad</option>
-            <option value="etnia">Etnia / pueblo originario</option>
-            <option value="unipersonal">Postulación unipersonal</option>
+            <option value="etnia">Pueblo originario</option>
+            <option value="unipersonal">Unipersonal</option>
           </select>
         </div>
       </section>

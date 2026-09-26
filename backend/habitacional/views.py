@@ -1,13 +1,13 @@
 from decimal import Decimal, InvalidOperation
 
-from django.db.models import Count, Q
+from django.db.models import Avg, Count, Q
 from django.utils import timezone
 from rest_framework import mixins, parsers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Ahorro, Alerta, Documento, ImportacionExcel, Persona
+from .models import Ahorro, Alerta, Comite, Documento, ImportacionExcel, Persona
 from .serializers import (
     AlertaSerializer,
     ImportacionExcelSerializer,
@@ -214,7 +214,8 @@ class RukanAIStatusAPIView(APIView):
 
 class DashboardResumenAPIView(APIView):
     def get(self, request):
-        return Response(dashboard_resumen_data())
+        comite = request.query_params.get("comite", "").strip()
+        return Response(dashboard_resumen_data(comite=comite))
 
 
 class AlertaViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
@@ -226,12 +227,15 @@ class AlertaViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.G
         severidad = self.request.query_params.get("severidad", "").strip()
         tipo = self.request.query_params.get("tipo", "").strip()
         q = self.request.query_params.get("q", "").strip()
+        comite = self.request.query_params.get("comite", "").strip()
         if activa in {"1", "true", "True"}:
             queryset = queryset.filter(activa=True)
         if severidad:
             queryset = queryset.filter(severidad=severidad)
         if tipo:
             queryset = queryset.filter(tipo=tipo)
+        if comite:
+            queryset = queryset.filter(persona__comite__nombre__icontains=comite)
         if q:
             queryset = queryset.filter(
                 Q(titulo__icontains=q)
@@ -245,7 +249,8 @@ class AlertaViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.G
 
 class ReportesResumenAPIView(APIView):
     def get(self, request):
-        resumen = dashboard_resumen_data()
+        comite = request.query_params.get("comite", "").strip()
+        resumen = dashboard_resumen_data(comite=comite)
         resumen["documentos"] = list(
             Documento.objects.values("tipo", "estado")
             .annotate(total=Count("id"))
@@ -260,10 +265,61 @@ class ReportesResumenAPIView(APIView):
         return Response(resumen)
 
 
-def dashboard_resumen_data():
+def dashboard_resumen_data(comite=None):
     personas = Persona.objects.all()
     alertas_activas = Alerta.objects.filter(activa=True)
+    if comite:
+        personas = personas.filter(comite__nombre__iexact=comite)
+        alertas_activas = alertas_activas.filter(persona__comite__nombre__iexact=comite)
+
+    # Detalle enriquecido por cada comité registrado
+    comites_qs = Comite.objects.all().order_by("nombre")
+    comites_resumen = []
+    for c in comites_qs:
+        c_pers = c.personas.all()
+        c_total = c_pers.count()
+        if c_total == 0:
+            continue
+        c_aptas = c_pers.filter(estado_general=Persona.ESTADO_APTA).count()
+        c_observadas = c_pers.filter(estado_general=Persona.ESTADO_OBSERVADA).count()
+        c_bloqueadas = c_pers.filter(estado_general=Persona.ESTADO_BLOQUEADA).count()
+        c_mayores = c_pers.filter(persona_mayor=True).count()
+        c_disc = c_pers.filter(discapacidad=True).count()
+        c_etnia = filter_personas_con_etnia(c_pers).count()
+        c_unip = filter_personas_unipersonales(c_pers).count()
+        c_rsh_pref = c_pers.filter(rsh__porcentaje__lte=40).count()
+        c_ahorro_prom = (
+            c_pers.filter(ahorro__monto_uf__gt=0).aggregate(prom=Avg("ahorro__monto_uf"))["prom"]
+            or 0
+        )
+        c_cedulas_rev = Documento.objects.filter(
+            persona__comite=c,
+            tipo=Documento.TIPO_CEDULA,
+            estado__in=[Documento.ESTADO_VENCIDO, Documento.ESTADO_POR_VENCER],
+        ).count()
+
+        comites_resumen.append(
+            {
+                "id": c.id,
+                "nombre": c.nombre,
+                "comuna": c.comuna,
+                "total_personas": c_total,
+                "aptas": c_aptas,
+                "observadas": c_observadas,
+                "bloqueadas": c_bloqueadas,
+                "porcentaje_aptos": round((c_aptas / c_total) * 100) if c_total > 0 else 0,
+                "personas_mayores": c_mayores,
+                "discapacidad": c_disc,
+                "etnia": c_etnia,
+                "unipersonales": c_unip,
+                "rsh_preferente": c_rsh_pref,
+                "ahorro_promedio_uf": round(float(c_ahorro_prom), 1),
+                "cedulas_revision": c_cedulas_rev,
+            }
+        )
+
     return {
+        "comite_filtrado": comite or None,
         "total_personas": personas.count(),
         "personas_aptas": personas.filter(estado_general=Persona.ESTADO_APTA).count(),
         "observadas": personas.filter(estado_general=Persona.ESTADO_OBSERVADA).count(),
@@ -274,12 +330,14 @@ def dashboard_resumen_data():
         "unipersonales": filter_personas_unipersonales(personas).count(),
         "hijos_revision_18": count_personas_con_hijos_revision(personas),
         "cedulas_revision": Documento.objects.filter(
+            persona__in=personas,
             tipo=Documento.TIPO_CEDULA,
             estado__in=[Documento.ESTADO_VENCIDO, Documento.ESTADO_POR_VENCER],
         ).count(),
         "rsh_sobre_40": personas.filter(rsh__porcentaje__gt=40).count(),
-        "ahorro_insuficiente": Ahorro.objects.filter(insuficiente=True).count(),
+        "ahorro_insuficiente": Ahorro.objects.filter(persona__in=personas, insuficiente=True).count(),
         "cedulas_vencidas": Documento.objects.filter(
+            persona__in=personas,
             tipo=Documento.TIPO_CEDULA,
             estado=Documento.ESTADO_VENCIDO,
         ).count(),
@@ -299,6 +357,7 @@ def dashboard_resumen_data():
             .annotate(total=Count("id"))
             .order_by("estado_general")
         ),
+        "comites_resumen": comites_resumen,
     }
 
 
