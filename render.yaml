@@ -1,0 +1,46 @@
+services:
+  # 1. Backend: API Django REST Framework
+  - type: web
+    name: consulta-habitacional-api
+    runtime: python
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: "chmod +x build.sh && ./build.sh"
+    startCommand: "gunicorn config.wsgi:application"
+    healthCheckPath: "/"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: consulta-habitacional-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "0"
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+
+  # 2. Frontend: Aplicacion React (Vite)
+  - type: web
+    name: consulta-habitacional-web
+    runtime: static
+    region: oregon
+    plan: free
+    rootDir: frontend
+    buildCommand: "npm install && npm run build"
+    staticPublishPath: "./dist"
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: "https://consulta-habitacional-api.onrender.com/api"
+
+databases:
+  # Base de datos PostgreSQL administrada
+  - name: consulta-habitacional-db
+    plan: free
+    databaseName: consulta_habitacional
+    user: consulta_user

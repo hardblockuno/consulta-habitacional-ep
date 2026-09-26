@@ -223,3 +223,17 @@ Este segundo importador:
 - Observaciones internas, como respaldo de discapacidad, no cambian el estado general.
 - Hijos o cargas que cumplen 18 anos generan revision documental interna; no cambian el estado general por si solos.
 - Sin alertas activas: persona apta.
+
+## Despliegue en Render
+
+El repositorio cuenta con `render.yaml` (Blueprint) para desplegar con un solo clic la base de datos PostgreSQL, la API Django y el frontend React:
+
+1. Ve a [dashboard.render.com](https://dashboard.render.com).
+2. Haz clic en **New +** y selecciona **Blueprint**.
+3. Conecta el repositorio `hardblockuno/consulta-habitacional-ep`.
+4. Render detectará automáticamente el archivo `render.yaml` y creará:
+   - **PostgreSQL:** `consulta-habitacional-db`
+   - **API Backend:** `consulta-habitacional-api` (ejecuta migraciones y `collectstatic`)
+   - **Frontend Web:** `consulta-habitacional-web` (SPA con redirección automática)
+5. Haz clic en **Apply**.
+
