@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Consulta Habitacional EP</title>
-    <link rel="stylesheet" href="./styles.css?v=20260619-rukan-ocr-local" />
+    <link rel="stylesheet" href="./styles.css?v=20260927-social-tecnica" />
   </head>
   <body>
     <aside class="sidebar">
@@ -16,27 +16,29 @@
         </div>
       </div>
       <nav class="nav" aria-label="Principal">
-        <button class="nav-item primary-action active" data-view="resumen" title="Resumen EP">
-          <span class="icon" aria-hidden="true">EP</span>
-          Resumen
-        </button>
         <p class="nav-section-title">Área social</p>
-        <button class="nav-item" data-view="dashboard" title="Dashboard social">
-          <span class="icon" aria-hidden="true">DS</span>
-          Dashboard
+        <button class="nav-item primary-action active" data-view="demanda" title="Organización Demanda">
+          <span class="icon" aria-hidden="true">OD</span>
+          Organización Demanda
         </button>
-        <button class="nav-item" data-view="personas" title="Buscar persona">
-          <span class="icon" aria-hidden="true">ID</span>
-          Personas
+        <button class="nav-item" data-view="personas" title="Bases de datos">
+          <span class="icon" aria-hidden="true">BD</span>
+          Bases de datos
         </button>
-        <button class="nav-item secondary-action" data-view="importar" title="Cargar base">
-          <span class="icon" aria-hidden="true">UP</span>
-          Importar base
+        <button class="nav-item" data-view="ahorro" title="Extraer ahorro">
+          <span class="icon" aria-hidden="true">AH</span>
+          Extraer ahorro
         </button>
-        <button class="nav-item" data-view="rukan" title="Nomina Rukan">
+        <button class="nav-item" data-view="rukan" title="Extraer RUKAN">
           <span class="icon" aria-hidden="true">RK</span>
-          Nomina Rukan
+          Extraer RUKAN
         </button>
+        <p class="nav-section-title">Área técnica</p>
+        <button class="nav-item" data-view="tecnica" title="Área Técnica">
+          <span class="icon" aria-hidden="true">AT</span>
+          Área técnica
+        </button>
+        <p class="nav-section-title">Seguimiento</p>
         <button class="nav-item" data-view="alertas" title="Alertas">
           <span class="icon" aria-hidden="true">!</span>
           Alertas
@@ -45,12 +47,6 @@
           <span class="icon" aria-hidden="true">RP</span>
           Reportes
         </button>
-        <p class="nav-section-title">Proyecto</p>
-        <button class="nav-item" data-view="tecnica" title="Área Técnica">
-          <span class="icon" aria-hidden="true">AT</span>
-          Área técnica
-        </button>
-        <p class="nav-section-title">Seguimiento</p>
         <button class="nav-item" data-view="gestion" title="Gestión">
           <span class="icon" aria-hidden="true">GT</span>
           Gestión
@@ -93,6 +89,6 @@
     <script src="./vendor/xlsx.full.min.js"></script>
     <script src="./vendor/jspdf.umd.min.js"></script>
     <script src="./vendor/jspdf.plugin.autotable.min.js"></script>
-    <script src="./app.js?v=20260619-rukan-ocr-local"></script>
+    <script src="./app.js?v=20260927-social-tecnica"></script>
   </body>
 </html>

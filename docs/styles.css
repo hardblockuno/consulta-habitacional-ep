@@ -1198,3 +1198,245 @@ tbody tr:hover {
     text-align: left;
   }
 }
+
+/* --- Organización Demanda & Multicomité --- */
+.demanda-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.comite-demanda-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.comite-demanda-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 16px;
+  transition: all 0.2s ease;
+}
+
+.comite-demanda-card:hover {
+  border-color: #94a3b8;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+.comite-demanda-card.active-comite {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 1px var(--cyan), 0 6px 16px rgba(14, 116, 144, 0.1);
+  background: linear-gradient(180deg, rgba(14, 116, 144, 0.02), var(--panel));
+}
+
+.comite-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.comite-eyebrow-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.active-badge {
+  background: #e0f2fe;
+  color: var(--cyan-dark);
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.comite-card-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.comite-progress-box {
+  margin: 12px 0;
+  padding: 10px;
+  background: #f8fafc;
+  border-radius: 6px;
+  border: 1px solid #f1f5f9;
+}
+
+.comite-progress-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.progress-bar-track {
+  display: flex;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #e2e8f0;
+}
+
+.progress-bar-segment {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.progress-bar-segment.emerald {
+  background: #10b981;
+}
+
+.progress-bar-segment.amber {
+  background: #f59e0b;
+}
+
+.progress-bar-segment.rose {
+  background: #f43f5e;
+}
+
+.comite-mini-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 10px 0 14px;
+  padding-top: 8px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.mini-metric {
+  display: flex;
+  flex-direction: column;
+}
+
+.mini-metric span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.mini-metric strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.comite-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.comite-card-footer .button {
+  flex: 1;
+  min-width: 90px;
+  padding: 6px 8px;
+  font-size: 12px;
+  text-align: center;
+}
+
+/* --- Matriz Comparativa Table --- */
+.comite-matrix-table th,
+.comite-matrix-table td {
+  padding: 10px 12px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.comite-matrix-table th {
+  background: #f8fafc;
+  font-weight: 700;
+}
+
+.comite-matrix-table tr:hover td {
+  background: #f8fafc;
+}
+
+/* --- Extraer Ahorro --- */
+.ahorro-settings-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 18px;
+}
+
+.ahorro-settings-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ahorro-settings-group span {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  white-space: nowrap;
+}
+
+.badge.cumple {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.badge.insuficiente {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge.sin_ahorro {
+  background: #ffe4e6;
+  color: #9f1239;
+}
+
+.filter-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filter-pill {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filter-pill:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.filter-pill.active {
+  background: var(--cyan);
+  border-color: var(--cyan);
+  color: #fff;
+}
+

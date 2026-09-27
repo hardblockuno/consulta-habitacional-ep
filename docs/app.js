@@ -316,13 +316,13 @@ const RUKAN_OCR_ZONES = [
 let workspaceStore = loadWorkspaceStore();
 let state = getWorkspaceState(getActiveWorkspace());
 let rukanTool = loadRukanToolState();
-let currentView = "resumen";
+let currentView = "demanda";
 let pendingManualImport = null;
 saveWorkspaceStore({ updateUi: false });
 
 document.addEventListener("DOMContentLoaded", () => {
   bindGlobalEvents();
-  navigate("resumen");
+  navigate("demanda");
 });
 
 function bindGlobalEvents() {
@@ -347,10 +347,12 @@ function navigate(view, params = {}) {
   });
 
   const routes = {
-    resumen: renderResumenEp,
+    demanda: renderOrganizacionDemanda,
+    resumen: renderOrganizacionDemanda,
     dashboard: renderDashboard,
     personas: () => renderPersonas(params),
     importar: renderImportar,
+    ahorro: renderExtraerAhorro,
     rukan: renderRukan,
     alertas: renderAlertas,
     gestion: renderGestion,
@@ -358,7 +360,7 @@ function navigate(view, params = {}) {
     tecnica: renderAreaTecnica,
     ficha: () => renderFicha(params.rut),
   };
-  (routes[view] || routes.resumen)();
+  (routes[view] || routes.demanda)();
   updateStorageSummary();
 }
 
@@ -947,107 +949,425 @@ function updateStorageSummary() {
     `${formatNumber(count)} ${count === 1 ? "persona" : "personas"} en ${workspaceDisplayName(workspace)}`;
 }
 
-function renderResumenEp() {
-  const resumen = getResumen();
-  const workspace = getActiveWorkspace();
+function renderOrganizacionDemanda() {
+  const activeWs = getActiveWorkspace();
+  const allWorkspaces = workspaceStore.workspaces;
+
+  // Calculate consolidated metrics across all committees:
+  const totalComites = allWorkspaces.length;
+  let totalFamilias = 0;
+  let totalAptas = 0;
+  let totalObservadas = 0;
+  let totalBloqueadas = 0;
+  let totalMayores = 0;
+  let totalDiscapacidad = 0;
+  let totalEtnia = 0;
+  let totalRsh40 = 0;
+  let totalUnipersonales = 0;
+
+  const comitesData = allWorkspaces.map((ws) => {
+    const res = getResumen(ws);
+    totalFamilias += res.totalPersonas;
+    totalAptas += res.personasAptas;
+    totalObservadas += res.observadas;
+    totalBloqueadas += res.bloqueadas;
+    totalMayores += res.personasMayores;
+    totalDiscapacidad += res.discapacidad;
+    totalEtnia += res.etnia;
+    totalRsh40 += res.rshHasta40;
+    totalUnipersonales += res.unipersonales;
+
+    return {
+      ws,
+      res,
+      coordinacion: normalizeCoordination(ws.coordinacion),
+      proyecto: normalizeProjectOverview(ws.proyecto),
+      tecnica: normalizeTechnicalArea(ws.areaTecnica),
+      isActive: ws.id === activeWs.id,
+    };
+  });
+
+  const pctGlobalAptitud = totalFamilias > 0 ? Math.round((totalAptas / totalFamilias) * 100) : 0;
+  const totalPrioritarios = totalMayores + totalDiscapacidad + totalEtnia;
+
+  // Active committee diagnostics:
+  const activeRes = getResumen(activeWs);
   const tasks = managementTasks();
   const summary = managementSummary(tasks);
   const housingRows = getHousingRows();
   const abiertas = summary.pendiente + summary.en_revision;
-  const tecnica = normalizeTechnicalArea(workspace.areaTecnica);
-  const coordinacion = normalizeCoordination(workspace.coordinacion);
-  const proyecto = normalizeProjectOverview(workspace.proyecto);
+  const tecnica = normalizeTechnicalArea(activeWs.areaTecnica);
+  const coordinacion = normalizeCoordination(activeWs.coordinacion);
+  const proyecto = normalizeProjectOverview(activeWs.proyecto);
+
+  // Committee cards HTML:
+  const comiteCardsHtml = comitesData.map(({ ws, res, coordinacion: coord, proyecto: proy, isActive }) => {
+    const total = res.totalPersonas;
+    const pctApt = total > 0 ? Math.round((res.personasAptas / total) * 100) : 0;
+    const pctObs = total > 0 ? Math.round((res.observadas / total) * 100) : 0;
+    const pctBloq = total > 0 ? Math.max(0, 100 - pctApt - pctObs) : 0;
+
+    return `
+      <article class="comite-demanda-card ${isActive ? "active-comite" : ""}">
+        <div class="comite-card-head">
+          <div>
+            <div class="comite-eyebrow-row">
+              <span class="eyebrow">${escapeHtml(ws.comuna || "Comité")}</span>
+              ${isActive ? '<span class="active-badge">Comité Activo</span>' : ""}
+            </div>
+            <h3 class="comite-card-title">${escapeHtml(workspaceDisplayName(ws))}</h3>
+          </div>
+          <div class="comite-card-top-actions">
+            ${
+              !isActive
+                ? `<button class="button secondary subtle small btn-activate-ws" data-ws-id="${escapeAttr(ws.id)}" type="button" title="Seleccionar como comité activo">Activar</button>`
+                : ""
+            }
+          </div>
+        </div>
+
+        <div class="comite-progress-box">
+          <div class="comite-progress-label">
+            <span><strong>${pctApt}%</strong> aptitud (${formatNumber(res.personasAptas)}/${formatNumber(total)})</span>
+            <span class="muted small">${formatNumber(res.observadas)} obs. · ${formatNumber(res.bloqueadas)} bloq.</span>
+          </div>
+          <div class="progress-bar-track" title="Aptas: ${pctApt}%, Observadas: ${pctObs}%, Bloqueadas: ${pctBloq}%">
+            <div class="progress-bar-segment emerald" style="width: ${pctApt}%"></div>
+            <div class="progress-bar-segment amber" style="width: ${pctObs}%"></div>
+            <div class="progress-bar-segment rose" style="width: ${pctBloq}%"></div>
+          </div>
+        </div>
+
+        <div class="comite-mini-metrics">
+          <div class="mini-metric">
+            <span>RSH ≤ 40%</span>
+            <strong>${formatNumber(res.rshHasta40)}</strong>
+          </div>
+          <div class="mini-metric">
+            <span>Adulto mayor</span>
+            <strong>${formatNumber(res.personasMayores)}</strong>
+          </div>
+          <div class="mini-metric">
+            <span>Discapacidad</span>
+            <strong>${formatNumber(res.discapacidad)}</strong>
+          </div>
+          <div class="mini-metric">
+            <span>Pueblos orig.</span>
+            <strong>${formatNumber(res.etnia)}</strong>
+          </div>
+          <div class="mini-metric">
+            <span>Unipersonal</span>
+            <strong>${formatNumber(res.unipersonales)}</strong>
+          </div>
+          <div class="mini-metric">
+            <span>Cédulas rev.</span>
+            <strong>${formatNumber(res.cedulasRevision)}</strong>
+          </div>
+        </div>
+
+        <div class="comite-card-footer">
+          <button class="button secondary small btn-goto-personas" data-ws-id="${escapeAttr(ws.id)}" type="button">
+            Bases de datos
+          </button>
+          <button class="button secondary small btn-goto-ahorro" data-ws-id="${escapeAttr(ws.id)}" type="button">
+            Extraer ahorro
+          </button>
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  // Executive comparison matrix rows:
+  const matrixRowsHtml = comitesData.map(({ ws, res, coordinacion: coord, proyecto: proy, isActive }) => {
+    return `
+      <tr class="${isActive ? "active-row" : ""}">
+        <td><strong>${escapeHtml(workspaceDisplayName(ws))}</strong> ${isActive ? '<span class="active-badge" style="margin-left:4px;">Activo</span>' : ""}</td>
+        <td>${escapeHtml(ws.comuna || "Sin dato")}</td>
+        <td><strong>${formatNumber(res.totalPersonas)}</strong></td>
+        <td><span class="badge ${res.porcentajeAptitud >= 80 ? "apta" : res.porcentajeAptitud >= 50 ? "observada" : "bloqueada"}">${res.porcentajeAptitud}%</span></td>
+        <td><strong style="color:var(--emerald);">${formatNumber(res.personasAptas)}</strong></td>
+        <td><span style="color:var(--amber);">${formatNumber(res.observadas)}</span></td>
+        <td><span style="color:var(--rose);">${formatNumber(res.bloqueadas)}</span></td>
+        <td>${formatNumber(res.rshHasta40)}</td>
+        <td>${formatNumber(res.personasMayores)}</td>
+        <td>${formatNumber(res.discapacidad)}</td>
+        <td>${formatNumber(res.etnia)}</td>
+        <td>${escapeHtml(coord.social || "Sin asignar")}</td>
+        <td>${escapeHtml(proy.estado || "Sin estado")}</td>
+        <td>
+          <button class="button secondary subtle small btn-activate-ws" data-ws-id="${escapeAttr(ws.id)}" type="button">
+            ${isActive ? "Seleccionado" : "Trabajar"}
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join("");
 
   setApp(`
     <div class="page-head">
       <div>
-        <div class="eyebrow">Gestión EP</div>
-        <h2>Resumen EP</h2>
-        <p class="muted">${escapeHtml(workspaceDisplayName(workspace))}${workspace.comuna ? ` · ${escapeHtml(workspace.comuna)}` : ""}</p>
+        <div class="eyebrow">Área Social</div>
+        <h2>Organización Demanda</h2>
+        <p class="muted">Resumen consolidado por comité y diagnóstico de demanda habitacional elaborado a partir de sus bases de datos.</p>
+      </div>
+      <div class="demanda-header-actions">
+        <button id="btnNuevoComiteDemanda" class="button secondary" type="button">+ Nuevo comité</button>
+        <button id="btnImportarBaseDemanda" class="button secondary" type="button">Cargar base Excel</button>
+        <button id="btnExportarMatrizDemanda" class="button primary" type="button">Exportar matriz consolidada</button>
       </div>
     </div>
+
+    <!-- Consolidado Global EP -->
+    <div class="eyebrow" style="margin-bottom: 8px;">Consolidado Entidad Patrocinante (EP)</div>
     <section class="grid stats">
-      ${stat("Personas área social", resumen.totalPersonas, "", "total")}
-      ${stat("Observadas", resumen.observadas, "amber", "observadas")}
-      ${stat("Alertas críticas", resumen.alertasCriticas, "rose")}
-      ${stat("Gestiones abiertas", abiertas, "cyan")}
-      ${stat("Tipos de vivienda", housingRows.length, "indigo")}
+      ${stat("Comités en cartera", totalComites, "cyan")}
+      ${stat("Total familias postulantes", totalFamilias, "", "total")}
+      ${stat("Socios aptos global", `${formatNumber(totalAptas)} (${pctGlobalAptitud}%)`, "emerald")}
+      ${stat("Observados global", totalObservadas, "amber")}
+      ${stat("Bloqueados global", totalBloqueadas, "rose")}
+      ${stat("Prioritarios vulnerables", totalPrioritarios, "indigo")}
     </section>
-    <section class="grid two area-overview-grid" style="margin-top: 18px;">
-      <article class="panel area-panel">
-        <div class="area-panel-head">
-          <div>
-            <p class="eyebrow">Área Social</p>
-            <h3>Base social y postulantes</h3>
-          </div>
-          <span class="status-pill">${escapeHtml(coordinacion.social || "Sin coordinación")}</span>
-        </div>
-        <div class="area-metric-list">
-          ${areaMetric("Personas aptas", resumen.personasAptas)}
-          ${areaMetric("Cédulas por revisar", resumen.cedulasRevision)}
-          ${areaMetric("Adultos mayores", resumen.personasMayores)}
-          ${areaMetric("Etnia / pueblo originario", resumen.etnia)}
-        </div>
-        <div class="toolbar-row">
-          <button class="button primary overview-nav" type="button" data-target-view="dashboard">Dashboard social</button>
-          <button class="button secondary overview-nav" type="button" data-target-view="personas">Personas</button>
-        </div>
-      </article>
-      <article class="panel area-panel">
-        <div class="area-panel-head">
-          <div>
-            <p class="eyebrow">Área Técnica</p>
-            <h3>Proyecto y expediente técnico</h3>
-          </div>
-          <span class="status-pill">${escapeHtml(coordinacion.tecnica || "Sin coordinación")}</span>
-        </div>
-        <div class="area-metric-list">
-          ${areaMetric("Estado proyecto", proyecto.estado || "Sin estado")}
-          ${areaMetric("Estado técnico", tecnica.estado || "Sin estado")}
-          ${areaMetric("Terreno", tecnica.terreno || "Sin dato")}
-          ${areaMetric("SERVIU / MINVU", tecnica.serviuMinvu || "Sin dato")}
-        </div>
-        <div class="toolbar-row">
-          <button class="button primary overview-nav" type="button" data-target-view="tecnica">Abrir área técnica</button>
-          <button class="button secondary overview-nav" type="button" data-target-view="gestion">Gestión</button>
-        </div>
-      </article>
-    </section>
-    <section class="panel project-form-panel" style="margin-top: 18px;">
+
+    <!-- Resumen de Cada Comité -->
+    <section style="margin-top: 24px;">
       <div class="report-export-head">
         <div>
-          <h3>Coordinación del comité</h3>
-          <p class="muted">Responsables y estado general del proyecto activo.</p>
+          <div class="eyebrow">Diagnóstico por Comité</div>
+          <h3>Resumen de Cada Comité</h3>
+          <p class="muted">Indicadores elaborados a partir de las bases de datos individuales de cada comité.</p>
         </div>
       </div>
-      <div class="field-row project-field-row">
-        <label class="field">
-          <span>Coordinación social</span>
-          <input class="input workspace-field" data-workspace-field="coordinacion.social" value="${escapeAttr(coordinacion.social)}" placeholder="Nombre responsable social" />
-        </label>
-        <label class="field">
-          <span>Coordinación técnica</span>
-          <input class="input workspace-field" data-workspace-field="coordinacion.tecnica" value="${escapeAttr(coordinacion.tecnica)}" placeholder="Nombre responsable técnico" />
-        </label>
-        <label class="field">
-          <span>Estado proyecto</span>
-          <select class="select workspace-field" data-workspace-field="proyecto.estado">
-            ${projectStatusOptions(proyecto.estado)}
-          </select>
-        </label>
+      <div class="comite-demanda-grid">
+        ${comiteCardsHtml}
       </div>
-      <label class="field" style="margin-top: 12px;">
-        <span>Observaciones generales</span>
-        <textarea class="input workspace-field" data-workspace-field="proyecto.observaciones" rows="3" placeholder="Observaciones generales del comité o proyecto">${escapeHtml(proyecto.observaciones)}</textarea>
-      </label>
+    </section>
+
+    <!-- Matriz Comparativa de Comités -->
+    <section class="panel" style="margin-top: 24px;">
+      <div class="report-export-head">
+        <div>
+          <div class="eyebrow">Comparativa General</div>
+          <h3>Matriz de Demanda Habitacional por Comité</h3>
+          <p class="muted">Vista ejecutiva para seguimiento y priorización de comités.</p>
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-top: 14px;">
+        <table class="comite-matrix-table">
+          <thead>
+            <tr>
+              <th>Comité</th>
+              <th>Comuna</th>
+              <th>Total Socios</th>
+              <th>% Aptitud</th>
+              <th>Aptas</th>
+              <th>Observadas</th>
+              <th>Bloqueadas</th>
+              <th>RSH ≤ 40%</th>
+              <th>Adulto Mayor</th>
+              <th>Discapacidad</th>
+              <th>Pueblos Orig.</th>
+              <th>Coord. Social</th>
+              <th>Estado Proyecto</th>
+              <th>Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${matrixRowsHtml}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Detalle en Profundidad del Comité Activo -->
+    <section style="margin-top: 28px;">
+      <div class="report-export-head">
+        <div>
+          <div class="eyebrow">Detalle del Comité Activo</div>
+          <h3>Diagnóstico y Coordinación: ${escapeHtml(workspaceDisplayName(activeWs))}</h3>
+          <p class="muted">${escapeHtml(activeWs.comuna ? `Comuna: ${activeWs.comuna} · ` : "")}${formatNumber(activeRes.totalPersonas)} postulantes cargados</p>
+        </div>
+        <div class="toolbar-row">
+          <button class="button secondary overview-nav" type="button" data-target-view="personas">Bases de datos de este comité</button>
+          <button class="button secondary overview-nav" type="button" data-target-view="ahorro">Extraer ahorro</button>
+          <button class="button secondary overview-nav" type="button" data-target-view="tecnica">Área técnica</button>
+        </div>
+      </div>
+
+      <div class="grid stats" style="margin-top: 14px;">
+        ${stat("Personas comité activo", activeRes.totalPersonas, "", "total")}
+        ${stat("Observadas", activeRes.observadas, "amber", "observadas")}
+        ${stat("Alertas críticas", activeRes.alertasCriticas, "rose")}
+        ${stat("Gestiones abiertas", abiertas, "cyan")}
+        ${stat("Tipos de vivienda", housingRows.length, "indigo")}
+      </div>
+
+      <div class="grid two area-overview-grid" style="margin-top: 18px;">
+        <article class="panel area-panel">
+          <div class="area-panel-head">
+            <div>
+              <p class="eyebrow">Área Social</p>
+              <h3>Base social y caracterización</h3>
+            </div>
+            <span class="status-pill">${escapeHtml(coordinacion.social || "Sin coordinación")}</span>
+          </div>
+          <div class="area-metric-list">
+            ${areaMetric("Personas aptas", `${activeRes.personasAptas} (${activeRes.porcentajeAptitud}%)`)}
+            ${areaMetric("RSH hasta 40%", activeRes.rshHasta40)}
+            ${areaMetric("Cédulas por revisar", activeRes.cedulasRevision)}
+            ${areaMetric("Adultos mayores", activeRes.personasMayores)}
+            ${areaMetric("Discapacidad acreditada", activeRes.discapacidad)}
+            ${areaMetric("Etnia / pueblo originario", activeRes.etnia)}
+            ${areaMetric("Postulación unipersonal", activeRes.unipersonales)}
+          </div>
+        </article>
+
+        <article class="panel area-panel">
+          <div class="area-panel-head">
+            <div>
+              <p class="eyebrow">Área Técnica</p>
+              <h3>Proyecto y expediente técnico</h3>
+            </div>
+            <span class="status-pill">${escapeHtml(coordinacion.tecnica || "Sin coordinación")}</span>
+          </div>
+          <div class="area-metric-list">
+            ${areaMetric("Estado proyecto", proyecto.estado || "Sin estado")}
+            ${areaMetric("Estado técnico", tecnica.estado || "Sin estado")}
+            ${areaMetric("Terreno", tecnica.terreno || "Sin dato")}
+            ${areaMetric("SERVIU / MINVU", tecnica.serviuMinvu || "Sin dato")}
+            ${areaMetric("Factibilidad", tecnica.factibilidad || "Sin dato")}
+            ${areaMetric("Arquitectura", tecnica.arquitectura || "Sin dato")}
+          </div>
+        </article>
+      </div>
+
+      <section class="panel project-form-panel" style="margin-top: 18px;">
+        <div class="report-export-head">
+          <div>
+            <h3>Coordinación del comité</h3>
+            <p class="muted">Responsables y estado general del proyecto activo.</p>
+          </div>
+        </div>
+        <div class="field-row project-field-row">
+          <label class="field">
+            <span>Coordinación social</span>
+            <input class="input workspace-field" data-workspace-field="coordinacion.social" value="${escapeAttr(coordinacion.social)}" placeholder="Nombre responsable social" />
+          </label>
+          <label class="field">
+            <span>Coordinación técnica</span>
+            <input class="input workspace-field" data-workspace-field="coordinacion.tecnica" value="${escapeAttr(coordinacion.tecnica)}" placeholder="Nombre responsable técnico" />
+          </label>
+          <label class="field">
+            <span>Estado proyecto</span>
+            <select class="select workspace-field" data-workspace-field="proyecto.estado">
+              ${projectStatusOptions(proyecto.estado)}
+            </select>
+          </label>
+        </div>
+        <label class="field" style="margin-top: 12px;">
+          <span>Observaciones generales</span>
+          <textarea class="input workspace-field" data-workspace-field="proyecto.observaciones" rows="3" placeholder="Observaciones generales del comité o proyecto">${escapeHtml(proyecto.observaciones)}</textarea>
+        </label>
+      </section>
     </section>
   `);
 
+  // Event bindings:
   document.querySelectorAll(".stat-action").forEach((card) => {
     card.addEventListener("click", () => navigate("personas", { filtro: card.dataset.filter || "total" }));
   });
+  document.querySelectorAll(".btn-activate-ws").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      setActiveWorkspace(btn.dataset.wsId);
+      renderOrganizacionDemanda();
+    });
+  });
+  document.querySelectorAll(".btn-goto-personas").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      setActiveWorkspace(btn.dataset.wsId);
+      navigate("personas");
+    });
+  });
+  document.querySelectorAll(".btn-goto-ahorro").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      setActiveWorkspace(btn.dataset.wsId);
+      navigate("ahorro");
+    });
+  });
+  document.getElementById("btnNuevoComiteDemanda")?.addEventListener("click", createWorkspaceFromPrompt);
+  document.getElementById("btnImportarBaseDemanda")?.addEventListener("click", () => navigate("importar"));
+  document.getElementById("btnExportarMatrizDemanda")?.addEventListener("click", exportConsolidatedDemandaExcel);
+
   bindOverviewNavigation();
   bindWorkspaceFieldInputs();
+}
+
+const renderResumenEp = renderOrganizacionDemanda;
+
+function exportConsolidatedDemandaExcel() {
+  if (!window.XLSX) {
+    alert("Librería Excel no disponible.");
+    return;
+  }
+  const allWorkspaces = workspaceStore.workspaces;
+
+  // Sheet 1: Resumen Comites
+  const summaryRows = allWorkspaces.map((ws) => {
+    const res = getResumen(ws);
+    const coord = normalizeCoordination(ws.coordinacion);
+    const proy = normalizeProjectOverview(ws.proyecto);
+    const tec = normalizeTechnicalArea(ws.areaTecnica);
+    return {
+      "Comité": workspaceDisplayName(ws),
+      "Comuna": ws.comuna || "",
+      "Total Socios": res.totalPersonas,
+      "% Aptitud": `${res.porcentajeAptitud}%`,
+      "Aptas": res.personasAptas,
+      "Observadas": res.observadas,
+      "Bloqueadas": res.bloqueadas,
+      "RSH <= 40%": res.rshHasta40,
+      "RSH > 40%": res.rshSobre40,
+      "Adultos Mayores": res.personasMayores,
+      "Discapacidad": res.discapacidad,
+      "Pueblos Originarios": res.etnia,
+      "Unipersonales": res.unipersonales,
+      "Ahorro Insuficiente": res.ahorroInsuficiente,
+      "Cédulas Vencidas / Por Vencer": res.cedulasRevision,
+      "Coordinador Social": coord.social,
+      "Coordinador Técnico": coord.tecnica,
+      "Estado Proyecto": proy.estado,
+      "Estado Técnico": tec.estado,
+    };
+  });
+
+  // Sheet 2: Nomina Consolidada
+  const detailRows = allWorkspaces.flatMap((ws) => {
+    return (ws.personas || []).map((p) => ({
+      "Comité": workspaceDisplayName(ws),
+      "Comuna": ws.comuna || "",
+      "RUT": p.rut,
+      "Nombre": p.nombre,
+      "Estado": p.estadoGeneral,
+      "RSH %": p.rsh?.porcentaje ? `${p.rsh.porcentaje}%` : "",
+      "Ahorro Actual": p.ahorro?.montoActual || 0,
+      "Banco": p.ahorro?.banco || "",
+      "N° Cuenta": p.ahorro?.numeroCuenta || "",
+      "Adulto Mayor": p.personaMayor ? "SÍ" : "NO",
+      "Discapacidad": p.discapacidad ? "SÍ" : "NO",
+      "Etnia": hasEtnia(p) ? p.etnia : "NO",
+      "Unipersonal": isUnipersonal(p) ? "SÍ" : "NO",
+      "Teléfono": p.telefono || "",
+      "Correo": p.correo || "",
+    }));
+  });
+
+  const wb = XLSX.utils.book_new();
+  const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
+  XLSX.utils.book_append_sheet(wb, wsSummary, "Resumen Comites EP");
+  if (detailRows.length) {
+    const wsDetail = XLSX.utils.json_to_sheet(detailRows);
+    XLSX.utils.book_append_sheet(wb, wsDetail, "Padron Consolidado");
+  }
+  XLSX.writeFile(wb, `organizacion-demanda-comites-ep-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
 function renderAreaTecnica() {
@@ -1059,9 +1379,9 @@ function renderAreaTecnica() {
   setApp(`
     <div class="page-head">
       <div>
-        <div class="eyebrow">Gestión EP</div>
+        <div class="eyebrow">Área Técnica</div>
         <h2>Área Técnica</h2>
-        <p class="muted">${escapeHtml(workspaceDisplayName(workspace))}</p>
+        <p class="muted">Proyectos, terreno, factibilidades y expediente de ${escapeHtml(workspaceDisplayName(workspace))}</p>
       </div>
     </div>
     <section class="grid stats">
@@ -1126,6 +1446,412 @@ function renderAreaTecnica() {
   `);
 
   bindWorkspaceFieldInputs();
+}
+
+const AHORRO_UF_STORAGE_KEY = "consultaHabitacionalEP:ahorroValorUf:v1";
+const AHORRO_RULE_STORAGE_KEY = "consultaHabitacionalEP:ahorroRegla:v1";
+
+function getAhorroSettings() {
+  const valorUf = Number(localStorage.getItem(AHORRO_UF_STORAGE_KEY)) || 38500;
+  const regla = localStorage.getItem(AHORRO_RULE_STORAGE_KEY) || "rsh_ds49";
+  return { valorUf, regla };
+}
+
+function saveAhorroSettings(valorUf, regla) {
+  if (valorUf) localStorage.setItem(AHORRO_UF_STORAGE_KEY, String(valorUf));
+  if (regla) localStorage.setItem(AHORRO_RULE_STORAGE_KEY, String(regla));
+}
+
+function calculatePersonaAhorro(persona, valorUf, regla) {
+  const raw = Number(persona.ahorro?.montoActual || 0);
+  let ahorroClp = 0;
+  let ahorroUf = 0;
+
+  if (raw > 500) {
+    ahorroClp = raw;
+    ahorroUf = Number((raw / valorUf).toFixed(2));
+  } else if (raw > 0) {
+    ahorroUf = raw;
+    ahorroClp = Math.round(raw * valorUf);
+  }
+
+  // Calculate target minimum required UF
+  let metaUf = 10;
+  if (regla === "rsh_ds49") {
+    const rsh = Number(persona.rsh?.porcentaje);
+    metaUf = (!isNaN(rsh) && rsh > 40) ? 15 : 10;
+  } else if (!isNaN(Number(regla)) && Number(regla) > 0) {
+    metaUf = Number(regla);
+  }
+  const metaClp = Math.round(metaUf * valorUf);
+
+  const sinAhorro = ahorroUf <= 0;
+  const cumple = ahorroUf >= metaUf;
+  const brechaUf = cumple ? 0 : Number((metaUf - ahorroUf).toFixed(2));
+  const brechaClp = cumple ? 0 : Math.max(0, metaClp - ahorroClp);
+
+  return {
+    persona,
+    ahorroClp,
+    ahorroUf,
+    metaUf,
+    metaClp,
+    cumple,
+    sinAhorro,
+    brechaUf,
+    brechaClp,
+    banco: cleanString(persona.ahorro?.banco),
+    cuenta: cleanString(persona.ahorro?.numeroCuenta),
+  };
+}
+
+function renderExtraerAhorro() {
+  const activeWs = getActiveWorkspace();
+  const settings = getAhorroSettings();
+  let currentFilter = "todos";
+  let currentQuery = "";
+
+  setApp(`
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">Área Social</div>
+        <h2>Extraer Ahorro</h2>
+        <p class="muted">Verificación, cálculo de brechas y extracción de nóminas de ahorro para subsidios habitacionales.</p>
+      </div>
+      <div class="demanda-header-actions">
+        <label class="field" style="margin:0; min-width: 220px;">
+          <span style="font-size:11px; text-transform:uppercase; font-weight:800; color:var(--cyan-dark);">Comité en consulta</span>
+          <select id="ahorroComiteSelect" class="select">
+            ${workspaceStore.workspaces.map((ws) => `
+              <option value="${escapeAttr(ws.id)}" ${ws.id === activeWs.id ? "selected" : ""}>
+                ${escapeHtml(workspaceDisplayName(ws))} (${ws.personas.length} socios)
+              </option>
+            `).join("")}
+          </select>
+        </label>
+        <button id="btnToggleAhorroUpload" class="button secondary" type="button">Actualizar ahorro Excel</button>
+        <button id="btnExportarAhorroExcel" class="button primary" type="button">Exportar planilla ahorro</button>
+      </div>
+    </div>
+
+    <!-- Panel de Configuración de Ahorro -->
+    <section class="ahorro-settings-panel">
+      <div class="ahorro-settings-group">
+        <span>Exigencia de ahorro:</span>
+        <select id="ahorroReglaSelect" class="select" style="min-width: 260px;">
+          <option value="rsh_ds49" ${settings.regla === "rsh_ds49" ? "selected" : ""}>Diferenciado RSH DS49 (10 UF ≤ 40% / 15 UF > 40%)</option>
+          <option value="10" ${settings.regla === "10" ? "selected" : ""}>10 UF Fijas (DS49 Base Vulnerable)</option>
+          <option value="15" ${settings.regla === "15" ? "selected" : ""}>15 UF Fijas (DS49 Base Medio)</option>
+          <option value="30" ${settings.regla === "30" ? "selected" : ""}>30 UF Fijas (DS49 Individual / DS1 T1)</option>
+          <option value="35" ${settings.regla === "35" ? "selected" : ""}>35 UF Fijas (DS1 Tramo 2)</option>
+          <option value="40" ${settings.regla === "40" ? "selected" : ""}>40 UF Fijas (DS1 Tramo 3)</option>
+        </select>
+      </div>
+
+      <div class="ahorro-settings-group">
+        <span>Valor UF (CLP):</span>
+        <input id="ahorroValorUfInput" class="input" type="number" style="width: 110px;" value="${settings.valorUf}" />
+      </div>
+
+      <button id="btnAplicarAhorroSettings" class="button secondary subtle" type="button">Recalcular</button>
+    </section>
+
+    <!-- Panel de Carga Masiva de Ahorro (Ocultable) -->
+    <section id="ahorroUploadPanel" class="panel hidden" style="margin-bottom: 18px; border-color: var(--cyan); background: #f0fdfa;">
+      <div class="report-export-head">
+        <div>
+          <h3 style="margin:0;">Actualizar planilla de ahorro desde Excel</h3>
+          <p class="muted" style="margin:4px 0 0;">Carga un archivo Excel con columnas de RUT y Ahorro/Monto (opcionalmente Banco y Cuenta). Se actualizarán automáticamente los socios de ${escapeHtml(workspaceDisplayName(activeWs))}.</p>
+        </div>
+      </div>
+      <div class="field-row" style="margin-top: 12px; grid-template-columns: minmax(260px, 1fr) auto;">
+        <input id="ahorroExcelFileInput" class="input" type="file" accept=".xlsx,.xls" />
+        <button id="btnProcesarAhorroExcel" class="button primary" type="button">Cargar y Actualizar</button>
+      </div>
+      <div id="ahorroUploadMessage" style="margin-top: 10px;"></div>
+    </section>
+
+    <!-- Contenedor dinámico de estadísticas y tabla -->
+    <div id="ahorroDynamicContent"></div>
+  `);
+
+  function refreshAhorroView() {
+    const s = getAhorroSettings();
+    const personas = activeWs.personas || [];
+    const calculatedRows = personas.map((p) => calculatePersonaAhorro(p, s.valorUf, s.regla));
+
+    const totalPersonas = calculatedRows.length;
+    const cumplen = calculatedRows.filter((r) => r.cumple).length;
+    const pctCumplen = totalPersonas > 0 ? Math.round((cumplen / totalPersonas) * 100) : 0;
+    const conDeficit = calculatedRows.filter((r) => !r.cumple && !r.sinAhorro);
+    const sinAhorro = calculatedRows.filter((r) => r.sinAhorro).length;
+
+    const totalAhorroClp = calculatedRows.reduce((sum, r) => sum + r.ahorroClp, 0);
+    const totalAhorroUf = calculatedRows.reduce((sum, r) => sum + r.ahorroUf, 0);
+    const totalBrechaClp = calculatedRows.reduce((sum, r) => sum + r.brechaClp, 0);
+    const totalBrechaUf = calculatedRows.reduce((sum, r) => sum + r.brechaUf, 0);
+
+    // Filter rows for the table:
+    const q = normalize(currentQuery);
+    const filteredRows = calculatedRows.filter((r) => {
+      const matchQ =
+        !q ||
+        normalize(r.persona.nombre).includes(q) ||
+        normalize(r.persona.rut).includes(q) ||
+        normalize(r.banco).includes(q) ||
+        normalize(r.cuenta).includes(q);
+
+      if (!matchQ) return false;
+
+      if (currentFilter === "cumple") return r.cumple;
+      if (currentFilter === "insuficiente") return !r.cumple && !r.sinAhorro;
+      if (currentFilter === "sin_ahorro") return r.sinAhorro;
+      return true;
+    }).sort((a, b) => a.persona.nombre.localeCompare(b.persona.nombre, "es"));
+
+    const container = document.getElementById("ahorroDynamicContent");
+    if (!container) return;
+
+    container.innerHTML = `
+      <!-- Métricas Clave de Ahorro -->
+      <section class="grid stats">
+        ${stat("Socios analizados", totalPersonas, "", "total")}
+        ${stat("Cumplen exigencia", `${formatNumber(cumplen)} (${pctCumplen}%)`, "emerald")}
+        ${stat("Con déficit", `${formatNumber(conDeficit.length)} socios`, "amber")}
+        ${stat("Sin libreta / Sin ahorro", sinAhorro, "rose")}
+        ${stat("Ahorro acumulado", `$${formatNumber(totalAhorroClp)} (${formatNumber(Number(totalAhorroUf.toFixed(1)))} UF)`, "cyan")}
+      </section>
+
+      <!-- Barra de Filtros y Búsqueda -->
+      <section class="card" style="margin-top: 18px;">
+        <div class="field-row" style="grid-template-columns: minmax(260px, 1fr) auto;">
+          <label class="field" style="margin:0;">
+            <span>Buscar por RUT, Nombre, Banco o Cuenta</span>
+            <input id="ahorroSearchInput" class="input" placeholder="Escribe para buscar..." value="${escapeAttr(currentQuery)}" autocomplete="off" />
+          </label>
+          <div style="display:flex; flex-direction:column; justify-content:flex-end;">
+            <span style="font-size:12px; font-weight:800; color:var(--cyan-dark); margin-bottom:6px; text-transform:uppercase;">Filtrar estado</span>
+            <div class="filter-pills">
+              <button class="filter-pill ${currentFilter === "todos" ? "active" : ""}" type="button" data-filter="todos">Todos (${formatNumber(totalPersonas)})</button>
+              <button class="filter-pill ${currentFilter === "cumple" ? "active" : ""}" type="button" data-filter="cumple">Cumplen (${formatNumber(cumplen)})</button>
+              <button class="filter-pill ${currentFilter === "insuficiente" ? "active" : ""}" type="button" data-filter="insuficiente">Con déficit (${formatNumber(conDeficit.length)})</button>
+              <button class="filter-pill ${currentFilter === "sin_ahorro" ? "active" : ""}" type="button" data-filter="sin_ahorro">Sin ahorro (${formatNumber(sinAhorro)})</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tabla de Ahorro -->
+      <section class="panel" style="margin-top: 18px;">
+        <div class="report-export-head">
+          <div>
+            <h3>Nómina y Estado de Ahorro (${formatNumber(filteredRows.length)} socios)</h3>
+            <p class="muted">Montos expresados en pesos chilenos y su conversión a UF referencial ($${formatNumber(s.valorUf)}).</p>
+          </div>
+        </div>
+
+        ${
+          !filteredRows.length
+            ? emptyHtml("No hay socios que coincidan con los filtros de búsqueda.")
+            : `
+              <div class="table-wrap" style="margin-top: 14px;">
+                <table class="comite-matrix-table">
+                  <thead>
+                    <tr>
+                      <th>Socio</th>
+                      <th>RSH</th>
+                      <th>Banco / Entidad</th>
+                      <th>N° Cuenta / Libreta</th>
+                      <th>Ahorro Acreditado</th>
+                      <th>Meta Exigida</th>
+                      <th>Estado</th>
+                      <th>Brecha Faltante</th>
+                      <th>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${filteredRows.map((r) => `
+                      <tr>
+                        <td>
+                          <strong>${escapeHtml(r.persona.nombre)}</strong>
+                          <div class="muted small">${escapeHtml(r.persona.rut)}</div>
+                        </td>
+                        <td>${r.persona.rsh?.porcentaje ? `${r.persona.rsh.porcentaje}%` : "Sin dato"}</td>
+                        <td>${escapeHtml(r.banco || "Sin dato")}</td>
+                        <td>${escapeHtml(r.cuenta || "Sin dato")}</td>
+                        <td>
+                          <strong>$${formatNumber(r.ahorroClp)}</strong>
+                          <div class="muted small">${formatNumber(r.ahorroUf)} UF</div>
+                        </td>
+                        <td>
+                          <strong>${r.metaUf} UF</strong>
+                          <div class="muted small">$${formatNumber(r.metaClp)}</div>
+                        </td>
+                        <td>
+                          ${
+                            r.cumple
+                              ? '<span class="badge cumple">Cumple meta</span>'
+                              : r.sinAhorro
+                              ? '<span class="badge sin_ahorro">Sin ahorro</span>'
+                              : '<span class="badge insuficiente">Déficit</span>'
+                          }
+                        </td>
+                        <td>
+                          ${
+                            r.cumple
+                              ? '<span style="color:var(--emerald); font-weight:700;">$0</span>'
+                              : `<strong style="color:var(--rose);">$${formatNumber(r.brechaClp)}</strong><div class="muted small">${formatNumber(r.brechaUf)} UF</div>`
+                          }
+                        </td>
+                        <td>
+                          <button class="button secondary subtle small btn-ver-ficha-ahorro" data-rut="${escapeAttr(r.persona.rut)}" type="button">Ficha</button>
+                        </td>
+                      </tr>
+                    `).join("")}
+                  </tbody>
+                </table>
+              </div>
+            `
+        }
+      </section>
+    `;
+
+    // Bind dynamic elements:
+    const searchInput = document.getElementById("ahorroSearchInput");
+    if (searchInput) {
+      searchInput.addEventListener("input", (e) => {
+        currentQuery = e.target.value;
+        refreshAhorroView();
+      });
+    }
+
+    document.querySelectorAll(".filter-pill").forEach((pill) => {
+      pill.addEventListener("click", () => {
+        currentFilter = pill.dataset.filter;
+        refreshAhorroView();
+      });
+    });
+
+    document.querySelectorAll(".btn-ver-ficha-ahorro").forEach((btn) => {
+      btn.addEventListener("click", () => navigate("ficha", { rut: btn.dataset.rut }));
+    });
+  }
+
+  refreshAhorroView();
+
+  // Top header events:
+  document.getElementById("ahorroComiteSelect")?.addEventListener("change", (e) => {
+    setActiveWorkspace(e.target.value);
+    renderExtraerAhorro();
+  });
+
+  document.getElementById("btnAplicarAhorroSettings")?.addEventListener("click", () => {
+    const valUf = Number(document.getElementById("ahorroValorUfInput").value);
+    const reg = document.getElementById("ahorroReglaSelect").value;
+    saveAhorroSettings(valUf, reg);
+    refreshAhorroView();
+  });
+
+  document.getElementById("btnToggleAhorroUpload")?.addEventListener("click", () => {
+    const panel = document.getElementById("ahorroUploadPanel");
+    panel?.classList.toggle("hidden");
+  });
+
+  document.getElementById("btnProcesarAhorroExcel")?.addEventListener("click", async () => {
+    const file = document.getElementById("ahorroExcelFileInput")?.files[0];
+    const msg = document.getElementById("ahorroUploadMessage");
+    if (!file) {
+      if (msg) msg.innerHTML = notice("Selecciona un archivo Excel con los datos de ahorro.", "error");
+      return;
+    }
+    if (msg) msg.innerHTML = notice("Procesando planilla de ahorro...");
+    try {
+      await handleAhorroExcelUpdate(file);
+    } catch (err) {
+      if (msg) msg.innerHTML = notice(`Error al procesar: ${err.message}`, "error");
+    }
+  });
+
+  document.getElementById("btnExportarAhorroExcel")?.addEventListener("click", () => {
+    const s = getAhorroSettings();
+    const rows = (activeWs.personas || []).map((p) => calculatePersonaAhorro(p, s.valorUf, s.regla));
+    exportAhorroExcel(rows, workspaceDisplayName(activeWs));
+  });
+}
+
+function exportAhorroExcel(rows, wsName) {
+  if (!window.XLSX) {
+    alert("Librería Excel no disponible.");
+    return;
+  }
+  const data = rows.map((r) => ({
+    RUT: r.persona.rut,
+    "Nombre Postulante": r.persona.nombre,
+    "Comité": workspaceDisplayName(getActiveWorkspace()),
+    "Comuna": getActiveWorkspace().comuna || "",
+    "RSH %": r.persona.rsh?.porcentaje ? `${r.persona.rsh.porcentaje}%` : "Sin dato",
+    "Banco / Entidad": r.banco || "Sin dato",
+    "N° Cuenta / Libreta": r.cuenta || "Sin dato",
+    "Ahorro CLP ($)": r.ahorroClp,
+    "Ahorro (UF)": r.ahorroUf,
+    "Meta Exigida (UF)": r.metaUf,
+    "Meta Exigida CLP ($)": r.metaClp,
+    "Estado Cumplimiento": r.cumple ? "CUMPLE META" : (r.sinAhorro ? "SIN LIBRETA / SIN AHORRO" : "INSUFICIENTE"),
+    "Brecha Faltante (UF)": r.brechaUf,
+    "Brecha Faltante CLP ($)": r.brechaClp,
+  }));
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Nomina Ahorro");
+  XLSX.writeFile(wb, `nomina-ahorro-${normalize(wsName)}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+async function handleAhorroExcelUpdate(file) {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: "array" });
+  const sheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+  if (rawRows.length < 2) {
+    throw new Error("El archivo no contiene suficientes filas.");
+  }
+
+  const headers = rawRows[0].map((h) => normalize(String(h)));
+  const rutIdx = headers.findIndex((h) => COLUMN_ALIASES.rut.some((alias) => h === alias || h.includes(alias)));
+  const ahorroIdx = headers.findIndex((h) => COLUMN_ALIASES.ahorro.some((alias) => h === alias || h.includes(alias)));
+  const bancoIdx = headers.findIndex((h) => COLUMN_ALIASES.banco.some((alias) => h === alias || h.includes(alias)));
+  const cuentaIdx = headers.findIndex((h) => COLUMN_ALIASES.numeroCuenta.some((alias) => h === alias || h.includes(alias)));
+
+  if (rutIdx === -1 || ahorroIdx === -1) {
+    throw new Error("No se detectaron columnas de RUT y Ahorro/Monto en la primera fila.");
+  }
+
+  let updatedCount = 0;
+  for (let i = 1; i < rawRows.length; i++) {
+    const row = rawRows[i];
+    const rawRut = cleanString(row[rutIdx]);
+    const normRut = normalizeRut(rawRut);
+    if (!normRut) continue;
+
+    const persona = state.personas.find((p) => normalizeRut(p.rut) === normRut);
+    if (persona) {
+      const rawAhorro = parseDecimal(row[ahorroIdx]);
+      if (rawAhorro !== null) {
+        persona.ahorro.montoActual = rawAhorro;
+      }
+      if (bancoIdx !== -1 && cleanString(row[bancoIdx])) {
+        persona.ahorro.banco = cleanString(row[bancoIdx]);
+      }
+      if (cuentaIdx !== -1 && cleanString(row[cuentaIdx])) {
+        persona.ahorro.numeroCuenta = cleanString(row[cuentaIdx]);
+      }
+      updatedCount++;
+    }
+  }
+
+  saveWorkspaceStore();
+  alert(`Se actualizaron con éxito los datos de ahorro para ${updatedCount} personas.`);
+  renderExtraerAhorro();
 }
 
 function areaMetric(label, value) {
@@ -1431,8 +2157,12 @@ function renderPersonas(params = {}) {
     <div class="page-head">
       <div>
         <div class="eyebrow">Área Social</div>
-        <h2>Personas</h2>
-        <p class="muted">${escapeHtml(workspaceDisplayName(workspace))}</p>
+        <h2>Bases de datos</h2>
+        <p class="muted">Padrón de socios y registros cargados para ${escapeHtml(workspaceDisplayName(workspace))}</p>
+      </div>
+      <div class="demanda-header-actions">
+        <button id="btnImportarBasePersonas" class="button secondary" type="button">Cargar base Excel</button>
+        <button id="exportPersonasBtn" class="button primary" type="button">Exportar nómina filtrada</button>
       </div>
     </div>
     <section class="card">
@@ -1462,9 +2192,6 @@ function renderPersonas(params = {}) {
           </select>
         </label>
       </div>
-      <div class="toolbar-row">
-        <button id="exportPersonasBtn" class="button secondary subtle" type="button">Exportar nómina filtrada</button>
-      </div>
     </section>
     <section id="personasResult" style="margin-top: 18px;"></section>
   `);
@@ -1477,6 +2204,7 @@ function renderPersonas(params = {}) {
   searchInput.addEventListener("input", update);
   statusFilter.addEventListener("change", update);
   quickFilter.addEventListener("change", update);
+  document.getElementById("btnImportarBasePersonas")?.addEventListener("click", () => navigate("importar"));
   document.getElementById("exportPersonasBtn").addEventListener("click", () => {
     exportPersonasExcel(searchInput.value, statusFilter.value, quickFilter.value);
   });
@@ -3119,12 +3847,12 @@ function renderRukan() {
   setApp(`
     <div class="page-head">
       <div>
-        <div class="eyebrow">Area Social</div>
-        <h2>Herramienta Rukan</h2>
-        <p class="muted">Genera una nomina de oficina desde Rukan PDF, independiente de los comites cargados.</p>
+        <div class="eyebrow">Área Social</div>
+        <h2>Extraer RUKAN</h2>
+        <p class="muted">Extracción y consolidación de nómina de oficina desde Rukan PDF y capturas OCR.</p>
       </div>
       <div class="report-actions">
-        <button id="exportRukanBtn" class="button primary" type="button">Exportar nomina Excel</button>
+        <button id="exportRukanBtn" class="button primary" type="button">Exportar nómina Excel</button>
         <button id="clearRukanBtn" class="button danger" type="button">Limpiar herramienta</button>
       </div>
     </div>
@@ -5232,23 +5960,44 @@ function excelFileName(prefix) {
   return `${cleanPrefix}-${workspace}-${new Date().toISOString().slice(0, 10)}`;
 }
 
-function getResumen() {
-  const alertas = state.personas.flatMap((persona) => persona.alertas || []);
+function getResumen(targetWorkspace = null) {
+  const personas = targetWorkspace ? (targetWorkspace.personas || []) : (state.personas || []);
+  const alertas = personas.flatMap((persona) => persona.alertas || []);
+  const total = personas.length;
+  const aptas = personas.filter((p) => p.estadoGeneral === "apta").length;
+  const observadas = personas.filter((p) => p.estadoGeneral === "observada").length;
+  const bloqueadas = personas.filter((p) => p.estadoGeneral === "bloqueada").length;
+  const rshHasta40 = personas.filter((p) => {
+    const v = Number(p.rsh?.porcentaje);
+    return (!isNaN(v) && v > 0 && v <= 40) || Boolean(p.rsh?.preferente);
+  }).length;
+  const rshSobre40 = personas.filter((p) => {
+    const v = Number(p.rsh?.porcentaje);
+    return !isNaN(v) && v > 40;
+  }).length;
+  const conAhorro = personas.filter((p) => Number(p.ahorro?.montoActual || 0) > 0).length;
+  const ahorroInsuficiente = personas.filter((p) => Boolean(p.ahorro?.insuficiente)).length;
+  const ahorroTotal = personas.reduce((acc, p) => acc + (Number(p.ahorro?.montoActual) || 0), 0);
+
   return {
-    totalPersonas: state.personas.length,
-    personasAptas: state.personas.filter((p) => p.estadoGeneral === "apta").length,
-    observadas: state.personas.filter((p) => p.estadoGeneral === "observada").length,
-    bloqueadas: state.personas.filter((p) => p.estadoGeneral === "bloqueada").length,
-    personasMayores: state.personas.filter((p) => p.personaMayor).length,
-    discapacidad: state.personas.filter((p) => p.discapacidad).length,
-    etnia: state.personas.filter(hasEtnia).length,
-    unipersonales: state.personas.filter(isUnipersonal).length,
-    hijosRevision18: state.personas.filter((p) => hijosConRevision(p).length).length,
-    rshSobre40: state.personas.filter((p) => Number(p.rsh.porcentaje) > 40).length,
-    ahorroInsuficiente: state.personas.filter((p) => p.ahorro.insuficiente).length,
-    cedulasRevision: state.personas.filter(hasCedulaRevision).length,
-    cedulasVencidas: state.personas.filter((p) =>
-      p.documentos.some((doc) => doc.tipo === "cedula" && doc.estado === "vencido")
+    totalPersonas: total,
+    personasAptas: aptas,
+    observadas: observadas,
+    bloqueadas: bloqueadas,
+    porcentajeAptitud: total > 0 ? Math.round((aptas / total) * 100) : 0,
+    personasMayores: personas.filter((p) => p.personaMayor).length,
+    discapacidad: personas.filter((p) => p.discapacidad).length,
+    etnia: personas.filter(hasEtnia).length,
+    unipersonales: personas.filter(isUnipersonal).length,
+    hijosRevision18: personas.filter((p) => hijosConRevision(p).length).length,
+    rshHasta40,
+    rshSobre40,
+    conAhorro,
+    ahorroInsuficiente,
+    ahorroTotal,
+    cedulasRevision: personas.filter(hasCedulaRevision).length,
+    cedulasVencidas: personas.filter((p) =>
+      (p.documentos || []).some((doc) => doc.tipo === "cedula" && doc.estado === "vencido")
     ).length,
     alertasCriticas: alertas.filter((alerta) => alerta.severidad === "critica").length,
     alertasPreventivas: alertas.filter((alerta) => alerta.severidad === "preventiva").length,
