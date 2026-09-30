@@ -8,6 +8,7 @@ import ExtraerAhorro from "./pages/ExtraerAhorro.jsx";
 import ExtraerRukan from "./pages/ExtraerRukan.jsx";
 import OrganizacionDemanda from "./pages/OrganizacionDemanda.jsx";
 import PersonaDetail from "./pages/PersonaDetail.jsx";
+import Postventa from "./pages/Postventa.jsx";
 import Reportes from "./pages/Reportes.jsx";
 
 export default function App() {
@@ -29,6 +30,8 @@ export default function App() {
 
         {/* ÁREA TÉCNICA */}
         <Route path="/tecnica" element={<AreaTecnica />} />
+        <Route path="/postventa" element={<Postventa />} />
+        <Route path="/postventa/solicitud" element={<Postventa defaultTab="beneficiario" />} />
 
         {/* SEGUIMIENTO */}
         <Route path="/alertas" element={<Alertas />} />

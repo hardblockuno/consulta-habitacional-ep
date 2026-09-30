@@ -7,12 +7,13 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Ahorro, Alerta, Comite, Documento, ImportacionExcel, Persona
+from .models import Ahorro, Alerta, Comite, Documento, ImportacionExcel, Persona, TicketPostventa
 from .serializers import (
     AlertaSerializer,
     ImportacionExcelSerializer,
     PersonaDetailSerializer,
     PersonaListSerializer,
+    TicketPostventaSerializer,
 )
 from .services.excel_importer import (
     ImportacionError,
@@ -393,3 +394,94 @@ def count_personas_con_hijos_revision(personas):
         if any(hijo.get("requiere_revision_documental") for hijo in hijos):
             total += 1
     return total
+
+
+
+class TicketPostventaViewSet(viewsets.ModelViewSet):
+    queryset = TicketPostventa.objects.all()
+    serializer_class = TicketPostventaSerializer
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        estado = self.request.query_params.get("estado", "").strip()
+        urgencia = self.request.query_params.get("urgencia", "").strip()
+        q = self.request.query_params.get("q", "").strip()
+
+        if estado:
+            queryset = queryset.filter(estado=estado)
+        if urgencia:
+            queryset = queryset.filter(urgencia=urgencia)
+        if q:
+            queryset = queryset.filter(
+                Q(codigo__icontains=q)
+                | Q(rut__icontains=q)
+                | Q(nombre__icontains=q)
+                | Q(telefono__icontains=q)
+                | Q(comite_nombre__icontains=q)
+                | Q(vivienda_direccion__icontains=q)
+                | Q(recinto__icontains=q)
+                | Q(descripcion__icontains=q)
+            )
+        return queryset
+
+    @action(detail=False, methods=["get"])
+    def consultar(self, request):
+        rut = request.query_params.get("rut", "").strip()
+        codigo = request.query_params.get("codigo", "").strip()
+
+        if not rut and not codigo:
+            return Response(
+                {"detail": "Debe indicar RUT o Código de solicitud para consultar."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        queryset = self.get_queryset()
+        if codigo:
+            queryset = queryset.filter(codigo__iexact=codigo)
+        elif rut:
+            clean_rut = rut.replace(".", "").replace(" ", "").upper()
+            queryset = queryset.filter(
+                Q(rut__iexact=rut)
+                | Q(rut__icontains=clean_rut)
+            )
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["post"])
+    def resolver(self, request, pk=None):
+        ticket = self.get_object()
+        respuesta = request.data.get("respuesta_tecnica", "").strip()
+        tecnico = request.data.get("tecnico_responsable", "").strip()
+
+        if not respuesta:
+            return Response(
+                {"detail": "Debe ingresar una respuesta o solución técnica."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ticket.respuesta_tecnica = respuesta
+        if tecnico:
+            ticket.tecnico_responsable = tecnico
+        ticket.estado = TicketPostventa.ESTADO_RESUELTA
+        ticket.save()
+
+        serializer = self.get_serializer(ticket)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get"])
+    def resumen(self, request):
+        total = TicketPostventa.objects.count()
+        recibidas = TicketPostventa.objects.filter(estado=TicketPostventa.ESTADO_RECIBIDA).count()
+        en_gestion = TicketPostventa.objects.filter(estado=TicketPostventa.ESTADO_EN_GESTION).count()
+        resueltas = TicketPostventa.objects.filter(estado=TicketPostventa.ESTADO_RESUELTA).count()
+        urgentes = TicketPostventa.objects.filter(urgencia=TicketPostventa.URGENCIA_URGENTE).count()
+
+        return Response({
+            "total": total,
+            "recibidas": recibidas,
+            "en_gestion": en_gestion,
+            "resueltas": resueltas,
+            "urgentes": urgentes,
+        })

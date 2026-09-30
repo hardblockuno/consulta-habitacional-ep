@@ -7,6 +7,7 @@ import {
   PiggyBank,
   ScanLine,
   Users,
+  Wrench,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
@@ -24,6 +25,7 @@ const navSections = [
     title: "ÁREA TÉCNICA",
     items: [
       { to: "/tecnica", label: "Proyectos y Terrenos", icon: HardHat },
+      { to: "/postventa", label: "Postventa", icon: Wrench },
     ],
   },
   {

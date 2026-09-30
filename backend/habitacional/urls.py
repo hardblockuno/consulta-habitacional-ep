@@ -10,11 +10,13 @@ from .views import (
     ReportesResumenAPIView,
     RukanAIExtractionAPIView,
     RukanAIStatusAPIView,
+    TicketPostventaViewSet,
 )
 
 router = DefaultRouter()
 router.register("personas", PersonaViewSet, basename="personas")
 router.register("alertas", AlertaViewSet, basename="alertas")
+router.register("postventa/tickets", TicketPostventaViewSet, basename="postventa-tickets")
 
 urlpatterns = [
     path("", include(router.urls)),

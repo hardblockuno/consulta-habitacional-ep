@@ -288,3 +288,73 @@ class ImportacionExcel(TimeStampedModel):
 
     def __str__(self):
         return self.nombre_archivo
+
+
+
+
+
+class TicketPostventa(TimeStampedModel):
+    ESTADO_RECIBIDA = "recibida"
+    ESTADO_EN_GESTION = "en_gestion"
+    ESTADO_RESUELTA = "resuelta"
+    ESTADO_CHOICES = [
+        (ESTADO_RECIBIDA, "Recibida"),
+        (ESTADO_EN_GESTION, "En gestión"),
+        (ESTADO_RESUELTA, "Resuelta"),
+    ]
+
+    URGENCIA_NORMAL = "normal"
+    URGENCIA_URGENTE = "urgente"
+    URGENCIA_CHOICES = [
+        (URGENCIA_NORMAL, "Normal"),
+        (URGENCIA_URGENTE, "Urgente"),
+    ]
+
+    codigo = models.CharField(max_length=32, unique=True, editable=False, db_index=True)
+    rut = models.CharField(max_length=16, db_index=True)
+    nombre = models.CharField(max_length=255)
+    telefono = models.CharField(max_length=40, blank=True)
+    comite_nombre = models.CharField(max_length=255, blank=True)
+    vivienda_direccion = models.CharField(max_length=255, blank=True)
+    recinto = models.CharField(max_length=100, blank=True)
+    descripcion = models.TextField()
+    foto = models.ImageField(upload_to="postventa/fotos/%Y/%m/", null=True, blank=True)
+
+    estado = models.CharField(
+        max_length=20,
+        choices=ESTADO_CHOICES,
+        default=ESTADO_RECIBIDA,
+        db_index=True,
+    )
+    urgencia = models.CharField(
+        max_length=20,
+        choices=URGENCIA_CHOICES,
+        default=URGENCIA_NORMAL,
+        db_index=True,
+    )
+
+    respuesta_tecnica = models.TextField(blank=True)
+    tecnico_responsable = models.CharField(max_length=150, blank=True)
+    fecha_resolucion = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-creado_en"]
+        indexes = [
+            models.Index(fields=["rut"]),
+            models.Index(fields=["estado"]),
+            models.Index(fields=["urgencia"]),
+        ]
+
+    def __str__(self):
+        return f"{self.codigo} - {self.nombre} ({self.get_estado_display()})"
+
+    def save(self, *args, **kwargs):
+        if not self.codigo:
+            year = timezone.localdate().year
+            count = TicketPostventa.objects.filter(creado_en__year=year).count() + 1
+            self.codigo = f"PV-{year}-{count:04d}"
+        if self.estado == self.ESTADO_RESUELTA and not self.fecha_resolucion:
+            self.fecha_resolucion = timezone.now()
+        elif self.estado != self.ESTADO_RESUELTA:
+            self.fecha_resolucion = None
+        super().save(*args, **kwargs)

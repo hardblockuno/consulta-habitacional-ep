@@ -7,6 +7,7 @@ from .models import (
     Comite,
     Documento,
     ImportacionExcel,
+    TicketPostventa,
     Observacion,
     Persona,
     Postulacion,
@@ -240,3 +241,33 @@ class ImportacionExcelSerializer(serializers.ModelSerializer):
             "creado_en",
             "finalizado_en",
         ]
+
+
+class TicketPostventaSerializer(serializers.ModelSerializer):
+    estado_display = serializers.CharField(source="get_estado_display", read_only=True)
+    urgencia_display = serializers.CharField(source="get_urgencia_display", read_only=True)
+
+    class Meta:
+        model = TicketPostventa
+        fields = [
+            "id",
+            "codigo",
+            "rut",
+            "nombre",
+            "telefono",
+            "comite_nombre",
+            "vivienda_direccion",
+            "recinto",
+            "descripcion",
+            "foto",
+            "estado",
+            "estado_display",
+            "urgencia",
+            "urgencia_display",
+            "respuesta_tecnica",
+            "tecnico_responsable",
+            "fecha_resolucion",
+            "creado_en",
+            "actualizado_en",
+        ]
+        read_only_fields = ["id", "codigo", "fecha_resolucion", "creado_en", "actualizado_en"]
