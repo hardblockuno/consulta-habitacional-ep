@@ -57,16 +57,6 @@ export default function PortalPostventaPublico() {
 
       {/* Contenedor Principal */}
       <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
-        {/* Ficha Informativa Institucional (Sobria, estilo Linear) */}
-        <div className="mb-6 rounded-lg border border-slate-200/80 bg-white p-4 shadow-2xs">
-          <h2 className="text-sm font-semibold tracking-tight text-slate-900">
-            Recepción y Seguimiento de Requerimientos Técnicos
-          </h2>
-          <p className="mt-1 text-[13px] text-slate-600 leading-relaxed">
-            Plataforma para el ingreso de observaciones de postventa y consulta del estado de atención asignado por el equipo técnico.
-          </p>
-        </div>
-
         {/* Pestañas de Navegación Segmentadas (Linear / Apple style) */}
         <div className="mb-6 flex justify-center">
           <div className="inline-flex rounded-lg bg-slate-100 p-0.5 border border-slate-200/70 w-full sm:w-auto">
@@ -102,11 +92,8 @@ export default function PortalPostventaPublico() {
       </main>
 
       {/* Pie Institucional */}
-      <footer className="mt-12 border-t border-slate-200/70 bg-white py-6 text-center text-xs text-slate-500">
-        <p className="font-medium text-slate-700">Entidad Patrocinante · Departamento Técnico y de Postventa</p>
-        <p className="mt-1 text-[11px] text-slate-400">
-          Información tratada bajo confidencialidad y para fines exclusivos de mantención y fiscalización habitacional.
-        </p>
+      <footer className="mt-12 border-t border-slate-200/70 py-6 text-center text-xs text-slate-400">
+        Entidad Patrocinante · Postventa Habitacional
       </footer>
     </div>
   );
@@ -211,13 +198,10 @@ function FormularioPublico() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="border-b border-slate-100 pb-3">
+      <div className="border-b border-slate-100 pb-2.5">
         <h3 className="text-sm font-semibold tracking-tight text-slate-900">
           Antecedentes del Requerimiento
         </h3>
-        <p className="text-xs text-slate-500 mt-0.5">
-          Complete los antecedentes para la debida atención por parte del equipo técnico.
-        </p>
       </div>
 
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
@@ -372,19 +356,10 @@ function ConsultaPublica() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-sm font-semibold tracking-tight text-slate-900">
-          Consulta de Estado y Respuesta Técnica
-        </h3>
-        <p className="text-xs text-slate-500 mt-0.5">
-          Ingrese el RUT del beneficiario o el código de seguimiento asignado (ej: PV-2026-0001).
-        </p>
-      </div>
-
       <form onSubmit={handleConsultar} className="flex gap-2">
         <input
           type="text"
-          placeholder="RUT (12.345.678-9) o Código de seguimiento"
+          placeholder="RUT o código (ej: PV-2026-0001)"
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           className="flex-1 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 focus:outline-none transition-all"

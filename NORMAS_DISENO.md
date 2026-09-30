@@ -2,10 +2,11 @@
 
 ## 🛑 Reglas Inquebrantables de Diseño e Implementación
 
-Toda la plataforma, sus interfaces, componentes y flujos deben cumplir rigurosamente con dos estándares fundamentales:
+Toda la plataforma, sus interfaces, componentes y flujos deben cumplir rigurosamente con tres estándares fundamentales:
 
 1. **Cero Clichés de IA y Cero Apariencia Generada por IA.**
 2. **Estándares de Diseño Silicon Valley (Linear, Apple, Vercel, Stripe).**
+3. **Economía de Texto y Cero Redundancia (Sin Verborrea de IA).**
 
 ---
 
@@ -42,3 +43,11 @@ Toda la plataforma, sus interfaces, componentes y flujos deben cumplir rigurosam
 - **Prohibido el uso de emojis en interfaces formales:** Nada de 🟡, 🔵, 🟢, ⚠️, 📋, 🚀, 🤖, ✨ en botones, tablas, selectores o estados.
 - **Prohibido el lenguaje publicitario o exclamativo:** Nada de *"¡Éxito!"*, *"¡Bienvenido al portal inteligente!"* o promesas de IA. El lenguaje es estrictamente sobrio, técnico y administrativo chileno.
 - **Prohibido el glassmorphism o neomorfismo:** Superficies limpias, planas y estructuradas con bordes de 1px.
+
+---
+
+### 3. Economía de Texto y Cero Redundancia (Sin Verborrea de IA)
+- **Prohibido el texto redundante o explicativo innecesario:** Si una interfaz es intuitiva (títulos claros, botones explícitos, campos bien rotulados), no se deben agregar párrafos explicativos que repitan lo evidente.
+- **Sin disclaimers ni sermones:** Evitar avisos largos o discursos sobre confidencialidad que saturan la vista.
+- **Alto ratio señal/ruido:** Todo texto debe aportar una instrucción concreta o un dato indispensable. Reducir la cantidad de palabras al mínimo sin perder precisión técnica.
+- **Directo al grano:** Formularios y listados van directo a los controles sin banners introductorios redundantes.

@@ -37,11 +37,8 @@ export default function Postventa() {
             Área Técnica
           </span>
           <h1 className="mt-0.5 text-xl font-semibold tracking-tight text-slate-900">
-            Bandeja de Postventa Habitacional
+            Bandeja de Postventa
           </h1>
-          <p className="text-xs text-slate-500">
-            Recepción de solicitudes de beneficiarios, gestión técnica y visación de soluciones.
-          </p>
         </div>
 
         {/* Acceso y copiado de enlace para vecinos */}
@@ -51,7 +48,7 @@ export default function Postventa() {
             onClick={copiarEnlacePublico}
             className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-slate-900 transition-colors"
           >
-            {copiado ? "Enlace copiado" : "Copiar enlace del portal"}
+            {copiado ? "Enlace copiado" : "Copiar enlace"}
           </button>
           <a
             href="/postventa/solicitud"
@@ -59,7 +56,7 @@ export default function Postventa() {
             rel="noreferrer"
             className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3.5 py-1.5 text-xs font-medium text-white shadow-2xs hover:bg-slate-800 transition-colors"
           >
-            <ExternalLink size={13} /> Ver portal de vecinos
+            <ExternalLink size={13} /> Portal público
           </a>
         </div>
       </div>
@@ -435,11 +432,11 @@ function ModalGestionTicket({ ticket, onClose, onGuardado }) {
 
           <div>
             <label className="block text-[11px] font-medium text-slate-600">
-              Profesional o Cuadrilla a Cargo
+              Responsable o Cuadrilla
             </label>
             <input
               type="text"
-              placeholder="Ej: Cuadrilla Constructora / Técnico EP"
+              placeholder="Ej: Técnico EP / Constructora"
               value={tecnico}
               onChange={(e) => setTecnico(e.target.value)}
               className="mt-1 w-full rounded border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:border-slate-800 focus:outline-hidden"
@@ -448,11 +445,11 @@ function ModalGestionTicket({ ticket, onClose, onGuardado }) {
 
           <div>
             <label className="block text-[11px] font-medium text-slate-600">
-              Resolución Técnica Formal (Visible para el Beneficiario)
+              Resolución Técnica (Visible al beneficiario)
             </label>
             <textarea
               rows={3}
-              placeholder="Describa el trabajo técnico efectuado o la constatación realizada..."
+              placeholder="Detalle de la solución o constatación técnica..."
               value={respuesta}
               onChange={(e) => setRespuesta(e.target.value)}
               className="mt-1 w-full rounded border border-slate-200 bg-white p-2.5 text-xs text-slate-800 focus:border-slate-800 focus:outline-hidden placeholder-slate-400 leading-relaxed"
