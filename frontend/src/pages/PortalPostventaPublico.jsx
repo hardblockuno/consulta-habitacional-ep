@@ -1,17 +1,15 @@
 import { useState } from "react";
 import {
-  AlertTriangle,
+  AlertCircle,
   Building2,
   CheckCircle2,
   Clock,
-  FileSpreadsheet,
-  HardHat,
+  FileText,
   Home,
-  Image as ImageIcon,
+  Paperclip,
   Phone,
   Search,
   Send,
-  ShieldCheck,
   Wrench,
 } from "lucide-react";
 import { api } from "../api/client.js";
@@ -34,83 +32,78 @@ export default function PortalPostventaPublico() {
   const [tab, setTab] = useState("ingresar"); // "ingresar" | "consultar"
 
   return (
-    <div className="min-h-screen bg-slate-100/70 text-slate-800">
-      {/* Encabezado Público Oficial */}
-      <header className="border-b border-slate-200 bg-white shadow-2xs">
+    <div className="min-h-screen bg-slate-50 text-slate-800">
+      {/* Encabezado Institucional */}
+      <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-700 text-white shadow-xs">
-              <FileSpreadsheet size={22} />
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-slate-800 text-white">
+              <Building2 size={20} />
             </div>
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-cyan-700">
+              <p className="text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
                 Entidad Patrocinante
               </p>
-              <h1 className="text-base font-bold text-slate-900 leading-tight sm:text-lg">
-                Atención de Postventa Habitacional
+              <h1 className="text-base font-bold text-slate-900 leading-tight">
+                Atención y Postventa Habitacional
               </h1>
             </div>
           </div>
-          <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 border border-slate-200">
-            <ShieldCheck size={14} className="text-cyan-700" /> Canal Oficial
+          <span className="text-xs text-slate-500 font-medium">
+            Canal de Atención Directa
           </span>
         </div>
       </header>
 
       {/* Contenedor Principal */}
-      <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
-        {/* Banner Explicativo */}
-        <div className="mb-6 rounded-2xl bg-gradient-to-br from-cyan-800 to-slate-900 p-6 text-white shadow-md">
-          <span className="inline-flex items-center gap-1.5 rounded-md bg-white/15 px-2.5 py-1 text-xs font-semibold text-cyan-100 backdrop-blur-xs">
-            <Wrench size={13} /> Portal para Socios y Familias
-          </span>
-          <h2 className="mt-3 text-xl font-extrabold sm:text-2xl">
-            Ingreso y Seguimiento de Solicitudes
+      <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
+        {/* Ficha Informativa Institucional (Sobria, sin degradados) */}
+        <div className="mb-6 rounded-lg border-l-4 border-slate-700 border border-slate-200 bg-white p-5">
+          <h2 className="text-base font-bold text-slate-900">
+            Recepción de Solicitudes Técnicas
           </h2>
-          <p className="mt-1.5 text-xs text-cyan-100 sm:text-sm leading-relaxed">
-            Reporta cualquier inconveniente o falla en tu vivienda para que el equipo técnico de la EP lo evalúe y devuelva una solución oficial.
+          <p className="mt-1 text-xs text-slate-600 leading-relaxed">
+            Plataforma para el ingreso formal de requerimientos de postventa y consulta del estado de avance atendido por el equipo técnico.
           </p>
         </div>
 
-        {/* Selector de Acción */}
-        <div className="mb-6 grid grid-cols-2 rounded-xl bg-slate-200/80 p-1 border border-slate-300/80">
+        {/* Pestañas de Navegación */}
+        <div className="mb-6 flex border-b border-slate-200">
           <button
             type="button"
             onClick={() => setTab("ingresar")}
-            className={`flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-bold transition sm:text-sm ${
+            className={`border-b-2 px-4 py-2.5 text-xs font-semibold transition ${
               tab === "ingresar"
-                ? "bg-white text-cyan-800 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
+                ? "border-slate-900 text-slate-900 font-bold"
+                : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
           >
-            <Send size={15} />
-            Ingresar Solicitud
+            Ingresar Nueva Solicitud
           </button>
           <button
             type="button"
             onClick={() => setTab("consultar")}
-            className={`flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-bold transition sm:text-sm ${
+            className={`border-b-2 px-4 py-2.5 text-xs font-semibold transition ${
               tab === "consultar"
-                ? "bg-white text-cyan-800 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
+                ? "border-slate-900 text-slate-900 font-bold"
+                : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
           >
-            <Search size={15} />
-            Consultar Estado
+            Consultar Estado de Solicitud
           </button>
         </div>
 
-        {/* Tarjeta del Formulario o Consulta */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        {/* Contenido de la Acción */}
+        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-2xs">
           {tab === "ingresar" ? <FormularioPublico /> : <ConsultaPublica />}
         </div>
       </main>
 
-      {/* Pie de Página Aislado */}
+      {/* Pie Institucional */}
       <footer className="mt-12 border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-500">
-        <p className="font-semibold text-slate-700">Entidad Patrocinante · Plataforma de Consulta Habitacional</p>
+        <p className="font-medium text-slate-700">Entidad Patrocinante · Departamento Técnico y de Postventa</p>
         <p className="mt-1 text-[11px] text-slate-400">
-          Tus datos son tratados de forma confidencial y utilizados exclusivamente para la gestión técnica de tu vivienda.
+          Información tratada bajo confidencialidad y para fines exclusivos de mantención y fiscalización habitacional.
         </p>
       </footer>
     </div>
@@ -118,7 +111,7 @@ export default function PortalPostventaPublico() {
 }
 
 /* =========================================================================
-   FORMULARIO DE INGRESO PÚBLICO
+   FORMULARIO DE INGRESO (SOBRIO Y PROFESIONAL)
    ========================================================================= */
 function FormularioPublico() {
   const [rut, setRut] = useState("");
@@ -137,7 +130,7 @@ function FormularioPublico() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!rut.trim() || !nombre.trim() || !descripcion.trim()) {
-      alert("Por favor completa los campos requeridos: RUT, Nombre y Descripción.");
+      alert("Por favor complete los campos obligatorios: RUT, Nombre y Descripción.");
       return;
     }
 
@@ -163,7 +156,7 @@ function FormularioPublico() {
       setTicketCreado(res.data);
     } catch (err) {
       console.error("Error al ingresar solicitud:", err);
-      alert("Ocurrió un error al enviar tu solicitud. Intenta nuevamente.");
+      alert("Ocurrió un error al registrar la solicitud. Intente nuevamente.");
     } finally {
       setEnviando(false);
     }
@@ -171,26 +164,28 @@ function FormularioPublico() {
 
   if (ticketCreado) {
     return (
-      <div className="py-6 text-center space-y-5">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-inner">
-          <CheckCircle2 size={36} />
-        </div>
-        <div>
-          <h3 className="text-xl font-bold text-slate-900">¡Tu Solicitud Fue Recibida!</h3>
-          <p className="mt-1 text-sm text-slate-600">
-            El equipo técnico de la Entidad Patrocinante ya tiene tu solicitud en su bandeja de trabajo.
+      <div className="py-6 space-y-4">
+        <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-600">
+            Registro Conforme
+          </p>
+          <h3 className="mt-1 text-base font-bold text-slate-900">
+            Solicitud Registrada en la Plataforma
+          </h3>
+          <p className="mt-1 text-xs text-slate-600">
+            El requerimiento fue derivado al equipo técnico para su revisión.
           </p>
         </div>
 
-        <div className="rounded-2xl bg-cyan-50/70 p-5 border border-cyan-200">
-          <p className="text-xs font-bold uppercase tracking-wider text-cyan-800">
-            Tu Código de Seguimiento
+        <div className="rounded-md border border-slate-200 bg-white p-4">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+            Código de Seguimiento
           </p>
-          <p className="mt-2 font-mono text-3xl font-extrabold text-cyan-900 tracking-wider">
+          <p className="mt-1 font-mono text-2xl font-bold text-slate-900">
             {ticketCreado.codigo}
           </p>
-          <p className="mt-2 text-xs text-slate-500">
-            Guarda o anota este código. Con él o con tu RUT podrás consultar la respuesta de la EP en cualquier momento.
+          <p className="mt-1 text-xs text-slate-500">
+            Conserve este número para consultar el estado o resolución de su caso.
           </p>
         </div>
 
@@ -201,7 +196,7 @@ function FormularioPublico() {
             setDescripcion("");
             setFoto(null);
           }}
-          className="rounded-xl bg-cyan-700 px-6 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-cyan-800"
+          className="rounded-md border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
         >
           Ingresar otra solicitud
         </button>
@@ -210,84 +205,84 @@ function FormularioPublico() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      <div>
-        <h3 className="text-base font-bold text-slate-900 sm:text-lg">
-          Datos de la Solicitud
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="border-b border-slate-100 pb-2">
+        <h3 className="text-sm font-bold text-slate-900">
+          Antecedentes del Requerimiento
         </h3>
         <p className="text-xs text-slate-500">
           Los campos con asterisco (*) son obligatorios.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label className="block text-xs font-bold text-slate-700">RUT del Beneficiario *</label>
+          <label className="block text-xs font-semibold text-slate-700">RUT del Beneficiario *</label>
           <input
             type="text"
             required
-            placeholder="Ej: 12.345.678-9"
+            placeholder="12.345.678-9"
             value={rut}
             onChange={(e) => setRut(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 focus:border-cyan-600 focus:bg-white focus:outline-hidden"
+            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-slate-800 focus:outline-hidden"
           />
         </div>
         <div>
-          <label className="block text-xs font-bold text-slate-700">Nombre Completo *</label>
+          <label className="block text-xs font-semibold text-slate-700">Nombre Completo *</label>
           <input
             type="text"
             required
-            placeholder="Ej: María González"
+            placeholder="Nombres y Apellidos"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 focus:border-cyan-600 focus:bg-white focus:outline-hidden"
+            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-slate-800 focus:outline-hidden"
           />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label className="block text-xs font-bold text-slate-700">Teléfono Celular *</label>
+          <label className="block text-xs font-semibold text-slate-700">Teléfono de Contacto *</label>
           <input
             type="tel"
             required
             placeholder="+56 9 1234 5678"
             value={telefono}
             onChange={(e) => setTelefono(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 focus:border-cyan-600 focus:bg-white focus:outline-hidden"
+            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-slate-800 focus:outline-hidden"
           />
         </div>
         <div>
-          <label className="block text-xs font-bold text-slate-700">Comité / Proyecto</label>
+          <label className="block text-xs font-semibold text-slate-700">Comité / Proyecto Habitacional</label>
           <input
             type="text"
-            placeholder="Ej: Villa Los Aromos"
+            placeholder="Nombre del comité o conjunto"
             value={comite}
             onChange={(e) => setComite(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 focus:border-cyan-600 focus:bg-white focus:outline-hidden"
+            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-slate-800 focus:outline-hidden"
           />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label className="block text-xs font-bold text-slate-700">N° de Casa / Lote o Depto</label>
+          <label className="block text-xs font-semibold text-slate-700">N° de Casa, Lote o Departamento</label>
           <input
             type="text"
-            placeholder="Ej: Casa 14 Mz D o Depto 302"
+            placeholder="Ej: Lote 14 Mz D / Depto 302"
             value={vivienda}
             onChange={(e) => setVivienda(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 focus:border-cyan-600 focus:bg-white focus:outline-hidden"
+            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-slate-800 focus:outline-hidden"
           />
         </div>
         <div>
-          <label className="block text-xs font-bold text-slate-700">Recinto del Problema</label>
+          <label className="block text-xs font-semibold text-slate-700">Recinto Afectado</label>
           <select
             value={recinto}
             onChange={(e) => setRecinto(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 focus:border-cyan-600 focus:bg-white focus:outline-hidden"
+            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-slate-800 focus:outline-hidden"
           >
-            <option value="">Selecciona el lugar...</option>
+            <option value="">Seleccione recinto...</option>
             {RECINTOS.map((r) => (
               <option key={r} value={r}>
                 {r}
@@ -298,39 +293,37 @@ function FormularioPublico() {
       </div>
 
       <div>
-        <label className="block text-xs font-bold text-slate-700">¿Qué problema ocurre? *</label>
+        <label className="block text-xs font-semibold text-slate-700">Descripción de la Observación o Falla *</label>
         <textarea
           rows={3}
           required
-          placeholder="Describe con claridad lo que sucede (ej: filtración en lavamanos, ventana descuadrada, humedad en el cielo raso, etc.)..."
+          placeholder="Describa brevemente la situación técnica observada en la vivienda..."
           value={descripcion}
           onChange={(e) => setDescripcion(e.target.value)}
-          className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-sm text-slate-800 focus:border-cyan-600 focus:bg-white focus:outline-hidden placeholder-slate-400"
+          className="mt-1 w-full rounded-md border border-slate-300 bg-white p-3 text-xs text-slate-900 focus:border-slate-800 focus:outline-hidden placeholder-slate-400"
         />
       </div>
 
       <div>
-        <label className="block text-xs font-bold text-slate-700">Fotografía de Respaldo (Opcional)</label>
+        <label className="block text-xs font-semibold text-slate-700">Fotografía de Respaldo (Opcional)</label>
         <input
           type="file"
           accept="image/*"
           onChange={(e) => setFoto(e.target.files[0] || null)}
-          className="mt-1 block w-full text-xs text-slate-500 file:mr-3 file:rounded-xl file:border-0 file:bg-cyan-50 file:px-4 file:py-2 file:text-xs file:font-bold file:text-cyan-800 hover:file:bg-cyan-100"
+          className="mt-1 block w-full text-xs text-slate-500 file:mr-3 file:rounded-md file:border file:border-slate-300 file:bg-slate-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-slate-700 hover:file:bg-slate-100"
         />
-        <p className="mt-1 text-[11px] text-slate-400">Puedes tomar la foto directamente con la cámara de tu celular.</p>
       </div>
 
-      {/* Casilla de Urgencia */}
-      <div className="rounded-xl bg-red-50/70 p-3.5 border border-red-200">
-        <label className="flex items-center gap-2.5 cursor-pointer">
+      <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+        <label className="flex items-start gap-2.5 cursor-pointer">
           <input
             type="checkbox"
             checked={esUrgente}
             onChange={(e) => setEsUrgente(e.target.checked)}
-            className="h-4 w-4 rounded text-red-600 focus:ring-red-500"
+            className="mt-0.5 rounded border-slate-300 text-slate-800 focus:ring-slate-700"
           />
-          <span className="text-xs font-bold text-red-900">
-            ⚠️ ¿Es una urgencia crítica? (Ej: fuga continua de agua o escape de gas)
+          <span className="text-xs text-slate-700 font-medium">
+            Clasificar como urgencia prioritaria (filtración continua de agua potable o red de gas)
           </span>
         </label>
       </div>
@@ -338,16 +331,16 @@ function FormularioPublico() {
       <button
         type="submit"
         disabled={enviando}
-        className="w-full rounded-xl bg-cyan-700 py-3.5 text-sm font-bold text-white shadow-md hover:bg-cyan-800 transition disabled:opacity-50"
+        className="w-full rounded-md bg-slate-900 py-2.5 text-xs font-bold text-white hover:bg-slate-800 transition disabled:opacity-50"
       >
-        {enviando ? "Enviando Solicitud..." : "Enviar Solicitud a la EP"}
+        {enviando ? "Registrando Solicitud..." : "Registrar Solicitud"}
       </button>
     </form>
   );
 }
 
 /* =========================================================================
-   CONSULTA PÚBLICA DE ESTADO
+   CONSULTA PÚBLICA (SOBRIA)
    ========================================================================= */
 function ConsultaPublica() {
   const [busqueda, setBusqueda] = useState("");
@@ -366,117 +359,109 @@ function ConsultaPublica() {
       setResultados(res.data || []);
     } catch (err) {
       console.error("Error al consultar:", err);
-      alert("No fue posible consultar tu solicitud. Por favor verifica los datos ingresados.");
+      alert("No fue posible consultar la solicitud. Verifique los antecedentes ingresados.");
     } finally {
       setCargando(false);
     }
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div>
-        <h3 className="text-base font-bold text-slate-900 sm:text-lg">
-          Consultar Estado de mi Solicitud
+        <h3 className="text-sm font-bold text-slate-900">
+          Consulta de Estado y Respuesta Técnica
         </h3>
         <p className="text-xs text-slate-500">
-          Ingresa tu RUT o tu Código de Solicitud (ej: PV-2026-0001).
+          Ingrese el RUT del beneficiario o el código de solicitud asignado (ej: PV-2026-0001).
         </p>
       </div>
 
       <form onSubmit={handleConsultar} className="flex gap-2">
         <input
           type="text"
-          placeholder="Ej: 12.345.678-9 o PV-2026-0001"
+          placeholder="RUT (12.345.678-9) o Código"
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 focus:border-cyan-600 focus:bg-white focus:outline-hidden"
+          className="flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-slate-800 focus:outline-hidden"
         />
         <button
           type="submit"
           disabled={cargando}
-          className="rounded-xl bg-cyan-700 px-5 py-2.5 text-xs font-bold text-white hover:bg-cyan-800 transition disabled:opacity-50"
+          className="rounded-md bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition disabled:opacity-50"
         >
           {cargando ? "Buscando..." : "Consultar"}
         </button>
       </form>
 
-      {/* Resultados de la Consulta */}
+      {/* Resultados */}
       {resultados !== null && (
-        <div className="mt-6 space-y-4">
+        <div className="mt-5 space-y-3">
           {resultados.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-xs text-slate-500">
-              No se encontraron solicitudes registradas con ese RUT o código. Verifica haberlo escrito correctamente.
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-6 text-center text-xs text-slate-500">
+              No existen solicitudes registradas para el criterio ingresado.
             </div>
           ) : (
             resultados.map((t) => (
               <div
                 key={t.id}
-                className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 space-y-3.5 shadow-2xs"
+                className="rounded-md border border-slate-200 bg-white p-4 space-y-3 text-xs"
               >
-                <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
-                  <span className="font-mono text-xs font-extrabold text-cyan-800 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-100">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <span className="font-mono font-bold text-slate-800">
                     {t.codigo}
                   </span>
                   <BadgeEstado estado={t.estado} />
                 </div>
 
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                    Problema Reportado
+                  <p className="text-[11px] font-semibold text-slate-500 uppercase">
+                    Detalle del Requerimiento
                   </p>
-                  <p className="text-sm text-slate-800 mt-1 font-medium">"{t.descripcion}"</p>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Ingresado el {formatearFecha(t.creado_en)}
+                  <p className="mt-0.5 text-slate-800">{t.descripcion}</p>
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    Fecha de ingreso: {formatearFecha(t.creado_en)}
                   </p>
                 </div>
 
-                {/* Explicación de Estado según avance */}
                 {t.estado === "recibida" && (
-                  <div className="rounded-xl bg-amber-50 p-4 text-xs text-amber-900 border border-amber-200 flex items-start gap-2.5">
-                    <Clock size={18} className="text-amber-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-bold text-sm">Tu solicitud fue recibida</p>
-                      <p className="text-xs text-amber-800 mt-1 leading-relaxed">
-                        Está en espera de revisión por el equipo técnico de la EP. Si se requiere inspección en terreno, te contactaremos al teléfono registrado.
-                      </p>
-                    </div>
+                  <div className="rounded border border-slate-200 bg-slate-50 p-3 text-slate-700">
+                    <p className="font-semibold text-slate-800">Estado: Solicitud Recibida</p>
+                    <p className="mt-0.5 text-[11px] text-slate-600">
+                      En espera de revisión y asignación por parte del equipo técnico de la EP.
+                    </p>
                   </div>
                 )}
 
                 {t.estado === "en_gestion" && (
-                  <div className="rounded-xl bg-blue-50 p-4 text-xs text-blue-900 border border-blue-200 flex items-start gap-2.5">
-                    <Wrench size={18} className="text-blue-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-bold text-sm">Solicitud en gestión</p>
-                      <p className="text-xs text-blue-800 mt-1 leading-relaxed">
-                        El equipo técnico de la EP se encuentra coordinando la revisión en terreno o los trabajos correspondientes con la cuadrilla.
-                      </p>
-                    </div>
+                  <div className="rounded border border-blue-200 bg-blue-50/50 p-3 text-blue-900">
+                    <p className="font-semibold text-blue-900">Estado: En Atención Técnica</p>
+                    <p className="mt-0.5 text-[11px] text-blue-800">
+                      El requerimiento se encuentra en proceso de coordinación con la cuadrilla técnica o constructora.
+                    </p>
                   </div>
                 )}
 
                 {t.estado === "resuelta" && (
-                  <div className="rounded-2xl bg-emerald-50 p-5 text-xs text-emerald-950 border border-emerald-200 space-y-3">
-                    <div className="flex items-center gap-2 font-bold text-emerald-800 text-sm sm:text-base">
-                      <CheckCircle2 size={20} className="text-emerald-600" />
-                      Solicitud Resuelta por la Entidad Patrocinante
-                    </div>
-                    <div className="bg-white rounded-xl p-4 border border-emerald-100 text-sm shadow-2xs">
-                      <p className="font-bold text-xs uppercase tracking-wider text-emerald-700">
-                        Respuesta Oficial de la EP:
+                  <div className="rounded border border-emerald-200 bg-emerald-50/40 p-3.5 space-y-2">
+                    <p className="font-bold text-emerald-900 text-xs">
+                      Estado: Solicitud Finalizada
+                    </p>
+                    <div className="rounded border border-emerald-100 bg-white p-2.5">
+                      <p className="text-[10px] font-bold text-emerald-800 uppercase">
+                        Resolución Técnica del Profesional a Cargo:
                       </p>
-                      <p className="mt-1.5 text-slate-800 font-medium leading-relaxed">
-                        {t.respuesta_tecnica || "Trabajos ejecutados y conformes."}
+                      <p className="mt-1 text-slate-800 text-xs leading-relaxed">
+                        {t.respuesta_tecnica || "Trabajo concluido conforme."}
                       </p>
                     </div>
                     {t.tecnico_responsable && (
-                      <p className="text-xs text-emerald-800">
-                        <span className="font-semibold">Responsable técnico:</span> {t.tecnico_responsable}
+                      <p className="text-[11px] text-slate-600">
+                        Profesional a cargo: {t.tecnico_responsable}
                       </p>
                     )}
                     {t.fecha_resolucion && (
-                      <p className="text-[11px] text-emerald-700">
-                        Fecha de resolución: {formatearFecha(t.fecha_resolucion)}
+                      <p className="text-[10px] text-slate-400">
+                        Fecha de cierre: {formatearFecha(t.fecha_resolucion)}
                       </p>
                     )}
                   </div>
@@ -493,21 +478,21 @@ function ConsultaPublica() {
 function BadgeEstado({ estado }) {
   if (estado === "resuelta") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800">
-        <CheckCircle2 size={12} /> Resuelta
+      <span className="rounded border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+        Finalizada
       </span>
     );
   }
   if (estado === "en_gestion") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-800">
-        <Clock size={12} /> En gestión
+      <span className="rounded border border-blue-300 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-800">
+        En atención
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800">
-      <Clock size={12} /> Recibida
+    <span className="rounded border border-slate-300 bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+      Pendiente
     </span>
   );
 }
@@ -518,7 +503,7 @@ function formatearFecha(isoString) {
     const d = new Date(isoString);
     return d.toLocaleDateString("es-CL", {
       day: "2-digit",
-      month: "short",
+      month: "2-digit",
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",

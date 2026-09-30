@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
-  AlertTriangle,
+  AlertCircle,
+  Building2,
   Calendar,
   CheckCircle2,
   Clock,
@@ -8,31 +9,14 @@ import {
   FileText,
   Filter,
   Home,
-  Image as ImageIcon,
   MessageCircle,
   Phone,
-  PlusCircle,
   RefreshCw,
   Search,
-  User,
   Wrench,
   X,
 } from "lucide-react";
 import { api, listFromResponse } from "../api/client.js";
-
-const RECINTOS_PREDEFINIDOS = [
-  "Baño",
-  "Cocina",
-  "Dormitorio Principal",
-  "Dormitorio Secundario",
-  "Living - Comedor",
-  "Techumbre / Cubierta",
-  "Fachada / Muros Exteriores",
-  "Instalación Eléctrica",
-  "Instalación Sanitaria / Gas",
-  "Patio / Acceso",
-  "Otro",
-];
 
 export default function Postventa() {
   const [copiado, setCopiado] = useState(false);
@@ -49,16 +33,14 @@ export default function Postventa() {
       {/* Encabezado Interno para el Equipo EP */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-5">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-cyan-50 px-2.5 py-1 text-xs font-semibold text-cyan-800 border border-cyan-200">
-              <Wrench size={13} /> Área Técnica · Postventa
-            </span>
-          </div>
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Área Técnica
+          </span>
           <h1 className="mt-1 text-2xl font-bold text-slate-900 tracking-tight">
-            Bandeja de Gestión de Postventa
+            Bandeja de Postventa Habitacional
           </h1>
-          <p className="text-sm text-slate-500">
-            Recepción centralizada de solicitudes de beneficiarios, gestión técnica y devolución de soluciones visadas.
+          <p className="text-xs text-slate-500 sm:text-sm">
+            Control de requerimientos de beneficiarios, gestión técnica y visación de soluciones.
           </p>
         </div>
 
@@ -67,17 +49,17 @@ export default function Postventa() {
           <button
             type="button"
             onClick={copiarEnlacePublico}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition"
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition"
           >
-            {copiado ? "✓ Enlace Copiado" : "📋 Copiar Enlace Vecinos"}
+            {copiado ? "Enlace copiado al portapapeles" : "Copiar enlace del portal"}
           </button>
           <a
             href="/postventa/solicitud"
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-700 px-3.5 py-2 text-xs font-semibold text-white shadow-2xs hover:bg-cyan-800 transition"
+            className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 transition"
           >
-            <ExternalLink size={14} /> Abrir Portal Vecino
+            <ExternalLink size={13} /> Ver portal de vecinos
           </a>
         </div>
       </div>
@@ -87,9 +69,6 @@ export default function Postventa() {
   );
 }
 
-/* =========================================================================
-   1. BANDEJA DEL EQUIPO EP (Gestión, Revisión y Devolución Resuelta)
-   ========================================================================= */
 function BandejaEP() {
   const [tickets, setTickets] = useState([]);
   const [metricas, setMetricas] = useState({ total: 0, recibidas: 0, en_gestion: 0, resueltas: 0, urgentes: 0 });
@@ -132,43 +111,43 @@ function BandejaEP() {
 
   return (
     <div className="space-y-6">
-      {/* Tarjetas de Métricas */}
+      {/* Tarjetas de Métricas Sobrias */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Solicitudes</p>
           <p className="mt-1 text-2xl font-bold text-slate-900">{metricas.total || 0}</p>
         </div>
-        <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 shadow-2xs">
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">🟡 Recibidas (Nuevas)</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">Pendientes</p>
             {metricas.urgentes > 0 && (
-              <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">
+              <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
                 {metricas.urgentes} urgentes
               </span>
             )}
           </div>
-          <p className="mt-1 text-2xl font-bold text-amber-900">{metricas.recibidas || 0}</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{metricas.recibidas || 0}</p>
         </div>
-        <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 shadow-2xs">
-          <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">🔵 En Gestión</p>
-          <p className="mt-1 text-2xl font-bold text-blue-900">{metricas.en_gestion || 0}</p>
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">En Atención</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{metricas.en_gestion || 0}</p>
         </div>
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 shadow-2xs">
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">🟢 Resueltas</p>
-          <p className="mt-1 text-2xl font-bold text-emerald-900">{metricas.resueltas || 0}</p>
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">Finalizadas</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{metricas.resueltas || 0}</p>
         </div>
       </div>
 
-      {/* Barra de Filtros y Búsqueda */}
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-2xs sm:flex-row sm:items-center sm:justify-between">
+      {/* Filtros y Búsqueda */}
+      <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3.5 sm:flex-row sm:items-center sm:justify-between">
         <form onSubmit={handleBuscar} className="relative flex-1">
-          <Search className="absolute left-3 top-2.5 text-slate-400" size={17} />
+          <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
           <input
             type="text"
             placeholder="Buscar por RUT, nombre, código, casa o problema..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm text-slate-800 placeholder-slate-400 focus:border-cyan-600 focus:bg-white focus:outline-hidden"
+            className="w-full rounded-md border border-slate-200 bg-slate-50 py-1.5 pl-9 pr-3 text-xs text-slate-800 placeholder-slate-400 focus:border-slate-700 focus:bg-white focus:outline-hidden"
           />
         </form>
 
@@ -176,21 +155,21 @@ function BandejaEP() {
           <select
             value={filtroEstado}
             onChange={(e) => setFiltroEstado(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 focus:border-cyan-600 focus:outline-hidden"
+            className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 focus:border-slate-700 focus:outline-hidden"
           >
             <option value="">Todos los Estados</option>
-            <option value="recibida">🟡 Recibida (Pendiente)</option>
-            <option value="en_gestion">🔵 En gestión</option>
-            <option value="resuelta">🟢 Resuelta</option>
+            <option value="recibida">Pendiente</option>
+            <option value="en_gestion">En atención</option>
+            <option value="resuelta">Finalizada</option>
           </select>
 
           <select
             value={filtroUrgencia}
             onChange={(e) => setFiltroUrgencia(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 focus:border-cyan-600 focus:outline-hidden"
+            className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 focus:border-slate-700 focus:outline-hidden"
           >
-            <option value="">Todas las Urgencias</option>
-            <option value="urgente">⚠️ Solo Urgentes</option>
+            <option value="">Todas las prioridades</option>
+            <option value="urgente">Solo urgentes</option>
             <option value="normal">Normal</option>
           </select>
 
@@ -198,23 +177,23 @@ function BandejaEP() {
             type="button"
             onClick={cargarDatos}
             title="Recargar listado"
-            className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            className="rounded-md border border-slate-200 bg-slate-50 p-1.5 text-slate-600 hover:bg-slate-100"
           >
-            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+            <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
           </button>
         </div>
       </div>
 
-      {/* Lista de Solicitudes */}
+      {/* Listado */}
       {loading ? (
         <div className="flex justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-cyan-700 border-t-transparent"></div>
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-800 border-t-transparent"></div>
         </div>
       ) : tickets.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-200 bg-white py-12 text-center">
-          <Wrench size={36} className="mx-auto text-slate-300" />
-          <p className="mt-3 text-sm font-semibold text-slate-700">No hay solicitudes que coincidan</p>
-          <p className="text-xs text-slate-500">Prueba ajustando los filtros o espera nuevas solicitudes de socios.</p>
+        <div className="rounded-lg border border-dashed border-slate-300 bg-white py-12 text-center">
+          <FileText size={32} className="mx-auto text-slate-300" />
+          <p className="mt-2 text-sm font-semibold text-slate-700">Sin registros</p>
+          <p className="text-xs text-slate-500">No existen solicitudes bajo los filtros seleccionados.</p>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -222,65 +201,57 @@ function BandejaEP() {
             <div
               key={t.id}
               onClick={() => setTicketSeleccionado(t)}
-              className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-2xs transition hover:border-cyan-400 hover:shadow-md flex flex-col justify-between"
+              className="cursor-pointer rounded-lg border border-slate-200 bg-white p-4 transition hover:border-slate-400 hover:shadow-xs flex flex-col justify-between"
             >
               <div>
-                {/* Cabecera de la tarjeta */}
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-mono text-xs font-bold text-cyan-800 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-100">
+                <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                  <span className="font-mono text-xs font-bold text-slate-900">
                     {t.codigo}
                   </span>
                   <div className="flex items-center gap-1.5">
                     {t.urgencia === "urgente" && (
-                      <span className="inline-flex items-center gap-1 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
-                        <AlertTriangle size={11} /> Urgente
+                      <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
+                        Urgente
                       </span>
                     )}
                     <EstadoBadge estado={t.estado} />
                   </div>
                 </div>
 
-                {/* Datos del Beneficiario */}
                 <div className="mt-3">
                   <p className="text-sm font-bold text-slate-900 line-clamp-1">{t.nombre}</p>
                   <p className="text-xs text-slate-500">RUT: {t.rut}</p>
                   {(t.comite_nombre || t.vivienda_direccion) && (
-                    <p className="mt-0.5 text-xs text-slate-600 line-clamp-1 flex items-center gap-1">
-                      <Home size={12} className="text-slate-400 shrink-0" />
+                    <p className="mt-0.5 text-xs text-slate-600 line-clamp-1">
                       {t.comite_nombre ? `${t.comite_nombre} · ` : ""}
                       {t.vivienda_direccion || "Sin dirección"}
                     </p>
                   )}
                 </div>
 
-                {/* Recinto y Descripción */}
-                <div className="mt-3 rounded-lg bg-slate-50 p-2.5 border border-slate-100">
+                <div className="mt-3 rounded border border-slate-100 bg-slate-50 p-2.5">
                   {t.recinto && (
-                    <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider block mb-1">
-                      📍 {t.recinto}
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">
+                      Recinto: {t.recinto}
                     </span>
                   )}
-                  <p className="text-xs text-slate-700 line-clamp-3 italic">"{t.descripcion}"</p>
+                  <p className="text-xs text-slate-700 line-clamp-2">{t.descripcion}</p>
                 </div>
 
-                {/* Si ya tiene respuesta técnica */}
                 {t.respuesta_tecnica && (
-                  <div className="mt-2.5 rounded-lg bg-emerald-50/70 p-2 border border-emerald-200">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
-                      ✓ Solución Devuelta:
+                  <div className="mt-2.5 rounded border border-emerald-200 bg-emerald-50/50 p-2 text-xs">
+                    <p className="text-[10px] font-bold uppercase text-emerald-800">
+                      Resolución Registrada:
                     </p>
-                    <p className="text-xs text-emerald-950 line-clamp-2 mt-0.5">{t.respuesta_tecnica}</p>
+                    <p className="text-slate-800 line-clamp-2 mt-0.5">{t.respuesta_tecnica}</p>
                   </div>
                 )}
               </div>
 
-              {/* Pie de tarjeta */}
-              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
-                <span className="flex items-center gap-1">
-                  <Clock size={12} /> {formatearFecha(t.creado_en)}
-                </span>
-                <span className="text-cyan-700 font-semibold text-xs hover:underline">
-                  Ver y Gestionar →
+              <div className="mt-4 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                <span>{formatearFecha(t.creado_en)}</span>
+                <span className="text-slate-800 font-semibold hover:underline">
+                  Abrir ficha →
                 </span>
               </div>
             </div>
@@ -288,7 +259,7 @@ function BandejaEP() {
         </div>
       )}
 
-      {/* Modal de Detalle y Resolución */}
+      {/* Modal de Detalle */}
       {ticketSeleccionado && (
         <ModalGestionTicket
           ticket={ticketSeleccionado}
@@ -306,9 +277,6 @@ function BandejaEP() {
   );
 }
 
-/* =========================================================================
-   2. MODAL DE RESOLUCIÓN TÉCNICA (HUMANA Y DIRECTA)
-   ========================================================================= */
 function ModalGestionTicket({ ticket, onClose, onGuardado }) {
   const [estado, setEstado] = useState(ticket.estado || "recibida");
   const [urgencia, setUrgencia] = useState(ticket.urgencia || "normal");
@@ -329,14 +297,14 @@ function ModalGestionTicket({ ticket, onClose, onGuardado }) {
         tecnico_responsable: tecnico,
       });
 
-      setMensajeExito("¡Solicitud actualizada con éxito!");
+      setMensajeExito("Registro actualizado correctamente.");
       if (onGuardado) onGuardado(res.data);
       setTimeout(() => {
         setMensajeExito("");
       }, 3000);
     } catch (err) {
       console.error("Error guardando ticket:", err);
-      alert("No fue posible guardar la solicitud. Intenta nuevamente.");
+      alert("No fue posible guardar la solicitud.");
     } finally {
       setGuardando(false);
     }
@@ -344,189 +312,167 @@ function ModalGestionTicket({ ticket, onClose, onGuardado }) {
 
   const numeroLimpio = ticket.telefono ? ticket.telefono.replace(/[^0-9]/g, "") : "";
   const whatsappUrl = numeroLimpio
-    ? `https://wa.me/${numeroLimpio.startsWith("56") ? numeroLimpio : "56" + numeroLimpio}?text=Hola%20${encodeURIComponent(
+    ? `https://wa.me/${numeroLimpio.startsWith("56") ? numeroLimpio : "56" + numeroLimpio}?text=Estimado(a)%20${encodeURIComponent(
         ticket.nombre
-      )},%20te%20escribimos%20desde%20la%20Entidad%20Patrocinante%20por%20tu%20solicitud%20de%20postventa%20${ticket.codigo}.`
+      )},%20le%20escribimos%20desde%20la%20Entidad%20Patrocinante%20respecto%20a%20su%20solicitud%20de%20postventa%20${ticket.codigo}.`
     : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs overflow-y-auto">
-      <div className="relative w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl my-8 max-h-[90vh] overflow-y-auto">
-        {/* Cabecera */}
-        <div className="flex items-start justify-between border-b border-slate-100 pb-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 overflow-y-auto">
+      <div className="relative w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl my-6 max-h-[90vh] overflow-y-auto border border-slate-200">
+        <div className="flex items-start justify-between border-b border-slate-200 pb-3">
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-sm font-bold text-cyan-800 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200">
+              <span className="font-mono text-xs font-bold text-slate-800">
                 {ticket.codigo}
               </span>
               <EstadoBadge estado={estado} />
               {urgencia === "urgente" && (
-                <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">
-                  ⚠️ Urgente
+                <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
+                  Urgente
                 </span>
               )}
             </div>
-            <h2 className="mt-2 text-xl font-bold text-slate-900">{ticket.nombre}</h2>
-            <p className="text-xs text-slate-500">RUT: {ticket.rut} · Ingresado el {formatearFecha(ticket.creado_en)}</p>
+            <h2 className="mt-1 text-lg font-bold text-slate-900">{ticket.nombre}</h2>
+            <p className="text-xs text-slate-500">RUT: {ticket.rut} · Ingreso: {formatearFecha(ticket.creado_en)}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
-        {/* Datos de Contacto y Vivienda */}
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 rounded-xl bg-slate-50 p-3.5 border border-slate-200">
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 rounded border border-slate-200 bg-slate-50 p-3 text-xs">
           <div>
-            <p className="text-xs font-bold uppercase text-slate-500">Ubicación / Vivienda</p>
-            <p className="text-sm font-medium text-slate-800 mt-0.5">
+            <p className="font-semibold text-slate-600 uppercase">Ubicación</p>
+            <p className="text-slate-900 mt-0.5">
               {ticket.comite_nombre ? `${ticket.comite_nombre} · ` : ""}
-              {ticket.vivienda_direccion || "Sin dirección registrada"}
+              {ticket.vivienda_direccion || "Sin dirección"}
             </p>
             {ticket.recinto && (
-              <p className="text-xs text-slate-600 mt-1">
-                <span className="font-semibold">Recinto:</span> {ticket.recinto}
+              <p className="text-slate-600 mt-1">
+                Recinto: <span className="font-medium text-slate-800">{ticket.recinto}</span>
               </p>
             )}
           </div>
           <div>
-            <p className="text-xs font-bold uppercase text-slate-500">Contacto Directo</p>
-            <p className="text-sm font-medium text-slate-800 mt-0.5 flex items-center gap-1.5">
-              <Phone size={14} className="text-slate-400" />
-              {ticket.telefono || "Sin teléfono"}
-            </p>
+            <p className="font-semibold text-slate-600 uppercase">Contacto</p>
+            <p className="text-slate-900 mt-0.5">{ticket.telefono || "Sin teléfono"}</p>
             {whatsappUrl && (
               <a
                 href={whatsappUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 hover:underline"
+                className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-slate-700 hover:underline"
               >
-                <MessageCircle size={14} /> Abrir WhatsApp con el vecino
+                Abrir conversación WhatsApp
               </a>
             )}
           </div>
         </div>
 
-        {/* Descripción de la solicitud */}
         <div className="mt-4">
-          <label className="text-xs font-bold uppercase text-slate-500">Problema Reportado por el Beneficiario</label>
-          <div className="mt-1 rounded-xl border border-slate-200 bg-white p-3.5 text-sm text-slate-800">
+          <label className="text-xs font-semibold text-slate-600 uppercase">Descripción Informada</label>
+          <div className="mt-1 rounded border border-slate-200 bg-white p-3 text-xs text-slate-900">
             {ticket.descripcion}
           </div>
         </div>
 
-        {/* Foto adjunta */}
         {ticket.foto && (
           <div className="mt-4">
-            <label className="text-xs font-bold uppercase text-slate-500 flex items-center gap-1.5">
-              <ImageIcon size={14} /> Fotografía Adjunta de Respaldo
-            </label>
-            <div className="mt-1.5 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 max-h-64 flex items-center justify-center">
+            <label className="text-xs font-semibold text-slate-600 uppercase">Fotografía Adjunta</label>
+            <div className="mt-1 overflow-hidden rounded border border-slate-200 bg-slate-50 max-h-64 flex items-center justify-center">
               <img
                 src={ticket.foto}
-                alt="Foto del problema"
-                className="max-h-64 object-contain w-full cursor-pointer hover:opacity-95"
+                alt="Foto de la falla"
+                className="max-h-64 object-contain w-full cursor-pointer"
                 onClick={() => window.open(ticket.foto, "_blank")}
-                title="Haz clic para ver en tamaño completo"
               />
             </div>
-            <p className="mt-1 text-[11px] text-slate-400">Haz clic en la foto para abrirla en alta resolución.</p>
           </div>
         )}
 
-        {/* FORMULARIO DE RESOLUCIÓN TÉCNICA */}
-        <form onSubmit={handleGuardar} className="mt-6 border-t border-slate-200 pt-5 space-y-4">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-cyan-800 flex items-center gap-2">
-            <Wrench size={16} /> Gestión y Resolución Técnica del Equipo
+        <form onSubmit={handleGuardar} className="mt-5 border-t border-slate-200 pt-4 space-y-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+            Registro y Resolución Técnica
           </h3>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-bold text-slate-700">Estado de la Solicitud</label>
+              <label className="block text-xs font-semibold text-slate-700">Estado</label>
               <select
                 value={estado}
                 onChange={(e) => setEstado(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium focus:border-cyan-600 focus:outline-hidden"
+                className="mt-1 w-full rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-slate-800 focus:outline-hidden"
               >
-                <option value="recibida">🟡 Recibida (Pendiente)</option>
-                <option value="en_gestion">🔵 En gestión (Cuadrilla / Visita)</option>
-                <option value="resuelta">🟢 Resuelta (Devuelta al socio)</option>
+                <option value="recibida">Pendiente</option>
+                <option value="en_gestion">En atención</option>
+                <option value="resuelta">Finalizada</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700">Nivel de Prioridad</label>
+              <label className="block text-xs font-semibold text-slate-700">Prioridad</label>
               <select
                 value={urgencia}
                 onChange={(e) => setUrgencia(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 font-medium focus:border-cyan-600 focus:outline-hidden"
+                className="mt-1 w-full rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-slate-800 focus:outline-hidden"
               >
                 <option value="normal">Normal</option>
-                <option value="urgente">⚠️ Urgente</option>
+                <option value="urgente">Urgente</option>
               </select>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700">
-              Técnico o Responsable a Cargo (Opcional)
+            <label className="block text-xs font-semibold text-slate-700">
+              Profesional o Cuadrilla a Cargo
             </label>
             <input
               type="text"
-              placeholder="Ej: Cuadrilla Constructora / Juan Técnico EP"
+              placeholder="Ej: Cuadrilla Constructora / Técnico Inspector EP"
               value={tecnico}
               onChange={(e) => setTecnico(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-cyan-600 focus:outline-hidden"
+              className="mt-1 w-full rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-slate-800 focus:outline-hidden"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700">
-              Respuesta o Solución Oficial de la EP{" "}
-              <span className="text-slate-400 font-normal">(Esta respuesta la verá el beneficiario)</span>
+            <label className="block text-xs font-semibold text-slate-700">
+              Resolución Técnica Formal (Visible para el Beneficiario)
             </label>
             <textarea
-              rows={4}
-              placeholder="Escribe aquí la solución o estado formal. Ej: Se coordinó visita con el técnico para el jueves 15. Se cambió empaquetadura de lavamanos y se verificó que no existen fugas."
+              rows={3}
+              placeholder="Indique los antecedentes de la inspección o trabajo ejecutado en la vivienda..."
               value={respuesta}
               onChange={(e) => setRespuesta(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-3 text-sm text-slate-800 focus:border-cyan-600 focus:outline-hidden placeholder-slate-400"
+              className="mt-1 w-full rounded border border-slate-300 bg-white p-2.5 text-xs text-slate-900 focus:border-slate-800 focus:outline-hidden placeholder-slate-400"
             />
           </div>
 
           {mensajeExito && (
-            <div className="rounded-lg bg-emerald-50 p-3 text-xs font-semibold text-emerald-800 border border-emerald-200 flex items-center gap-2">
-              <CheckCircle2 size={16} className="text-emerald-600" />
+            <div className="rounded border border-emerald-200 bg-emerald-50 p-2 text-xs font-medium text-emerald-800">
               {mensajeExito}
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-3 pt-3">
+          <div className="flex items-center justify-end gap-2 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
             >
               Cerrar
             </button>
             <button
               type="submit"
               disabled={guardando}
-              className="inline-flex items-center gap-2 rounded-lg bg-cyan-700 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-cyan-800 disabled:opacity-50"
+              className="rounded bg-slate-900 px-4 py-1.5 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-50"
             >
-              {guardando ? (
-                <>
-                  <RefreshCw size={15} className="animate-spin" /> Guardando...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 size={16} /> Guardar y Visar Solución
-                </>
-              )}
+              {guardando ? "Guardando..." : "Guardar y Visar Resolución"}
             </button>
           </div>
         </form>
@@ -535,27 +481,24 @@ function ModalGestionTicket({ ticket, onClose, onGuardado }) {
   );
 }
 
-/* =========================================================================
-   COMPONENTES AUXILIARES
-   ========================================================================= */
 function EstadoBadge({ estado }) {
   if (estado === "resuelta") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">
-        <CheckCircle2 size={11} /> Resuelta
+      <span className="rounded border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+        Finalizada
       </span>
     );
   }
   if (estado === "en_gestion") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-800">
-        <Clock size={11} /> En gestión
+      <span className="rounded border border-blue-300 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-800">
+        En atención
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">
-      <Clock size={11} /> Recibida
+    <span className="rounded border border-slate-300 bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+      Pendiente
     </span>
   );
 }
@@ -566,7 +509,7 @@ function formatearFecha(isoString) {
     const d = new Date(isoString);
     return d.toLocaleDateString("es-CL", {
       day: "2-digit",
-      month: "short",
+      month: "2-digit",
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
