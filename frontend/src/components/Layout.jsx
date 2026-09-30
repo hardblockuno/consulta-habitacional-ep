@@ -9,7 +9,7 @@ import {
   Users,
   Wrench,
 } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { NavLink, Outlet } from "react-router-dom";
 
 const navSections = [
   {
@@ -92,7 +92,7 @@ export default function Layout({ children }) {
         </header>
 
         <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-          {children}
+          {children || <Outlet />}
         </main>
       </div>
     </div>

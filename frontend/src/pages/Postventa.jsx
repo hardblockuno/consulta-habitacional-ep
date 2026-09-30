@@ -34,57 +34,55 @@ const RECINTOS_PREDEFINIDOS = [
   "Otro",
 ];
 
-export default function Postventa({ defaultTab = "bandeja" }) {
-  const [tab, setTab] = useState(defaultTab); // "bandeja" | "beneficiario"
+export default function Postventa() {
+  const [copiado, setCopiado] = useState(false);
+
+  const copiarEnlacePublico = () => {
+    const url = `${window.location.origin}/postventa/solicitud`;
+    navigator.clipboard.writeText(url);
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 3000);
+  };
 
   return (
     <div className="space-y-6">
-      {/* Encabezado y Navegación de Modo */}
+      {/* Encabezado Interno para el Equipo EP */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-5">
         <div>
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-md bg-cyan-50 px-2.5 py-1 text-xs font-semibold text-cyan-800 border border-cyan-200">
-              <Wrench size={13} /> Postventa Habitacional
+              <Wrench size={13} /> Área Técnica · Postventa
             </span>
           </div>
           <h1 className="mt-1 text-2xl font-bold text-slate-900 tracking-tight">
-            Gestión y Respuesta a Solicitudes
+            Bandeja de Gestión de Postventa
           </h1>
           <p className="text-sm text-slate-500">
-            Recepción directa de solicitudes de beneficiarios, gestión del equipo EP y devolución de respuestas resueltas.
+            Recepción centralizada de solicitudes de beneficiarios, gestión técnica y devolución de soluciones visadas.
           </p>
         </div>
 
-        {/* Selector de Vista: Bandeja EP vs Portal Beneficiario */}
-        <div className="flex items-center rounded-lg bg-slate-100 p-1 border border-slate-200">
+        {/* Acceso y copiado de enlace para vecinos */}
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setTab("bandeja")}
-            className={`flex items-center gap-2 rounded-md px-3.5 py-1.5 text-xs font-semibold transition ${
-              tab === "bandeja"
-                ? "bg-white text-slate-900 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
+            onClick={copiarEnlacePublico}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition"
           >
-            <FileText size={15} />
-            Bandeja Equipo EP
+            {copiado ? "✓ Enlace Copiado" : "📋 Copiar Enlace Vecinos"}
           </button>
-          <button
-            type="button"
-            onClick={() => setTab("beneficiario")}
-            className={`flex items-center gap-2 rounded-md px-3.5 py-1.5 text-xs font-semibold transition ${
-              tab === "beneficiario"
-                ? "bg-cyan-700 text-white shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
+          <a
+            href="/postventa/solicitud"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-700 px-3.5 py-2 text-xs font-semibold text-white shadow-2xs hover:bg-cyan-800 transition"
           >
-            <User size={15} />
-            Portal Beneficiario
-          </button>
+            <ExternalLink size={14} /> Abrir Portal Vecino
+          </a>
         </div>
       </div>
 
-      {tab === "bandeja" ? <BandejaEP /> : <PortalBeneficiario />}
+      <BandejaEP />
     </div>
   );
 }
@@ -533,388 +531,6 @@ function ModalGestionTicket({ ticket, onClose, onGuardado }) {
           </div>
         </form>
       </div>
-    </div>
-  );
-}
-
-/* =========================================================================
-   3. PORTAL PÚBLICO DEL BENEFICIARIO (Móvil / Consultas e Ingreso)
-   ========================================================================= */
-function PortalBeneficiario() {
-  const [submodo, setSubmodo] = useState("ingresar"); // "ingresar" | "consultar"
-
-  return (
-    <div className="mx-auto max-w-xl space-y-6">
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
-        {/* Toggle interno: Ingresar o Consultar */}
-        <div className="flex rounded-xl bg-slate-100 p-1 border border-slate-200 mb-6">
-          <button
-            type="button"
-            onClick={() => setSubmodo("ingresar")}
-            className={`flex-1 rounded-lg py-2 text-xs font-bold transition text-center ${
-              submodo === "ingresar"
-                ? "bg-white text-cyan-800 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            Ingresar Solicitud
-          </button>
-          <button
-            type="button"
-            onClick={() => setSubmodo("consultar")}
-            className={`flex-1 rounded-lg py-2 text-xs font-bold transition text-center ${
-              submodo === "consultar"
-                ? "bg-white text-cyan-800 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            Consultar Estado de mi Solicitud
-          </button>
-        </div>
-
-        {submodo === "ingresar" ? <FormularioIngresoBeneficiario /> : <ConsultaBeneficiario />}
-      </div>
-    </div>
-  );
-}
-
-function FormularioIngresoBeneficiario() {
-  const [rut, setRut] = useState("");
-  const [nombre, setNombre] = useState("");
-  const [telefono, setTelefono] = useState("");
-  const [comite, setComite] = useState("");
-  const [vivienda, setVivienda] = useState("");
-  const [recinto, setRecinto] = useState("");
-  const [descripcion, setDescripcion] = useState("");
-  const [esUrgente, setEsUrgente] = useState(false);
-  const [foto, setFoto] = useState(null);
-
-  const [enviando, setEnviando] = useState(false);
-  const [ticketCreado, setTicketCreado] = useState(null);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!rut.trim() || !nombre.trim() || !descripcion.trim()) {
-      alert("Por favor completa tu RUT, Nombre y la descripción del problema.");
-      return;
-    }
-
-    setEnviando(true);
-    try {
-      const formData = new FormData();
-      formData.append("rut", rut.trim());
-      formData.append("nombre", nombre.trim());
-      formData.append("telefono", telefono.trim());
-      formData.append("comite_nombre", comite.trim());
-      formData.append("vivienda_direccion", vivienda.trim());
-      formData.append("recinto", recinto);
-      formData.append("descripcion", descripcion.trim());
-      formData.append("urgencia", esUrgente ? "urgente" : "normal");
-      if (foto) {
-        formData.append("foto", foto);
-      }
-
-      const res = await api.post("/postventa/tickets/", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      setTicketCreado(res.data);
-    } catch (err) {
-      console.error("Error al ingresar solicitud:", err);
-      alert("Ocurrió un error al enviar tu solicitud. Intenta nuevamente.");
-    } finally {
-      setEnviando(false);
-    }
-  };
-
-  if (ticketCreado) {
-    return (
-      <div className="py-6 text-center space-y-4">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-          <CheckCircle2 size={32} />
-        </div>
-        <h3 className="text-xl font-bold text-slate-900">¡Solicitud Ingresada con Éxito!</h3>
-        <p className="text-sm text-slate-600">
-          Tu reporte ha quedado registrado directamente en el sistema de la Entidad Patrocinante.
-        </p>
-        <div className="rounded-xl bg-slate-50 p-4 border border-slate-200">
-          <p className="text-xs uppercase font-bold text-slate-500">Tu Código de Seguimiento</p>
-          <p className="mt-1 font-mono text-2xl font-extrabold text-cyan-800">{ticketCreado.codigo}</p>
-          <p className="mt-1 text-xs text-slate-500">
-            Guarda este código para consultar el avance o respuesta de tu caso.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            setTicketCreado(null);
-            setDescripcion("");
-            setFoto(null);
-          }}
-          className="mt-4 rounded-lg bg-cyan-700 px-5 py-2 text-xs font-semibold text-white hover:bg-cyan-800"
-        >
-          Ingresar otra solicitud
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <h2 className="text-lg font-bold text-slate-900">Ingreso de Solicitud de Postventa</h2>
-        <p className="text-xs text-slate-500">
-          Completa tus datos para que el equipo técnico pueda revisar tu caso y devolverte una solución.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <label className="block text-xs font-bold text-slate-700">RUT del Beneficiario *</label>
-          <input
-            type="text"
-            required
-            placeholder="Ej: 12.345.678-9"
-            value={rut}
-            onChange={(e) => setRut(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 focus:border-cyan-600 focus:bg-white focus:outline-hidden"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-slate-700">Nombre Completo *</label>
-          <input
-            type="text"
-            required
-            placeholder="Ej: Juan Pérez"
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 focus:border-cyan-600 focus:bg-white focus:outline-hidden"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <label className="block text-xs font-bold text-slate-700">Teléfono de Contacto</label>
-          <input
-            type="tel"
-            placeholder="+56 9 1234 5678"
-            value={telefono}
-            onChange={(e) => setTelefono(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 focus:border-cyan-600 focus:bg-white focus:outline-hidden"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-slate-700">Comité / Proyecto</label>
-          <input
-            type="text"
-            placeholder="Ej: Los Robles"
-            value={comite}
-            onChange={(e) => setComite(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 focus:border-cyan-600 focus:bg-white focus:outline-hidden"
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-xs font-bold text-slate-700">Dirección / N° de Casa o Depto</label>
-        <input
-          type="text"
-          placeholder="Ej: Pasaje Las Flores 123 o Casa 4 Mz B"
-          value={vivienda}
-          onChange={(e) => setVivienda(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 focus:border-cyan-600 focus:bg-white focus:outline-hidden"
-        />
-      </div>
-
-      <div>
-        <label className="block text-xs font-bold text-slate-700">Recinto Afectado</label>
-        <select
-          value={recinto}
-          onChange={(e) => setRecinto(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 focus:border-cyan-600 focus:bg-white focus:outline-hidden"
-        >
-          <option value="">Selecciona el recinto...</option>
-          {RECINTOS_PREDEFINIDOS.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-        <label className="block text-xs font-bold text-slate-700">Descripción del Problema *</label>
-        <textarea
-          rows={3}
-          required
-          placeholder="Explica qué está sucediendo (ej: filtración en lavamanos, ventana descuadrada, humedad en cielo raso)..."
-          value={descripcion}
-          onChange={(e) => setDescripcion(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-800 focus:border-cyan-600 focus:bg-white focus:outline-hidden placeholder-slate-400"
-        />
-      </div>
-
-      <div>
-        <label className="block text-xs font-bold text-slate-700">Foto del Problema (Opcional)</label>
-        <input
-          type="file"
-          accept="image/*"
-          onChange={(e) => setFoto(e.target.files[0] || null)}
-          className="mt-1 block w-full text-xs text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-cyan-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-cyan-800 hover:file:bg-cyan-100"
-        />
-        <p className="mt-1 text-[11px] text-slate-400">Puedes tomar la foto directamente con la cámara del celular.</p>
-      </div>
-
-      <div className="rounded-lg bg-red-50 p-3 border border-red-200">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={esUrgente}
-            onChange={(e) => setEsUrgente(e.target.checked)}
-            className="rounded text-red-600 focus:ring-red-500"
-          />
-          <span className="text-xs font-bold text-red-900">
-            ⚠️ ¿Es una urgencia crítica? (Ej: fuga activa de agua o gas)
-          </span>
-        </label>
-      </div>
-
-      <button
-        type="submit"
-        disabled={enviando}
-        className="w-full rounded-xl bg-cyan-700 py-3 text-sm font-bold text-white shadow-sm hover:bg-cyan-800 disabled:opacity-50"
-      >
-        {enviando ? "Enviando Solicitud..." : "Enviar Solicitud a la EP"}
-      </button>
-    </form>
-  );
-}
-
-function ConsultaBeneficiario() {
-  const [busqueda, setBusqueda] = useState("");
-  const [resultados, setResultados] = useState(null);
-  const [cargando, setCargando] = useState(false);
-
-  const handleConsultar = async (e) => {
-    e.preventDefault();
-    if (!busqueda.trim()) return;
-
-    setCargando(true);
-    try {
-      const isCodigo = busqueda.toUpperCase().startsWith("PV-");
-      const params = isCodigo ? { codigo: busqueda.trim() } : { rut: busqueda.trim() };
-      const res = await api.get("/postventa/tickets/consultar/", { params });
-      setResultados(res.data || []);
-    } catch (err) {
-      console.error("Error al consultar:", err);
-      alert("No fue posible consultar la solicitud. Verifica el dato ingresado.");
-    } finally {
-      setCargando(false);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-bold text-slate-900">Consulta de Estado de Solicitud</h2>
-        <p className="text-xs text-slate-500">
-          Ingresa tu RUT o tu Código de Solicitud para revisar el avance y la solución de la EP.
-        </p>
-      </div>
-
-      <form onSubmit={handleConsultar} className="flex gap-2">
-        <input
-          type="text"
-          placeholder="Ingresa tu RUT o Código (ej: PV-2026-0001)"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 focus:border-cyan-600 focus:bg-white focus:outline-hidden"
-        />
-        <button
-          type="submit"
-          disabled={cargando}
-          className="rounded-lg bg-cyan-700 px-4 py-2 text-xs font-bold text-white hover:bg-cyan-800 disabled:opacity-50"
-        >
-          {cargando ? "Buscando..." : "Consultar"}
-        </button>
-      </form>
-
-      {/* Resultados */}
-      {resultados !== null && (
-        <div className="mt-6 space-y-3">
-          {resultados.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500">
-              No se encontraron solicitudes registradas con ese RUT o código.
-            </div>
-          ) : (
-            resultados.map((t) => (
-              <div key={t.id} className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
-                  <span className="font-mono text-xs font-bold text-cyan-800">{t.codigo}</span>
-                  <EstadoBadge estado={t.estado} />
-                </div>
-
-                <div>
-                  <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Problema reportado:</p>
-                  <p className="text-sm text-slate-800 mt-0.5">"{t.descripcion}"</p>
-                  <p className="text-[11px] text-slate-400 mt-1">Ingresado el {formatearFecha(t.creado_en)}</p>
-                </div>
-
-                {/* Explicación del estado */}
-                {t.estado === "recibida" && (
-                  <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900 border border-amber-200 flex items-start gap-2">
-                    <Clock size={16} className="text-amber-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-bold">Tu solicitud fue recibida</p>
-                      <p className="text-[11px] text-amber-800 mt-0.5">
-                        Está en espera de revisión por el equipo técnico de la EP. Te contactaremos si se requiere inspección.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {t.estado === "en_gestion" && (
-                  <div className="rounded-lg bg-blue-50 p-3 text-xs text-blue-900 border border-blue-200 flex items-start gap-2">
-                    <Wrench size={16} className="text-blue-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-bold">Solicitud en gestión</p>
-                      <p className="text-[11px] text-blue-800 mt-0.5">
-                        El equipo técnico está coordinando la revisión en terreno o los trabajos correspondientes.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {t.estado === "resuelta" && (
-                  <div className="rounded-xl bg-emerald-50 p-4 text-xs text-emerald-950 border border-emerald-200 space-y-2">
-                    <div className="flex items-center gap-1.5 font-bold text-emerald-800 text-sm">
-                      <CheckCircle2 size={18} className="text-emerald-600" />
-                      Solicitud Resuelta por la EP
-                    </div>
-                    <div className="bg-white/80 rounded-lg p-3 border border-emerald-100 text-sm">
-                      <p className="font-bold text-xs uppercase text-emerald-700">Respuesta Oficial:</p>
-                      <p className="mt-1 text-slate-800 font-medium">
-                        {t.respuesta_tecnica || "Trabajos ejecutados y conformes."}
-                      </p>
-                    </div>
-                    {t.tecnico_responsable && (
-                      <p className="text-[11px] text-emerald-800">
-                        <span className="font-semibold">Responsable técnico:</span> {t.tecnico_responsable}
-                      </p>
-                    )}
-                    {t.fecha_resolucion && (
-                      <p className="text-[10px] text-emerald-700">
-                        Fecha de resolución: {formatearFecha(t.fecha_resolucion)}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      )}
     </div>
   );
 }
