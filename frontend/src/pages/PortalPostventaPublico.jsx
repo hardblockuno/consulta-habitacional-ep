@@ -42,7 +42,7 @@ export default function PortalPostventaPublico() {
             </div>
             <div>
               <p className="text-[10px] font-medium tracking-wider uppercase text-slate-400">
-                Entidad Patrocinante
+                Plan Social · Entidad Patrocinante
               </p>
               <h1 className="text-sm font-semibold tracking-tight text-slate-900 leading-tight">
                 Atención y Postventa Habitacional
@@ -93,7 +93,7 @@ export default function PortalPostventaPublico() {
 
       {/* Pie Institucional */}
       <footer className="mt-12 border-t border-slate-200/70 py-6 text-center text-xs text-slate-400">
-        Entidad Patrocinante · Postventa Habitacional
+        Plan Social · Entidad Patrocinante
       </footer>
     </div>
   );

@@ -121,32 +121,30 @@ export default function ExtraerAhorro() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/80 pb-5">
         <div>
           <div className="flex items-center gap-2">
-            <span className="rounded-md bg-cyan-100 px-2 py-0.5 text-xs font-semibold text-cyan-800">
-              ÁREA SOCIAL
+            <span className="text-[10px] font-medium tracking-wider uppercase text-slate-400">
+              Área Social
             </span>
-            <span className="text-xs font-medium text-slate-500">Ahorro para la vivienda</span>
+            <span className="text-slate-300">·</span>
+            <span className="text-[11px] font-medium text-slate-500">Ahorro para la vivienda</span>
           </div>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
-            Extraer y Gestionar Ahorro
+          <h1 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
+            Ahorro Habitacional
           </h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Control de cuentas de ahorro para la vivienda, validación de montos mínimos en UF y cruce de nóminas.
-          </p>
         </div>
 
         {/* Selector de ahorro mínimo */}
-        <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm">
-          <label htmlFor="ahorroMin" className="text-xs font-semibold text-slate-700 whitespace-nowrap">
-            Ahorro exigido (UF):
+        <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 shadow-2xs">
+          <label htmlFor="ahorroMin" className="text-[11px] font-medium text-slate-500 whitespace-nowrap">
+            Ahorro exigido:
           </label>
           <select
             id="ahorroMin"
             value={ahorroMinimo}
             onChange={(e) => setAhorroMinimo(Number(e.target.value))}
-            className="rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-900 focus:border-cyan-600 focus:outline-none"
+            className="bg-transparent text-xs font-medium text-slate-900 focus:outline-none cursor-pointer"
           >
             <option value={10}>10 UF (DS49 Tramo vulnerable)</option>
             <option value={15}>15 UF (DS49 Vulnerable con bonificación)</option>
@@ -159,105 +157,97 @@ export default function ExtraerAhorro() {
       </div>
 
       {/* Tarjetas de métricas de ahorro */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-lg border border-slate-200/80 bg-white p-3.5 shadow-2xs">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-slate-500">Ahorro Total Acreditado</p>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-50 text-cyan-700">
-              <Wallet size={16} />
-            </div>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Ahorro Acreditado</span>
+            <Wallet size={14} className="text-slate-400" />
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-950">
+          <p className="mt-1.5 text-lg font-semibold font-mono text-slate-900">
             {metricas.totalAhorroUf.toLocaleString("es-CL", { maximumFractionDigits: 1 })} UF
           </p>
-          <p className="mt-1 text-xs text-slate-500">Entre {metricas.total} socios registrados</p>
+          <p className="mt-0.5 text-[11px] text-slate-400">{metricas.total} socios registrados</p>
         </div>
 
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 shadow-sm">
+        <div className="rounded-lg border border-slate-200/80 bg-white p-3.5 shadow-2xs">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-emerald-800">Cumplen Ahorro Mínimo</p>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
-              <CheckCircle2 size={16} />
-            </div>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Cumplen Mínimo</span>
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
           </div>
-          <p className="mt-2 text-2xl font-bold text-emerald-950">{metricas.cumplen}</p>
-          <p className="mt-1 text-xs text-emerald-700">≥ {ahorroMinimo} UF requeridas</p>
+          <p className="mt-1.5 text-lg font-semibold font-mono text-emerald-600">{metricas.cumplen}</p>
+          <p className="mt-0.5 text-[11px] text-slate-400">≥ {ahorroMinimo} UF requeridas</p>
         </div>
 
-        <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 shadow-sm">
+        <div className="rounded-lg border border-slate-200/80 bg-white p-3.5 shadow-2xs">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-amber-800">Ahorro Insuficiente</p>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
-              <AlertCircle size={16} />
-            </div>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Insuficiente</span>
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
           </div>
-          <p className="mt-2 text-2xl font-bold text-amber-950">{metricas.pendientes}</p>
-          <p className="mt-1 text-xs text-amber-700">Tienen saldo pero menor a {ahorroMinimo} UF</p>
+          <p className="mt-1.5 text-lg font-semibold font-mono text-amber-600">{metricas.pendientes}</p>
+          <p className="mt-0.5 text-[11px] text-slate-400">Saldo menor a {ahorroMinimo} UF</p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="rounded-lg border border-slate-200/80 bg-white p-3.5 shadow-2xs">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-slate-500">Sin Saldo Informado</p>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-              <PiggyBank size={16} />
-            </div>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Sin Saldo</span>
+            <span className="h-1.5 w-1.5 rounded-full bg-slate-300"></span>
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{metricas.sinDato}</p>
-          <p className="mt-1 text-xs text-slate-500">Pendiente de cartola o libreta</p>
+          <p className="mt-1.5 text-lg font-semibold font-mono text-slate-900">{metricas.sinDato}</p>
+          <p className="mt-0.5 text-[11px] text-slate-400">Pendiente de cartola</p>
         </div>
       </div>
 
       {/* Sección para cargar cartolas o planillas de ahorro */}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-          <Upload size={18} className="text-cyan-700" />
-          <h2 className="text-sm font-semibold text-slate-900">
-            Actualizar saldos de ahorro desde planilla Excel / Cartola
+      <div className="rounded-lg border border-slate-200/80 bg-white p-4 shadow-2xs">
+        <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+          <Upload size={15} className="text-slate-500" />
+          <h2 className="text-xs font-semibold text-slate-900">
+            Actualizar saldos de ahorro desde planilla Excel o cartola
           </h2>
         </div>
-        <form onSubmit={handleSubirPlanillaAhorro} className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <form onSubmit={handleSubirPlanillaAhorro} className="mt-3 flex flex-col gap-2.5 sm:flex-row sm:items-center">
           <input
             type="file"
             accept=".xlsx,.xls"
             onChange={(e) => setArchivoAhorro(e.target.files?.[0] || null)}
-            className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-cyan-50 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-cyan-700 hover:file:bg-cyan-100"
+            className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-2.5 file:py-1.5 file:text-xs file:font-medium file:text-slate-700 hover:file:bg-slate-200 transition"
           />
           <button
             type="submit"
             disabled={!archivoAhorro || subiendoAhorro}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-700 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-cyan-800 disabled:opacity-50 transition whitespace-nowrap"
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-slate-900 px-3.5 py-1.5 text-xs font-medium text-white shadow-2xs hover:bg-slate-800 disabled:opacity-50 transition whitespace-nowrap"
           >
             {subiendoAhorro ? "Procesando..." : "Cruzar y actualizar ahorro"}
           </button>
         </form>
         {mensajeSubida && (
-          <p className="mt-3 rounded-lg bg-slate-50 p-2.5 text-xs text-slate-700 border border-slate-200">
+          <p className="mt-2.5 rounded-md bg-slate-50 p-2 text-xs text-slate-700 border border-slate-200">
             {mensajeSubida}
           </p>
         )}
       </div>
 
       {/* Buscador y Tabla de Socios con estado de ahorro */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="rounded-lg border border-slate-200/80 bg-white shadow-2xs">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1 max-w-md">
-            <Search size={16} className="absolute left-3 top-2.5 text-slate-400" />
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Buscar por RUT, nombre o comité..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 py-1.5 pl-9 pr-3 text-xs text-slate-900 placeholder:text-slate-400 focus:border-cyan-600 focus:outline-none"
+              className="h-9 w-full rounded-md border border-slate-200 py-1.5 pl-8 pr-3 text-xs text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none transition"
             />
           </div>
 
           <div className="flex items-center gap-2">
-            <Filter size={14} className="text-slate-500" />
+            <Filter size={13} className="text-slate-400" />
             <span className="text-xs text-slate-500">Filtrar:</span>
             <select
               value={filtroCumplimiento}
               onChange={(e) => setFiltroCumplimiento(e.target.value)}
-              className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-700 focus:border-cyan-600 focus:outline-none"
+              className="h-9 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 focus:border-slate-400 focus:outline-none transition"
             >
               <option value="todos">Todos ({personas.length})</option>
               <option value="cumple">Cumplen ({metricas.cumplen})</option>
@@ -297,7 +287,7 @@ export default function ExtraerAhorro() {
                   return (
                     <tr key={p.id} className="hover:bg-slate-50/75 transition">
                       <td className="px-4 py-3 font-mono font-medium text-slate-900">
-                        <Link to={`/personas/${p.id}`} className="hover:text-cyan-700 hover:underline">
+                        <Link to={`/personas/${p.id}`} className="hover:text-slate-600 hover:underline">
                           {p.rut}
                         </Link>
                       </td>
@@ -322,15 +312,18 @@ export default function ExtraerAhorro() {
                       </td>
                       <td className="px-4 py-3">
                         {sinDato ? (
-                          <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
-                            Pendiente acreditación
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 shadow-2xs">
+                            <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                            Pendiente
                           </span>
                         ) : cumple ? (
-                          <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
-                            ✓ Cumple ({ahorro.toFixed(1)} UF)
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 shadow-2xs">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            Cumple ({ahorro.toFixed(1)} UF)
                           </span>
                         ) : (
-                          <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 shadow-2xs">
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                             Faltan {brecha.toFixed(1)} UF
                           </span>
                         )}

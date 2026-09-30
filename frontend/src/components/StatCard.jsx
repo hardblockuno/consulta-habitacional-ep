@@ -1,23 +1,29 @@
 export default function StatCard({ label, value, icon: Icon, tone = "slate" }) {
-  const tones = {
-    slate: "border-slate-200 bg-white text-slate-950",
-    emerald: "border-emerald-200 bg-emerald-50 text-emerald-900",
-    amber: "border-amber-200 bg-amber-50 text-amber-950",
-    rose: "border-rose-200 bg-rose-50 text-rose-950",
-    cyan: "border-cyan-200 bg-cyan-50 text-cyan-950",
-    indigo: "border-indigo-200 bg-indigo-50 text-indigo-950",
-    violet: "border-violet-200 bg-violet-50 text-violet-950",
+  const dotColors = {
+    slate: "bg-slate-400",
+    emerald: "bg-emerald-500",
+    amber: "bg-amber-500",
+    rose: "bg-rose-500",
+    sky: "bg-sky-500",
+    indigo: "bg-indigo-500",
+    violet: "bg-purple-500",
   };
+
   return (
-    <div className={`rounded-lg border p-4 shadow-sm ${tones[tone] || tones.slate}`}>
-      <div className="flex items-start justify-between gap-3">
+    <div className="rounded-lg border border-slate-200/90 bg-white p-3.5 shadow-2xs">
+      <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-sm font-medium opacity-75">{label}</p>
-          <p className="mt-2 text-3xl font-semibold">{Number(value || 0).toLocaleString("es-CL")}</p>
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-slate-400">
+            {tone !== "slate" && <span className={`h-1.5 w-1.5 rounded-full ${dotColors[tone] || "bg-slate-400"}`} />}
+            {label}
+          </span>
+          <p className="mt-1 font-mono text-xl font-semibold tracking-tight text-slate-900">
+            {Number(value || 0).toLocaleString("es-CL")}
+          </p>
         </div>
         {Icon ? (
-          <div className="rounded-lg bg-white/70 p-2 shadow-sm">
-            <Icon size={20} />
+          <div className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-100 bg-slate-50 text-slate-500">
+            <Icon size={14} />
           </div>
         ) : null}
       </div>

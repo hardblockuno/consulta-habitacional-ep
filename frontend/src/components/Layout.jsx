@@ -1,6 +1,7 @@
 import {
   BarChart3,
   Bell,
+  Building2,
   Database,
   FileSpreadsheet,
   HardHat,
@@ -39,28 +40,28 @@ const navSections = [
 
 export default function Layout({ children }) {
   return (
-    <div className="min-h-screen bg-slate-50/60">
+    <div className="min-h-screen bg-slate-50/60 text-slate-800 antialiased">
       {/* Sidebar para desktop */}
-      <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-slate-200 bg-white px-5 py-6 overflow-y-auto xl:block shadow-sm">
+      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-slate-200/80 bg-white px-4 py-5 overflow-y-auto xl:block">
         {/* Logo / Encabezado */}
-        <div className="flex items-center gap-3 pb-6 border-b border-slate-100">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-700 text-white shadow-sm">
-            <FileSpreadsheet size={22} />
+        <div className="flex items-center gap-3 pb-5 border-b border-slate-100">
+          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-900 text-white shadow-2xs">
+            <Building2 size={18} />
           </div>
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-cyan-700">EP Interna</p>
-            <h1 className="text-base font-bold text-slate-950 leading-tight">Consulta Habitacional</h1>
+            <h1 className="text-sm font-semibold tracking-tight text-slate-900 leading-tight">Plan Social</h1>
+            <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Entidad Patrocinante</p>
           </div>
         </div>
 
         {/* Navegación por Áreas */}
-        <nav className="mt-6 space-y-6">
+        <nav className="mt-5 space-y-5">
           {navSections.map((section) => (
-            <div key={section.title} className="space-y-1.5">
-              <p className="px-3 text-[11px] font-bold tracking-wider text-slate-400 uppercase">
+            <div key={section.title} className="space-y-1">
+              <p className="px-2.5 text-[10px] font-medium tracking-wider text-slate-400 uppercase">
                 {section.title}
               </p>
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {section.items.map((item) => (
                   <NavItem key={item.to} item={item} />
                 ))}
@@ -71,20 +72,20 @@ export default function Layout({ children }) {
       </aside>
 
       {/* Contenido principal */}
-      <div className="xl:pl-72">
+      <div className="xl:pl-64">
         {/* Header responsive para móvil y tablet */}
-        <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur xl:hidden shadow-xs">
+        <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/95 px-4 py-3 backdrop-blur xl:hidden shadow-2xs">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-700 text-white">
-              <FileSpreadsheet size={20} />
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-900 text-white">
+              <Building2 size={16} />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase text-cyan-700">EP Interna</p>
-              <h1 className="text-sm font-bold text-slate-950">Consulta Habitacional</h1>
+              <h1 className="text-xs font-semibold text-slate-900">Plan Social</h1>
+              <p className="text-[10px] font-medium uppercase text-slate-400">Entidad Patrocinante</p>
             </div>
           </div>
 
-          <nav className="mt-3 flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+          <nav className="mt-3 flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
             {navSections.flatMap((s) => s.items).map((item) => (
               <NavItem key={item.to} item={item} compact />
             ))}
@@ -106,15 +107,15 @@ function NavItem({ item, compact = false }) {
       to={item.to}
       className={({ isActive }) =>
         [
-          "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition",
+          "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors",
           compact ? "shrink-0 whitespace-nowrap text-xs" : "",
           isActive
-            ? "bg-cyan-700 text-white shadow-sm font-semibold"
-            : "text-slate-700 hover:bg-slate-100 hover:text-slate-950",
+            ? "bg-slate-900 text-white shadow-2xs"
+            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
         ].join(" ")
       }
     >
-      <Icon size={18} className="shrink-0" />
+      <Icon size={16} className="shrink-0" />
       <span>{item.label}</span>
     </NavLink>
   );

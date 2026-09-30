@@ -119,42 +119,35 @@ export default function ExtraerRukan() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <span className="rounded-md bg-cyan-100 px-2 py-0.5 text-xs font-semibold text-cyan-800">
-              ÁREA SOCIAL
+            <span className="text-[10px] font-medium tracking-wider uppercase text-slate-400">
+              Área Social
             </span>
-            <span className="text-xs font-medium text-slate-500">Integración MINVU / SERVIU</span>
+            <span className="text-slate-300">·</span>
+            <span className="text-[11px] font-medium text-slate-500">Integración MINVU / SERVIU</span>
           </div>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
-            Extraer Ficha RUKAN
+          <h1 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
+            Ficha RUKAN
           </h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Extracción inteligente de fichas Rukan en PDF: detección de postulante titular, grupo familiar y cargas.
-          </p>
         </div>
 
-        {/* Estado del motor */}
-        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-sm">
-          <Bot size={16} className="text-cyan-700" />
-          <span className="text-slate-600">Motor OCR / IA:</span>
-          <span className="inline-flex items-center gap-1 font-semibold text-emerald-700">
-            <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-            Activo
-          </span>
+        <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 shadow-2xs">
+          <FileText size={13} className="text-slate-500" />
+          <span>Formato PDF Oficial</span>
         </div>
       </div>
 
       {/* Zona de Carga de PDF */}
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="rounded-lg border border-slate-200/80 bg-white p-5 shadow-2xs">
         <form onSubmit={handleExtraer} className="space-y-4">
-          <div className="rounded-xl border-2 border-dashed border-slate-300 p-8 text-center hover:border-cyan-500 bg-slate-50/50 transition">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-cyan-100 text-cyan-800">
-              <UploadCloud size={24} />
+          <div className="rounded-lg border-2 border-dashed border-slate-200 p-8 text-center hover:border-slate-400 bg-slate-50/50 transition-colors">
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 shadow-2xs">
+              <UploadCloud size={20} />
             </div>
-            <p className="mt-3 text-sm font-semibold text-slate-900">
-              Arrastra o selecciona la Ficha Rukan (PDF)
+            <p className="mt-3 text-sm font-semibold tracking-tight text-slate-900">
+              Cargar Ficha Rukan (PDF)
             </p>
-            <p className="mt-1 text-xs text-slate-500">
-              Formato oficial descargado del portal Rukan de MINVU / SERVIU
+            <p className="mt-0.5 text-xs text-slate-500">
+              Documento emitido por el sistema Rukan MINVU / SERVIU
             </p>
 
             <div className="mt-4 flex justify-center">
@@ -163,13 +156,13 @@ export default function ExtraerRukan() {
                 type="file"
                 accept=".pdf,application/pdf"
                 onChange={(e) => setArchivo(e.target.files?.[0] || null)}
-                className="block text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-cyan-700 file:px-4 file:py-2 file:text-xs file:font-semibold file:text-white hover:file:bg-cyan-800 file:cursor-pointer"
+                className="block text-xs text-slate-500 file:mr-3 file:rounded-md file:border file:border-slate-200 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-slate-700 hover:file:bg-slate-50 file:cursor-pointer shadow-2xs"
               />
             </div>
 
             {archivo && (
-              <p className="mt-3 text-xs font-semibold text-cyan-800">
-                Archivo seleccionado: <span className="font-mono">{archivo.name}</span> ({(archivo.size / 1024).toFixed(1)} KB)
+              <p className="mt-3 text-xs font-medium text-slate-700">
+                Archivo: <span className="font-mono">{archivo.name}</span> ({(archivo.size / 1024).toFixed(1)} KB)
               </p>
             )}
           </div>
@@ -178,17 +171,17 @@ export default function ExtraerRukan() {
             <button
               type="submit"
               disabled={!archivo || procesando}
-              className="inline-flex items-center gap-2 rounded-lg bg-cyan-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-cyan-800 disabled:opacity-50 transition"
+              className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3.5 py-1.5 text-xs font-medium text-white shadow-2xs hover:bg-slate-800 disabled:opacity-50 transition-colors"
             >
               {procesando ? (
                 <>
-                  <Loader2 size={16} className="animate-spin" />
-                  Procesando documento Rukan...
+                  <Loader2 size={14} className="animate-spin" />
+                  Procesando documento...
                 </>
               ) : (
                 <>
-                  <ScanLine size={16} />
-                  Extraer datos con IA / OCR
+                  <FileText size={14} />
+                  Procesar Ficha
                 </>
               )}
             </button>
@@ -208,45 +201,46 @@ export default function ExtraerRukan() {
 
       {/* Resultados de la extracción actual */}
       {resultadoActual && (
-        <div className="rounded-xl border border-cyan-200 bg-white p-6 shadow-sm space-y-6">
-          <div className="flex items-center justify-between border-b border-cyan-100 pb-4">
+        <div className="rounded-lg border border-slate-200/80 bg-white p-5 shadow-2xs space-y-5">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800">
-                <FileCheck size={20} />
+              <div className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-700">
+                <FileCheck size={16} />
               </div>
               <div>
-                <h2 className="text-base font-bold text-slate-900">Extracción Rukan Completada</h2>
-                <p className="text-xs text-slate-500">Documento: {resultadoActual.archivo || "Ficha Rukan"}</p>
+                <h2 className="text-sm font-semibold tracking-tight text-slate-900">Extracción Completada</h2>
+                <p className="text-[11px] text-slate-400">Documento: {resultadoActual.archivo || "Ficha Rukan"}</p>
               </div>
             </div>
-            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-[11px] font-medium text-emerald-800 shadow-2xs">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
               Datos verificados
             </span>
           </div>
 
           {/* Ficha Titular */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 rounded-lg bg-slate-50 p-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 rounded-md border border-slate-100 bg-slate-50/60 p-3.5">
             <div>
-              <p className="text-xs font-medium text-slate-500">RUT Titular</p>
-              <p className="text-sm font-bold font-mono text-slate-900">
+              <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">RUT Titular</p>
+              <p className="mt-0.5 text-xs font-semibold font-mono text-slate-900">
                 {resultadoActual.socio?.rut || "No detectado"}
               </p>
             </div>
             <div>
-              <p className="text-xs font-medium text-slate-500">Nombre Completo</p>
-              <p className="text-sm font-semibold text-slate-900">
+              <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Nombre Completo</p>
+              <p className="mt-0.5 text-xs font-medium text-slate-900">
                 {resultadoActual.socio?.nombre || "No detectado"}
               </p>
             </div>
             <div>
-              <p className="text-xs font-medium text-slate-500">Estado Rukan</p>
-              <p className="text-sm font-semibold text-cyan-800">
+              <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Estado Rukan</p>
+              <p className="mt-0.5 text-xs font-medium text-slate-800">
                 {resultadoActual.estado_rukan || "Inscrito / Hábil"}
               </p>
             </div>
             <div>
-              <p className="text-xs font-medium text-slate-500">Subsidio / Programa</p>
-              <p className="text-sm font-semibold text-slate-900">
+              <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Subsidio / Programa</p>
+              <p className="mt-0.5 text-xs font-medium text-slate-800">
                 {resultadoActual.programa || "Fondo Solidario DS49"}
               </p>
             </div>
@@ -254,9 +248,9 @@ export default function ExtraerRukan() {
 
           {/* Grupo familiar extraído */}
           <div>
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <Users size={16} className="text-cyan-700" />
-              Integrantes del Hogar y Cargas ({(resultadoActual.grupo_familiar || []).length})
+            <h3 className="text-xs font-semibold tracking-tight text-slate-900 flex items-center gap-2">
+              <Users size={14} className="text-slate-600" />
+              Integrantes del Hogar ({(resultadoActual.grupo_familiar || []).length})
             </h3>
 
             <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
@@ -304,7 +298,7 @@ export default function ExtraerRukan() {
           <div className="flex items-center justify-between pt-2">
             <Link
               to="/bases-datos"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-cyan-700 hover:underline"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900"
             >
               Ir al padrón de personas para verificar cruce <ArrowRight size={14} />
             </Link>

@@ -25,11 +25,11 @@ export default function Reportes() {
   return (
     <div className="space-y-5">
       <div>
-        <p className="text-sm font-semibold uppercase text-cyan-700">Resumen</p>
-        <h1 className="mt-1 text-2xl font-semibold text-slate-950">Reportes</h1>
+        <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Plan Social · Consolidado</p>
+        <h1 className="text-lg font-semibold text-slate-900 tracking-tight">Reportes y Auditoría</h1>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Personas" value={data.total_personas} icon={Users} tone="slate" />
         <StatCard label="Alertas críticas" value={data.alertas_criticas} icon={AlertTriangle} tone="rose" />
         <StatCard label="Cédulas vencidas" value={data.cedulas_vencidas} icon={FileText} tone="rose" />
@@ -39,7 +39,7 @@ export default function Reportes() {
         <StatCard label="Postulación unipersonal" value={data.unipersonales} icon={UserRound} tone="amber" />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         <Section title="Alertas por tipo">
           {data.alertas_por_tipo?.length ? (
             <Table
@@ -79,12 +79,12 @@ export default function Reportes() {
 
 function Table({ columns, rows }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-slate-200 text-sm">
-        <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
+    <div className="overflow-x-auto -mx-4 -mb-4">
+      <table className="min-w-full divide-y divide-slate-100 text-xs">
+        <thead className="bg-slate-50/60 text-left text-[11px] font-medium uppercase tracking-wider text-slate-400">
           <tr>
             {columns.map((column) => (
-              <th key={column} className="px-3 py-2">
+              <th key={column} className="px-4 py-2">
                 {column}
               </th>
             ))}
@@ -92,9 +92,9 @@ function Table({ columns, rows }) {
         </thead>
         <tbody className="divide-y divide-slate-100">
           {rows.map((row, index) => (
-            <tr key={index}>
+            <tr key={index} className="hover:bg-slate-50/50 transition">
               {row.map((cell, cellIndex) => (
-                <td key={`${index}-${cellIndex}`} className="px-3 py-2 text-slate-700">
+                <td key={`${index}-${cellIndex}`} className="px-4 py-2 text-slate-700">
                   {cell}
                 </td>
               ))}

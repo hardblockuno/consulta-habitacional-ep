@@ -24,47 +24,45 @@ export default function BasesDatos() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/80 pb-5">
         <div>
           <div className="flex items-center gap-2">
-            <span className="rounded-md bg-cyan-100 px-2 py-0.5 text-xs font-semibold text-cyan-800">
-              ÁREA SOCIAL
+            <span className="text-[10px] font-medium tracking-wider uppercase text-slate-400">
+              Área Social
             </span>
-            <span className="text-xs font-medium text-slate-500">Gestión de nóminas</span>
+            <span className="text-slate-300">·</span>
+            <span className="text-[11px] font-medium text-slate-500">Gestión de nóminas</span>
           </div>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+          <h1 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
             Bases de Datos
           </h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Padrón unificado de socios de comités, búsqueda por RUT y carga masiva de planillas Excel.
-          </p>
         </div>
 
-        {/* Pestañas internas */}
-        <div className="flex rounded-lg bg-slate-100 p-1 border border-slate-200">
+        {/* Pestañas internas estilo Linear */}
+        <div className="inline-flex rounded-lg bg-slate-100 p-0.5 border border-slate-200/70">
           <button
             type="button"
             onClick={() => handleTabChange("personas")}
-            className={`flex items-center gap-2 rounded-md px-3.5 py-1.5 text-xs font-semibold transition ${
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
               tab === "personas"
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-600 hover:text-slate-900"
+                ? "bg-white text-slate-900 shadow-2xs"
+                : "text-slate-500 hover:text-slate-800"
             }`}
           >
-            <Search size={14} />
+            <Search size={13} />
             Padrón de personas
           </button>
           <button
             type="button"
             onClick={() => handleTabChange("importar")}
-            className={`flex items-center gap-2 rounded-md px-3.5 py-1.5 text-xs font-semibold transition ${
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
               tab === "importar"
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-600 hover:text-slate-900"
+                ? "bg-white text-slate-900 shadow-2xs"
+                : "text-slate-500 hover:text-slate-800"
             }`}
           >
-            <Upload size={14} />
-            Cargar / Actualizar base
+            <Upload size={13} />
+            Cargar planilla Excel
           </button>
         </div>
       </div>

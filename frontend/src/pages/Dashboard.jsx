@@ -35,7 +35,7 @@ export default function Dashboard() {
       label: "Adultos mayores",
       value: data.personas_mayores,
       icon: UserRoundCheck,
-      tone: "cyan",
+      tone: "slate",
       to: "/personas?filtro=adultos_mayores",
     },
     {
@@ -64,8 +64,8 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm font-semibold uppercase text-cyan-700">Panel operativo</p>
-        <h1 className="mt-1 text-2xl font-semibold text-slate-950">Dashboard</h1>
+        <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Plan Social · Panel Operativo</p>
+        <h1 className="text-lg font-semibold text-slate-900 tracking-tight">Resumen General</h1>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

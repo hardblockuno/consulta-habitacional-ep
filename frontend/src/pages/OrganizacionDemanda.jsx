@@ -73,35 +73,33 @@ export default function OrganizacionDemanda() {
   return (
     <div className="space-y-8">
       {/* Header y Selector de Comité */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-slate-200 pb-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-slate-200/80 pb-5">
         <div>
           <div className="flex items-center gap-2">
-            <span className="rounded-md bg-cyan-100 px-2.5 py-0.5 text-xs font-semibold text-cyan-800">
-              ÁREA SOCIAL
+            <span className="text-[10px] font-medium tracking-wider uppercase text-slate-400">
+              Área Social
             </span>
-            <span className="text-xs font-medium text-slate-500">
-              {comiteActivo ? `Comité: ${comiteActivo}` : "Consolidado Entidad Patrocinante"}
+            <span className="text-slate-300">·</span>
+            <span className="text-[11px] font-medium text-slate-500">
+              {comiteActivo ? `Comité ${comiteActivo}` : "Plan Social · Consolidado General"}
             </span>
           </div>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+          <h1 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
             Organización de la Demanda
           </h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Diagnóstico, caracterización y avance de postulación elaborado a partir de las bases de datos de cada comité.
-          </p>
         </div>
 
         {/* Selector de Comité */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-xs">
-            <Building size={16} className="text-cyan-700 ml-1" />
-            <span className="text-xs font-semibold text-slate-600">Comité:</span>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 shadow-2xs">
+            <Building size={14} className="text-slate-500" />
+            <span className="text-[11px] font-medium text-slate-500">Comité:</span>
             <select
               value={comiteActivo}
               onChange={(e) => handleSelectComite(e.target.value)}
-              className="rounded-md border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-900 focus:border-cyan-600 focus:outline-none"
+              className="bg-transparent text-xs font-medium text-slate-900 focus:outline-none cursor-pointer"
             >
-              <option value="">🏢 Todos los Comités (Consolidado General)</option>
+              <option value="">Todos los comités (Consolidado)</option>
               {comitesResumen.map((c) => (
                 <option key={c.id} value={c.nombre}>
                   {c.nombre} ({c.total_personas} familias)
@@ -114,7 +112,7 @@ export default function OrganizacionDemanda() {
             <button
               type="button"
               onClick={() => handleSelectComite("")}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+              className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors shadow-2xs"
             >
               Ver todos
             </button>
@@ -122,10 +120,10 @@ export default function OrganizacionDemanda() {
 
           <Link
             to={comiteActivo ? `/bases-datos?comite=${encodeURIComponent(comiteActivo)}` : "/bases-datos"}
-            className="inline-flex items-center gap-2 rounded-lg bg-cyan-700 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-cyan-800 transition"
+            className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3.5 py-1.5 text-xs font-medium text-white hover:bg-slate-800 transition-colors shadow-2xs"
           >
-            <Users size={15} />
-            Ver padrón del comité
+            <Users size={14} />
+            Padrón del comité
           </Link>
         </div>
       </div>
@@ -155,7 +153,7 @@ export default function OrganizacionDemanda() {
             label="Socios aptos (listos postulación)"
             value={data.personas_aptas}
             icon={CheckCircle2}
-            tone="cyan"
+            tone="emerald"
           />
         </Link>
         <Link
@@ -195,88 +193,85 @@ export default function OrganizacionDemanda() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Building size={20} className="text-cyan-700" />
-                Resumen Elaborado por Cada Comité ({comitesResumen.length})
+              <h2 className="text-base font-semibold tracking-tight text-slate-900 flex items-center gap-2">
+                <Building size={16} className="text-slate-700" />
+                Comités Activos ({comitesResumen.length})
               </h2>
-              <p className="text-xs text-slate-500">
-                Comparativa y estado de avance de cada base de datos cargada en la Entidad Patrocinante
-              </p>
             </div>
           </div>
 
           {/* Grid de Comités */}
-          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {comitesResumen.map((comite) => (
               <div
                 key={comite.id}
-                className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-5 shadow-xs hover:border-cyan-500 hover:shadow-md transition"
+                className="flex flex-col justify-between rounded-lg border border-slate-200/80 bg-white p-4 shadow-2xs hover:border-slate-300 transition-colors"
               >
                 <div>
                   <div className="flex items-start justify-between">
                     <div>
-                      <span className="inline-block rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                      <span className="inline-block rounded border border-slate-200/60 bg-slate-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-slate-500">
                         {comite.comuna || "Comuna informada"}
                       </span>
-                      <h3 className="mt-1.5 text-base font-bold text-slate-950">{comite.nombre}</h3>
+                      <h3 className="mt-1 text-sm font-semibold text-slate-900">{comite.nombre}</h3>
                     </div>
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-50 text-cyan-800 font-bold text-xs">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-slate-50 font-mono text-xs font-semibold text-slate-800">
                       {comite.total_personas}
                     </span>
                   </div>
 
                   {/* Barra de progreso de Aptos */}
-                  <div className="mt-4 space-y-1">
+                  <div className="mt-3.5 space-y-1">
                     <div className="flex justify-between text-xs">
-                      <span className="font-semibold text-slate-700">Aptitud de postulación:</span>
-                      <span className="font-bold text-cyan-800">{comite.porcentaje_aptos}%</span>
+                      <span className="text-[11px] font-medium text-slate-500">Aptitud de postulación</span>
+                      <span className="font-mono text-xs font-semibold text-slate-900">{comite.porcentaje_aptos}%</span>
                     </div>
-                    <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+                    <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-cyan-700"
+                        className="h-full rounded-full bg-slate-900"
                         style={{ width: `${Math.min(comite.porcentaje_aptos, 100)}%` }}
                       ></div>
                     </div>
                   </div>
 
                   {/* Métricas del Comité */}
-                  <div className="mt-4 grid grid-cols-3 gap-2 rounded-lg bg-slate-50 p-2.5 text-center text-xs">
+                  <div className="mt-3.5 grid grid-cols-3 gap-2 rounded-md border border-slate-100 bg-slate-50/60 p-2 text-center text-xs">
                     <div>
-                      <p className="text-[10px] text-slate-500 font-medium">Aptos</p>
-                      <p className="font-bold text-emerald-700">{comite.aptas}</p>
+                      <p className="text-[10px] text-slate-400 font-medium uppercase">Aptos</p>
+                      <p className="font-mono text-xs font-semibold text-emerald-700">{comite.aptas}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] text-slate-500 font-medium">Observados</p>
-                      <p className="font-bold text-amber-700">{comite.observadas}</p>
+                      <p className="text-[10px] text-slate-400 font-medium uppercase">Observados</p>
+                      <p className="font-mono text-xs font-semibold text-amber-700">{comite.observadas}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] text-slate-500 font-medium">Bloqueados</p>
-                      <p className="font-bold text-rose-700">{comite.bloqueadas}</p>
+                      <p className="text-[10px] text-slate-400 font-medium uppercase">Bloqueados</p>
+                      <p className="font-mono text-xs font-semibold text-rose-700">{comite.bloqueadas}</p>
                     </div>
                   </div>
 
                   {/* Factores sociales */}
-                  <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] text-slate-600">
-                    <span className="rounded bg-slate-100 px-2 py-0.5">
-                      👴 {comite.personas_mayores} adultos mayores
+                  <div className="mt-2.5 flex flex-wrap gap-1 text-[11px] text-slate-600">
+                    <span className="rounded border border-slate-200/60 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600">
+                      {comite.personas_mayores} adultos mayores
                     </span>
-                    <span className="rounded bg-slate-100 px-2 py-0.5">
-                      ♿ {comite.discapacidad} discapacidad
+                    <span className="rounded border border-slate-200/60 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600">
+                      {comite.discapacidad} discapacidad
                     </span>
-                    <span className="rounded bg-slate-100 px-2 py-0.5">
-                      🌿 {comite.etnia} etnia
+                    <span className="rounded border border-slate-200/60 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600">
+                      {comite.etnia} etnia
                     </span>
                   </div>
                 </div>
 
-                <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-3">
-                  <span className="text-xs font-semibold text-slate-500">
-                    Ahorro prom: <strong className="text-slate-900">{comite.ahorro_promedio_uf} UF</strong>
+                <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-2.5">
+                  <span className="text-[11px] font-medium text-slate-500">
+                    Ahorro prom: <strong className="font-mono font-semibold text-slate-900">{comite.ahorro_promedio_uf} UF</strong>
                   </span>
                   <button
                     type="button"
                     onClick={() => handleSelectComite(comite.nombre)}
-                    className="inline-flex items-center gap-1 text-xs font-bold text-cyan-700 hover:text-cyan-900 transition"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-slate-700 hover:text-slate-900 transition-colors"
                   >
                     Diagnóstico <ArrowRight size={13} />
                   </button>
@@ -316,7 +311,8 @@ export default function OrganizacionDemanda() {
                       <td className="px-4 py-3 text-slate-600">{c.comuna || "-"}</td>
                       <td className="px-4 py-3 font-semibold text-slate-900">{c.total_personas}</td>
                       <td className="px-4 py-3">
-                        <span className="inline-flex items-center rounded-full bg-cyan-100 px-2 py-0.5 font-bold text-cyan-800">
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-0.5 font-mono text-[11px] font-medium text-slate-800">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                           {c.aptas} ({c.porcentaje_aptos}%)
                         </span>
                       </td>
@@ -330,7 +326,7 @@ export default function OrganizacionDemanda() {
                         <button
                           type="button"
                           onClick={() => handleSelectComite(c.nombre)}
-                          className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-cyan-700 hover:bg-cyan-50 hover:text-cyan-900"
+                          className="rounded border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
                         >
                           Ver comité
                         </button>
@@ -344,82 +340,81 @@ export default function OrganizacionDemanda() {
         </div>
       )}
 
-      {/* Bloque de Caracterización y Vulnerabilidad Social (del comité seleccionado o general) */}
+      {/* Bloque de Caracterización y Vulnerabilidad Social */}
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
+        <div className="rounded-lg border border-slate-200/80 bg-white p-5 shadow-2xs lg:col-span-2">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div>
-              <h2 className="text-base font-semibold text-slate-900">
+              <h2 className="text-sm font-semibold tracking-tight text-slate-900">
                 Caracterización Social {comiteActivo ? `· ${comiteActivo}` : "(Consolidado)"}
               </h2>
-              <p className="text-xs text-slate-500">Criterios de prioridad y factores de vulnerabilidad en la base</p>
             </div>
             <Link
               to={comiteActivo ? `/bases-datos?comite=${encodeURIComponent(comiteActivo)}` : "/bases-datos"}
-              className="inline-flex items-center gap-1 text-xs font-medium text-cyan-700 hover:text-cyan-800"
+              className="inline-flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900"
             >
               Ver nómina <ArrowRight size={14} />
             </Link>
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3.5">
+            <div className="flex items-center justify-between rounded-md border border-slate-100 bg-slate-50/60 p-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
-                  <Leaf size={18} />
+                <div className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-emerald-700">
+                  <Leaf size={16} />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-slate-500">Pueblos originarios / Etnia</p>
-                  <p className="text-lg font-bold text-slate-900">{data.etnia ?? 0}</p>
+                  <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Pueblos originarios</p>
+                  <p className="font-mono text-lg font-semibold text-slate-900">{data.etnia ?? 0}</p>
                 </div>
               </div>
-              <span className="text-xs text-slate-500">CONADI</span>
+              <span className="text-[10px] font-medium text-slate-400">CONADI</span>
             </div>
 
-            <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3.5">
+            <div className="flex items-center justify-between rounded-md border border-slate-100 bg-slate-50/60 p-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
-                  <UserRound size={18} />
+                <div className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-amber-700">
+                  <UserRound size={16} />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-slate-500">Postulación unipersonal</p>
-                  <p className="text-lg font-bold text-slate-900">{data.unipersonales ?? 0}</p>
+                  <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Unipersonal</p>
+                  <p className="font-mono text-lg font-semibold text-slate-900">{data.unipersonales ?? 0}</p>
                 </div>
               </div>
-              <span className="text-xs text-slate-500">Persona sola</span>
+              <span className="text-[10px] font-medium text-slate-400">Persona sola</span>
             </div>
 
-            <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3.5">
+            <div className="flex items-center justify-between rounded-md border border-slate-100 bg-slate-50/60 p-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700">
-                  <CheckCircle2 size={18} />
+                <div className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700">
+                  <CheckCircle2 size={16} />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-slate-500">RSH Tramo Preferente (≤ 40%)</p>
-                  <p className="text-lg font-bold text-slate-900">
+                  <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">RSH Tramo Preferente (≤ 40%)</p>
+                  <p className="font-mono text-lg font-semibold text-slate-900">
                     {total - (data.rsh_sobre_40 || 0)}{" "}
-                    <span className="text-xs font-normal text-slate-500">({rshPreferente}%)</span>
+                    <span className="text-xs font-normal text-slate-400">({rshPreferente}%)</span>
                   </p>
                 </div>
               </div>
-              <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-800">
-                Prioridad
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-[10px] font-medium text-emerald-800">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Prioridad
               </span>
             </div>
 
-            <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3.5">
+            <div className="flex items-center justify-between rounded-md border border-slate-100 bg-slate-50/60 p-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-rose-100 text-rose-700">
-                  <ShieldAlert size={18} />
+                <div className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-rose-700">
+                  <ShieldAlert size={16} />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-slate-500">Alertas críticas vigentes</p>
-                  <p className="text-lg font-bold text-slate-900">{data.alertas_criticas ?? 0}</p>
+                  <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Alertas críticas vigentes</p>
+                  <p className="font-mono text-lg font-semibold text-slate-900">{data.alertas_criticas ?? 0}</p>
                 </div>
               </div>
               <Link
                 to={comiteActivo ? `/alertas?comite=${encodeURIComponent(comiteActivo)}` : "/alertas"}
-                className="text-xs font-medium text-cyan-700 hover:underline"
+                className="text-xs font-medium text-slate-600 hover:text-slate-900"
               >
                 Revisar
               </Link>
@@ -428,51 +423,44 @@ export default function OrganizacionDemanda() {
         </div>
 
         {/* Acciones directas */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col justify-between">
+        <div className="rounded-lg border border-slate-200/80 bg-white p-5 shadow-2xs flex flex-col justify-between">
           <div>
-            <h2 className="text-base font-semibold text-slate-900">Módulos del Área Social</h2>
-            <p className="text-xs text-slate-500">
-              Operaciones disponibles para {comiteActivo || "los comités"}
-            </p>
+            <h2 className="text-sm font-semibold tracking-tight text-slate-900">Módulos del Área Social</h2>
 
-            <div className="mt-4 space-y-2.5">
+            <div className="mt-4 space-y-2">
               <Link
                 to={comiteActivo ? `/bases-datos?comite=${encodeURIComponent(comiteActivo)}` : "/bases-datos"}
-                className="flex items-center justify-between rounded-lg border border-slate-200 p-3 hover:border-cyan-500 hover:bg-cyan-50/50 transition"
+                className="flex items-center justify-between rounded-md border border-slate-200/70 p-2.5 hover:border-slate-300 hover:bg-slate-50 transition-colors"
               >
                 <div className="flex items-center gap-2.5">
-                  <FileSpreadsheet size={18} className="text-cyan-700" />
-                  <span className="text-sm font-medium text-slate-800">Bases de datos y nóminas</span>
+                  <FileSpreadsheet size={16} className="text-slate-600" />
+                  <span className="text-xs font-medium text-slate-800">Bases de datos y nóminas</span>
                 </div>
-                <ArrowRight size={16} className="text-slate-400" />
+                <ArrowRight size={14} className="text-slate-400" />
               </Link>
 
               <Link
                 to={comiteActivo ? `/extraer-ahorro?comite=${encodeURIComponent(comiteActivo)}` : "/extraer-ahorro"}
-                className="flex items-center justify-between rounded-lg border border-slate-200 p-3 hover:border-cyan-500 hover:bg-cyan-50/50 transition"
+                className="flex items-center justify-between rounded-md border border-slate-200/70 p-2.5 hover:border-slate-300 hover:bg-slate-50 transition-colors"
               >
                 <div className="flex items-center gap-2.5">
-                  <Wallet size={18} className="text-emerald-700" />
-                  <span className="text-sm font-medium text-slate-800">Extraer y cruzar ahorro</span>
+                  <Wallet size={16} className="text-slate-600" />
+                  <span className="text-xs font-medium text-slate-800">Extraer y cruzar ahorro</span>
                 </div>
-                <ArrowRight size={16} className="text-slate-400" />
+                <ArrowRight size={14} className="text-slate-400" />
               </Link>
 
               <Link
                 to="/extraer-rukan"
-                className="flex items-center justify-between rounded-lg border border-slate-200 p-3 hover:border-cyan-500 hover:bg-cyan-50/50 transition"
+                className="flex items-center justify-between rounded-md border border-slate-200/70 p-2.5 hover:border-slate-300 hover:bg-slate-50 transition-colors"
               >
                 <div className="flex items-center gap-2.5">
-                  <FileText size={18} className="text-indigo-700" />
-                  <span className="text-sm font-medium text-slate-800">Extraer Ficha RUKAN</span>
+                  <FileText size={16} className="text-slate-600" />
+                  <span className="text-xs font-medium text-slate-800">Extraer Ficha RUKAN</span>
                 </div>
-                <ArrowRight size={16} className="text-slate-400" />
+                <ArrowRight size={14} className="text-slate-400" />
               </Link>
             </div>
-          </div>
-
-          <div className="mt-5 rounded-lg bg-cyan-50 p-3 text-xs text-cyan-950 border border-cyan-100">
-            <strong>Gestión multircomité:</strong> Las nóminas cargadas mediante Excel se asignan automáticamente al comité correspondiente, permitiendo balances independientes y consolidados.
           </div>
         </div>
       </div>

@@ -27,19 +27,21 @@ export default function PersonaDetail() {
 
   return (
     <div className="space-y-5">
-      <Link to="/personas" className="inline-flex items-center gap-2 text-sm font-semibold text-cyan-800 hover:text-cyan-950">
-        <ArrowLeft size={18} />
-        Volver
+      <Link to="/personas" className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors">
+        <ArrowLeft size={14} />
+        Volver al padrón
       </Link>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="rounded-lg border border-slate-200/80 bg-white p-5 shadow-2xs">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold uppercase text-cyan-700">Ficha persona</p>
-            <h1 className="mt-1 text-2xl font-semibold text-slate-950">{persona.nombre}</h1>
-            <div className="mt-2 flex flex-wrap gap-3 text-sm text-slate-600">
-              <span>{persona.rut}</span>
+            <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Ficha Personal</p>
+            <h1 className="mt-0.5 text-lg font-semibold tracking-tight text-slate-900">{persona.nombre}</h1>
+            <div className="mt-1.5 flex flex-wrap gap-2 text-xs text-slate-500">
+              <span className="font-mono text-slate-700">{persona.rut}</span>
+              <span>·</span>
               <span>{persona.comite?.nombre}</span>
+              <span>·</span>
               <span>{persona.comite?.comuna || "Sin comuna"}</span>
             </div>
           </div>
