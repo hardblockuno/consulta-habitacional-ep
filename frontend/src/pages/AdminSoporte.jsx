@@ -271,17 +271,23 @@ export default function AdminSoporte() {
                     {u.email || "-"}
                   </td>
                   <td className="px-4 py-2.5">
-                    <select
-                      value={u.rol}
-                      disabled={guardandoUsuarioId === u.id}
-                      onChange={(e) => handleCambiarRol(u.id, e.target.value)}
-                      className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-slate-400 focus:outline-none transition"
-                    >
-                      <option value="social">Área Social</option>
-                      <option value="tecnico">Área Técnica</option>
-                      <option value="coordinador">Coordinador General</option>
-                      <option value="admin">Administrador / Soporte</option>
-                    </select>
+                    {u.rol === "admin" ? (
+                      <span className="inline-flex items-center gap-1.5 rounded border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-800">
+                        <span className="h-1.5 w-1.5 rounded-full bg-slate-900" />
+                        Administrador Único
+                      </span>
+                    ) : (
+                      <select
+                        value={u.rol}
+                        disabled={guardandoUsuarioId === u.id}
+                        onChange={(e) => handleCambiarRol(u.id, e.target.value)}
+                        className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-slate-400 focus:outline-none transition"
+                      >
+                        <option value="social">Área Social</option>
+                        <option value="tecnico">Área Técnica</option>
+                        <option value="coordinador">Coordinador General</option>
+                      </select>
+                    )}
                   </td>
                   <td className="px-4 py-2.5 text-center">
                     <button
@@ -376,7 +382,6 @@ export default function AdminSoporte() {
                     <option value="social">Área Social</option>
                     <option value="tecnico">Área Técnica</option>
                     <option value="coordinador">Coordinador General</option>
-                    <option value="admin">Administrador / Soporte</option>
                   </select>
                 </div>
               </div>

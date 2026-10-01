@@ -147,7 +147,6 @@ export default function Registro() {
                     <option value="social">Área Social</option>
                     <option value="tecnico">Área Técnica</option>
                     <option value="coordinador">Coordinador General / Gerencia</option>
-                    <option value="admin">Administrador / Soporte</option>
                   </select>
                 </div>
               </div>

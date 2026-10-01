@@ -500,3 +500,17 @@ class RolesYAutenticacionTests(TestCase):
         )
         self.assertEqual(resp.status_code, 401)
 
+    def test_bloqueo_autoregistro_como_admin(self):
+        resp = self.client.post(
+            "/api/auth/registro/",
+            {
+                "email": "hacker@test.cl",
+                "password": "Password123!",
+                "nombre_completo": "Intruso Admin",
+                "rol": "admin",
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("rol", resp.data)
+

@@ -118,11 +118,6 @@ export default function Login() {
             </Link>
           </div>
         </div>
-
-        {/* Pie institucional */}
-        <p className="text-center text-[10px] text-slate-400">
-          Entidad Patrocinante Plan Social · Acceso restringido a personal autorizado
-        </p>
       </div>
     </div>
   );

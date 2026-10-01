@@ -321,6 +321,13 @@ class UsuarioRegistroSerializer(serializers.Serializer):
             raise serializers.ValidationError("Este correo ya está registrado en la plataforma.")
         return val
 
+    def validate_rol(self, value):
+        if value == PerfilUsuario.ROL_ADMIN:
+            raise serializers.ValidationError(
+                "El rol de Administrador / Soporte es exclusivo y no está disponible en la creación de cuentas."
+            )
+        return value
+
     def create(self, validated_data):
         email = validated_data["email"].strip().lower()
         username = (validated_data.get("username") or email).strip().lower()[:150]

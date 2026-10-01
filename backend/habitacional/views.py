@@ -618,6 +618,11 @@ class UsuariosGestionViewSet(viewsets.ModelViewSet):
         nombre_completo = request.data.get("nombre_completo")
 
         if rol in dict(PerfilUsuario.ROL_CHOICES):
+            if rol == PerfilUsuario.ROL_ADMIN and PerfilUsuario.objects.filter(rol=PerfilUsuario.ROL_ADMIN).exclude(id=perfil.id).exists():
+                return Response(
+                    {"detail": "Solo puede existir un único Administrador en la plataforma."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             perfil.rol = rol
         if activo is not None:
             perfil.activo = bool(activo)
