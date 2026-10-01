@@ -302,39 +302,40 @@ class PerfilUsuarioSerializer(serializers.ModelSerializer):
 
 
 class UsuarioRegistroSerializer(serializers.Serializer):
-    username = serializers.CharField(max_length=150)
-    email = serializers.EmailField(required=False, allow_blank=True)
+    email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=6)
-    nombre_completo = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    nombre_completo = serializers.CharField(max_length=255)
     rol = serializers.ChoiceField(
         choices=PerfilUsuario.ROL_CHOICES,
         default=PerfilUsuario.ROL_SOCIAL,
     )
     cargo = serializers.CharField(max_length=150, required=False, allow_blank=True)
     telefono = serializers.CharField(max_length=40, required=False, allow_blank=True)
-
-    def validate_username(self, value):
-        val = value.strip().lower()
-        if User.objects.filter(username__iexact=val).exists():
-            raise serializers.ValidationError("Este nombre de usuario ya está registrado.")
-        return val
+    username = serializers.CharField(max_length=150, required=False, allow_blank=True)
 
     def validate_email(self, value):
-        if value:
-            val = value.strip().lower()
-            if User.objects.filter(email__iexact=val).exists():
-                raise serializers.ValidationError("Este correo ya está en uso por otra cuenta.")
-            return val
-        return ""
+        val = value.strip().lower()
+        if not val:
+            raise serializers.ValidationError("Debe indicar un correo electrónico.")
+        if User.objects.filter(email__iexact=val).exists() or User.objects.filter(username__iexact=val).exists():
+            raise serializers.ValidationError("Este correo ya está registrado en la plataforma.")
+        return val
 
     def create(self, validated_data):
-        username = validated_data["username"]
-        email = validated_data.get("email", "")
+        email = validated_data["email"].strip().lower()
+        username = (validated_data.get("username") or email).strip().lower()[:150]
         password = validated_data["password"]
-        nombre_completo = validated_data.get("nombre_completo", "")
+        nombre_completo = validated_data.get("nombre_completo", "").strip()
         rol = validated_data.get("rol", PerfilUsuario.ROL_SOCIAL)
-        cargo = validated_data.get("cargo", "")
-        telefono = validated_data.get("telefono", "")
+        cargo = validated_data.get("cargo", "").strip()
+        telefono = validated_data.get("telefono", "").strip()
+
+        # Si el username derivado ya existe por alguna razón pero no el email, asegurar unicidad
+        base_username = username
+        counter = 1
+        while User.objects.filter(username__iexact=username).exists():
+            username = f"{base_username[:140]}_{counter}"
+            counter += 1
 
         user = User.objects.create_user(
             username=username,

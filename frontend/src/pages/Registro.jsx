@@ -1,4 +1,4 @@
-import { Building2, Lock, Mail, Shield, User } from "lucide-react";
+import { Lock, Mail, Shield, User } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getHomeRouteForRole } from "../components/ProtectedRoute.jsx";
@@ -6,7 +6,6 @@ import { useAuth } from "../context/AuthContext.jsx";
 
 export default function Registro() {
   const [nombreCompleto, setNombreCompleto] = useState("");
-  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rol, setRol] = useState("social");
@@ -19,7 +18,7 @@ export default function Registro() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!username.trim() || !password) {
+    if (!nombreCompleto.trim() || !email.trim() || !password) {
       setError("Completa todos los campos obligatorios.");
       return;
     }
@@ -32,7 +31,6 @@ export default function Registro() {
     setLoading(true);
     try {
       const usuario = await registro({
-        username: username.trim(),
         email: email.trim(),
         password,
         nombre_completo: nombreCompleto.trim(),
@@ -60,15 +58,14 @@ export default function Registro() {
       <div className="w-full max-w-md space-y-5">
         {/* Marca Institucional */}
         <div className="text-center space-y-1.5">
-          <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-md bg-slate-900 text-white shadow-2xs">
-            <Building2 size={18} />
-          </div>
-          <div>
-            <h1 className="text-base font-semibold tracking-tight text-slate-900">SIGEP</h1>
-            <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
-              Creación de Cuenta · Plan Social
-            </p>
-          </div>
+          <img
+            src="/sigep-logo-transparent.png"
+            alt="SIGEP - Sistema de Información y Gestión de Entidades Patrocinantes"
+            className="mx-auto h-24 w-auto object-contain"
+          />
+          <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+            Creación de Cuenta · Plan Social
+          </p>
         </div>
 
         {/* Tarjeta de Formulario */}
@@ -86,50 +83,34 @@ export default function Registro() {
               <label className="block text-[11px] font-medium text-slate-600 mb-1">
                 Nombre y apellido
               </label>
-              <input
-                type="text"
-                value={nombreCompleto}
-                onChange={(e) => setNombreCompleto(e.target.value)}
-                placeholder="Ej: Carolina Morales"
-                className="h-9 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none transition"
-                required
-              />
+              <div className="relative">
+                <User size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={nombreCompleto}
+                  onChange={(e) => setNombreCompleto(e.target.value)}
+                  placeholder="Carolina Morales"
+                  className="h-9 w-full rounded-md border border-slate-200 bg-white pl-8 pr-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none transition"
+                  required
+                />
+              </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="block text-[11px] font-medium text-slate-600 mb-1">
-                  Nombre de usuario
-                </label>
-                <div className="relative">
-                  <User size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    autoComplete="username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="usuario"
-                    className="h-9 w-full rounded-md border border-slate-200 bg-white pl-8 pr-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none transition"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-medium text-slate-600 mb-1">
-                  Correo institucional
-                </label>
-                <div className="relative">
-                  <Mail size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="email"
-                    autoComplete="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="correo@plansocial.cl"
-                    className="h-9 w-full rounded-md border border-slate-200 bg-white pl-8 pr-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none transition"
-                  />
-                </div>
+            <div>
+              <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                Correo electrónico institucional
+              </label>
+              <div className="relative">
+                <Mail size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="correo@plansocial.cl"
+                  className="h-9 w-full rounded-md border border-slate-200 bg-white pl-8 pr-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none transition"
+                  required
+                />
               </div>
             </div>
 
@@ -154,7 +135,7 @@ export default function Registro() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="block text-[11px] font-medium text-slate-600 mb-1">
-                  Área / Rol de trabajo
+                  Rol / Área de trabajo
                 </label>
                 <div className="relative">
                   <Shield size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />

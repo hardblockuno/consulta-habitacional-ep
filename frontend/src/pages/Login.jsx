@@ -1,11 +1,11 @@
-import { Building2, Lock, User } from "lucide-react";
+import { Lock, Mail } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { getHomeRouteForRole } from "../components/ProtectedRoute.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 
 export default function Login() {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,15 +16,15 @@ export default function Login() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!username.trim() || !password) {
-      setError("Ingresa tu usuario o correo y contraseña.");
+    if (!email.trim() || !password) {
+      setError("Ingresa tu correo y contraseña.");
       return;
     }
 
     setError("");
     setLoading(true);
     try {
-      const usuario = await login(username.trim(), password);
+      const usuario = await login(email.trim(), password);
       const from = location.state?.from?.pathname;
       const target = from && from !== "/login" ? from : getHomeRouteForRole(usuario.rol, usuario.es_admin);
       navigate(target, { replace: true });
@@ -43,15 +43,14 @@ export default function Login() {
       <div className="w-full max-w-sm space-y-5">
         {/* Marca Institucional */}
         <div className="text-center space-y-1.5">
-          <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-md bg-slate-900 text-white shadow-2xs">
-            <Building2 size={18} />
-          </div>
-          <div>
-            <h1 className="text-base font-semibold tracking-tight text-slate-900">SIGEP</h1>
-            <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
-              Sistema de Información y Gestión · Plan Social
-            </p>
-          </div>
+          <img
+            src="/sigep-logo-transparent.png"
+            alt="SIGEP - Sistema de Información y Gestión de Entidades Patrocinantes"
+            className="mx-auto h-24 w-auto object-contain"
+          />
+          <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+            Entidad Patrocinante Plan Social
+          </p>
         </div>
 
         {/* Tarjeta de Formulario */}
@@ -67,16 +66,16 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
               <label className="block text-[11px] font-medium text-slate-600 mb-1">
-                Usuario o correo institucional
+                Correo electrónico institucional
               </label>
               <div className="relative">
-                <User size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Mail size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
-                  type="text"
-                  autoComplete="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="usuario o nombre@plansocial.cl"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="nombre@plansocial.cl"
                   className="h-9 w-full rounded-md border border-slate-200 bg-white pl-8 pr-3 text-xs text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none transition"
                   required
                 />

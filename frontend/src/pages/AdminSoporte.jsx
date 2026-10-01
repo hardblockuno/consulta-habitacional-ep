@@ -30,7 +30,6 @@ export default function AdminSoporte() {
   // Modal o formulario de nuevo usuario
   const [mostrarCrear, setMostrarCrear] = useState(false);
   const [nuevoUser, setNuevoUser] = useState({
-    username: "",
     email: "",
     password: "",
     nombre_completo: "",
@@ -108,11 +107,16 @@ export default function AdminSoporte() {
   async function handleCrearUsuario(e) {
     e.preventDefault();
     try {
-      await api.post("/auth/registro/", nuevoUser);
+      await api.post("/auth/registro/", {
+        email: nuevoUser.email.trim(),
+        password: nuevoUser.password,
+        nombre_completo: nuevoUser.nombre_completo.trim(),
+        rol: nuevoUser.rol,
+        cargo: nuevoUser.cargo.trim(),
+      });
       mostrarFeedback("Usuario creado con éxito.");
       setMostrarCrear(false);
       setNuevoUser({
-        username: "",
         email: "",
         password: "",
         nombre_completo: "",
@@ -121,7 +125,7 @@ export default function AdminSoporte() {
       });
       cargarDatos();
     } catch (err) {
-      alert("Error al crear usuario. Verifica que el usuario o correo no existan.");
+      alert("Error al crear usuario. Verifica que el correo institucional sea válido y no esté registrado.");
     }
   }
 
@@ -323,40 +327,29 @@ export default function AdminSoporte() {
             <form onSubmit={handleCrearUsuario} className="space-y-3">
               <div>
                 <label className="block text-[11px] font-medium text-slate-600 mb-1">
-                  Nombre Completo
+                  Nombre y apellido
                 </label>
                 <input
                   type="text"
                   required
                   value={nuevoUser.nombre_completo}
                   onChange={(e) => setNuevoUser({ ...nuevoUser, nombre_completo: e.target.value })}
+                  placeholder="Carolina Morales"
                   className="h-9 w-full rounded-md border border-slate-200 px-2.5 text-xs text-slate-900 focus:border-slate-400 focus:outline-none"
                 />
               </div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <div>
-                  <label className="block text-[11px] font-medium text-slate-600 mb-1">
-                    Usuario
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={nuevoUser.username}
-                    onChange={(e) => setNuevoUser({ ...nuevoUser, username: e.target.value })}
-                    className="h-9 w-full rounded-md border border-slate-200 px-2.5 text-xs text-slate-900 focus:border-slate-400 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-medium text-slate-600 mb-1">
-                    Correo
-                  </label>
-                  <input
-                    type="email"
-                    value={nuevoUser.email}
-                    onChange={(e) => setNuevoUser({ ...nuevoUser, email: e.target.value })}
-                    className="h-9 w-full rounded-md border border-slate-200 px-2.5 text-xs text-slate-900 focus:border-slate-400 focus:outline-none"
-                  />
-                </div>
+              <div>
+                <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                  Correo electrónico institucional
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={nuevoUser.email}
+                  onChange={(e) => setNuevoUser({ ...nuevoUser, email: e.target.value })}
+                  placeholder="correo@plansocial.cl"
+                  className="h-9 w-full rounded-md border border-slate-200 px-2.5 text-xs text-slate-900 focus:border-slate-400 focus:outline-none"
+                />
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
                 <div>

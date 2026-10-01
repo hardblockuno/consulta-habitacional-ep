@@ -524,24 +524,24 @@ class LoginAPIView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        username = str(request.data.get("username", "")).strip()
+        identificador = str(request.data.get("email") or request.data.get("username", "")).strip()
         password = str(request.data.get("password", "")).strip()
 
-        if not username or not password:
+        if not identificador or not password:
             return Response(
-                {"detail": "Debe ingresar usuario o correo y contraseña."},
+                {"detail": "Debe ingresar su correo electrónico y contraseña."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if "@" in username:
-            matched_user = User.objects.filter(email__iexact=username).first()
-            if matched_user:
-                username = matched_user.username
+        matched_user = User.objects.filter(
+            Q(email__iexact=identificador) | Q(username__iexact=identificador)
+        ).first()
 
+        username = matched_user.username if matched_user else identificador
         user = authenticate(username=username, password=password)
         if not user:
             return Response(
-                {"detail": "Credenciales inválidas. Verifique usuario y contraseña."},
+                {"detail": "Credenciales inválidas. Verifique correo y contraseña."},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 

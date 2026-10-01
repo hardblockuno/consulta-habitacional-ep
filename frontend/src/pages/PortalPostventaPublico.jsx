@@ -37,9 +37,11 @@ export default function PortalPostventaPublico() {
       <header className="border-b border-slate-200/80 bg-white">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3.5 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-900 text-white shadow-2xs">
-              <Building2 size={18} />
-            </div>
+            <img
+              src="/sigep-symbol.png"
+              alt="SIGEP"
+              className="h-9 w-9 object-contain shrink-0"
+            />
             <div>
               <p className="text-[10px] font-medium tracking-wider uppercase text-slate-400">
                 Plan Social · Entidad Patrocinante

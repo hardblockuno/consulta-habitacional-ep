@@ -151,10 +151,12 @@ export default function Layout({ children }) {
       <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-slate-200/80 bg-white px-4 py-5 overflow-y-auto xl:flex xl:flex-col xl:justify-between">
         <div>
           {/* Logo / Encabezado */}
-          <div className="flex items-center gap-3 pb-5 border-b border-slate-100">
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-900 text-white shadow-2xs">
-              <Building2 size={18} />
-            </div>
+          <div className="flex items-center gap-2.5 pb-5 border-b border-slate-100">
+            <img
+              src="/sigep-symbol.png"
+              alt="SIGEP"
+              className="h-9 w-9 object-contain shrink-0"
+            />
             <div>
               <h1 className="text-sm font-semibold tracking-tight text-slate-900 leading-tight">SIGEP</h1>
               <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
@@ -217,9 +219,11 @@ export default function Layout({ children }) {
             <div>
               <div className="flex items-center justify-between pb-4 border-b border-slate-100">
                 <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-900 text-white shadow-2xs">
-                    <Building2 size={16} />
-                  </div>
+                  <img
+                    src="/sigep-symbol.png"
+                    alt="SIGEP"
+                    className="h-8 w-8 object-contain shrink-0"
+                  />
                   <div>
                     <h1 className="text-xs font-semibold text-slate-900 leading-tight">SIGEP</h1>
                     <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Plan Social</p>
@@ -297,9 +301,11 @@ export default function Layout({ children }) {
                 <Menu size={16} />
               </button>
               <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-900 text-white">
-                  <Building2 size={14} />
-                </div>
+                <img
+                  src="/sigep-symbol.png"
+                  alt="SIGEP"
+                  className="h-7 w-7 object-contain shrink-0"
+                />
                 <div>
                   <h1 className="text-xs font-semibold text-slate-900 leading-tight">SIGEP</h1>
                   <p className="text-[9px] font-medium uppercase text-slate-400">Plan Social</p>
