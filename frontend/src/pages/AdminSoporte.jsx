@@ -317,8 +317,8 @@ export default function AdminSoporte() {
 
       {/* Modal / Formulario para Crear Usuario */}
       {mostrarCrear && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-lg">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-xs overflow-y-auto">
+          <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-lg border border-slate-200 bg-white p-5 shadow-lg my-6">
             <h2 className="text-xs font-semibold text-slate-900 mb-3">Registrar Nuevo Usuario</h2>
             <form onSubmit={handleCrearUsuario} className="space-y-3">
               <div>
@@ -421,8 +421,8 @@ export default function AdminSoporte() {
 
       {/* Modal para Resetear Contraseña */}
       {resetId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-5 shadow-lg">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-xs overflow-y-auto">
+          <div className="w-full max-w-sm max-h-[90vh] overflow-y-auto rounded-lg border border-slate-200 bg-white p-5 shadow-lg my-6">
             <h2 className="text-xs font-semibold text-slate-900 mb-2">Resetear Contraseña</h2>
             <form onSubmit={handleResetPassword} className="space-y-3">
               <div>

@@ -298,7 +298,7 @@ function FormularioPublico() {
         <input
           type="file"
           accept="image/*"
-          onChange={(e) => setFoto(e.target.files[0] || null)}
+          onChange={(e) => setFoto(e.target.files?.[0] || null)}
           className="mt-1 block w-full text-xs text-slate-500 file:mr-3 file:rounded-md file:border file:border-slate-200 file:bg-slate-50 file:px-3 file:py-1 file:text-xs file:font-medium file:text-slate-700 hover:file:bg-slate-100 cursor-pointer"
         />
       </div>

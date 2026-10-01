@@ -6,15 +6,17 @@ import {
   HardHat,
   LineChart,
   LogOut,
+  Menu,
   PiggyBank,
   ScanLine,
-  ShieldAlert,
   ShieldCheck,
   User,
   Users,
   Wrench,
+  X,
 } from "lucide-react";
-import { NavLink, Outlet } from "react-router-dom";
+import { useState } from "react";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 
 function getNavSectionsForUser(user) {
@@ -139,6 +141,7 @@ const rolePills = {
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
+  const [mobileOpen, setMobileOpen] = useState(false);
   const navSections = getNavSectionsForUser(user);
   const pill = rolePills[user?.rol] || { label: "Profesional", dot: "bg-slate-400" };
 
@@ -203,18 +206,104 @@ export default function Layout({ children }) {
         </div>
       </aside>
 
+      {/* Drawer móvil con Backdrop */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 xl:hidden">
+          <div
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity"
+            onClick={() => setMobileOpen(false)}
+          />
+          <aside className="fixed inset-y-0 left-0 w-72 max-w-[85vw] bg-white p-5 border-r border-slate-200/80 shadow-2xl flex flex-col justify-between overflow-y-auto">
+            <div>
+              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-900 text-white shadow-2xs">
+                    <Building2 size={16} />
+                  </div>
+                  <div>
+                    <h1 className="text-xs font-semibold text-slate-900 leading-tight">SIGEP</h1>
+                    <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Plan Social</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50"
+                  aria-label="Cerrar menú"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              <nav className="mt-4 space-y-4">
+                {navSections.map((section) => (
+                  <div key={section.title} className="space-y-1">
+                    <p className="px-2.5 text-[10px] font-medium tracking-wider text-slate-400 uppercase">
+                      {section.title}
+                    </p>
+                    <div className="space-y-0.5">
+                      {section.items.map((item) => (
+                        <NavItem
+                          key={item.to}
+                          item={item}
+                          onClick={() => setMobileOpen(false)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </nav>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0 pr-2">
+                  <p className="text-xs font-semibold text-slate-900 truncate">
+                    {user?.nombre_completo || user?.username || "Usuario"}
+                  </p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className={`h-1.5 w-1.5 rounded-full ${pill.dot}`} />
+                    <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider truncate">
+                      {pill.label}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={logout}
+                  title="Cerrar sesión"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 shadow-2xs"
+                >
+                  <LogOut size={13} />
+                </button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      )}
+
       {/* Contenido principal */}
       <div className="xl:pl-64">
         {/* Header responsive para móvil y tablet */}
         <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/95 px-4 py-3 backdrop-blur xl:hidden shadow-2xs">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-900 text-white">
-                <Building2 size={16} />
-              </div>
-              <div>
-                <h1 className="text-xs font-semibold text-slate-900 leading-tight">SIGEP</h1>
-                <p className="text-[10px] font-medium uppercase text-slate-400">Plan Social</p>
+              <button
+                type="button"
+                onClick={() => setMobileOpen(true)}
+                className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50 transition shadow-2xs"
+                aria-label="Abrir menú"
+              >
+                <Menu size={16} />
+              </button>
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-900 text-white">
+                  <Building2 size={14} />
+                </div>
+                <div>
+                  <h1 className="text-xs font-semibold text-slate-900 leading-tight">SIGEP</h1>
+                  <p className="text-[9px] font-medium uppercase text-slate-400">Plan Social</p>
+                </div>
               </div>
             </div>
 
@@ -234,14 +323,14 @@ export default function Layout({ children }) {
             </div>
           </div>
 
-          <nav className="mt-3 flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          <nav className="mt-2.5 flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
             {navSections.flatMap((s) => s.items).map((item) => (
               <NavItem key={item.to} item={item} compact />
             ))}
           </nav>
         </header>
 
-        <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <main className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
           {children || <Outlet />}
         </main>
       </div>
@@ -249,11 +338,12 @@ export default function Layout({ children }) {
   );
 }
 
-function NavItem({ item, compact = false }) {
+function NavItem({ item, compact = false, onClick }) {
   const Icon = item.icon;
   return (
     <NavLink
       to={item.to}
+      onClick={onClick}
       className={({ isActive }) =>
         [
           "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors",
