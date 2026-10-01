@@ -18,6 +18,7 @@ from .views import (
     SistemaDiagnosticoAPIView,
     TicketPostventaViewSet,
     UsuariosGestionViewSet,
+    SugerenciaFeedbackViewSet,
 )
 
 router = DefaultRouter()
@@ -25,6 +26,7 @@ router.register("personas", PersonaViewSet, basename="personas")
 router.register("alertas", AlertaViewSet, basename="alertas")
 router.register("postventa/tickets", TicketPostventaViewSet, basename="postventa-tickets")
 router.register("auth/usuarios", UsuariosGestionViewSet, basename="auth-usuarios")
+router.register("feedback", SugerenciaFeedbackViewSet, basename="feedback")
 
 urlpatterns = [
     path("", include(router.urls)),

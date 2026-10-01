@@ -10,6 +10,7 @@ from .models import (
     ImportacionExcel,
     PerfilUsuario,
     TicketPostventa,
+    SugerenciaFeedback,
     Observacion,
     Persona,
     Postulacion,
@@ -360,3 +361,40 @@ class UsuarioRegistroSerializer(serializers.Serializer):
         perfil.save()
 
         return perfil
+
+
+class SugerenciaFeedbackSerializer(serializers.ModelSerializer):
+    tipo_display = serializers.CharField(source="get_tipo_display", read_only=True)
+    estado_display = serializers.CharField(source="get_estado_display", read_only=True)
+    autor_username = serializers.CharField(source="usuario.username", read_only=True)
+
+    class Meta:
+        model = SugerenciaFeedback
+        fields = [
+            "id",
+            "usuario",
+            "autor_username",
+            "nombre_autor",
+            "correo_autor",
+            "rol_autor",
+            "modulo",
+            "ruta",
+            "tipo",
+            "tipo_display",
+            "mensaje",
+            "estado",
+            "estado_display",
+            "respuesta_soporte",
+            "creado_en",
+            "actualizado_en",
+        ]
+        read_only_fields = [
+            "id",
+            "usuario",
+            "autor_username",
+            "nombre_autor",
+            "correo_autor",
+            "rol_autor",
+            "creado_en",
+            "actualizado_en",
+        ]

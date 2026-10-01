@@ -514,3 +514,35 @@ class RolesYAutenticacionTests(TestCase):
         self.assertEqual(resp.status_code, 400)
         self.assertIn("rol", resp.data)
 
+    def test_envio_y_gestion_sugerencia_feedback(self):
+        # Crear usuario normal
+        reg_resp = self.client.post(
+            "/api/auth/registro/",
+            {
+                "email": "profesional@plansocial.cl",
+                "password": "Password123!",
+                "nombre_completo": "Profesional Demanda",
+                "rol": "social",
+            },
+            content_type="application/json",
+        )
+        token = reg_resp.data["token"]
+
+        # Enviar sugerencia desde el panel de demanda
+        sug_resp = self.client.post(
+            "/api/feedback/",
+            {
+                "modulo": "Organización de la Demanda",
+                "ruta": "/demanda",
+                "tipo": "mejora",
+                "mensaje": "Sería útil poder filtrar por porcentaje de vulnerabilidad directo en la tabla.",
+            },
+            HTTP_AUTHORIZATION=f"Token {token}",
+            content_type="application/json",
+        )
+        self.assertEqual(sug_resp.status_code, 201)
+        self.assertEqual(sug_resp.data["modulo"], "Organización de la Demanda")
+        self.assertEqual(sug_resp.data["estado"], "pendiente")
+        self.assertEqual(sug_resp.data["nombre_autor"], "Profesional Demanda")
+
+

@@ -18,6 +18,7 @@ import {
 import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
+import BotonSugerencia from "./BotonSugerencia.jsx";
 
 function getNavSectionsForUser(user) {
   if (!user) return [];
@@ -339,6 +340,9 @@ export default function Layout({ children }) {
         <main className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
           {children || <Outlet />}
         </main>
+
+        {/* Flotante de sugerencias permanente para desarrollo */}
+        <BotonSugerencia />
       </div>
     </div>
   );

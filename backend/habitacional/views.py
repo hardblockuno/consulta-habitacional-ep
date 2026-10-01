@@ -19,6 +19,7 @@ from .models import (
     PerfilUsuario,
     Persona,
     TicketPostventa,
+    SugerenciaFeedback,
 )
 from .serializers import (
     AlertaSerializer,
@@ -28,6 +29,7 @@ from .serializers import (
     PersonaListSerializer,
     TicketPostventaSerializer,
     UsuarioRegistroSerializer,
+    SugerenciaFeedbackSerializer,
 )
 from .services.excel_importer import (
     ImportacionError,
@@ -730,4 +732,41 @@ class DashboardCoordinacionAPIView(APIView):
             },
             "comites": resumen_gral.get("comites_resumen", []),
         })
+
+
+class SugerenciaFeedbackViewSet(viewsets.ModelViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = SugerenciaFeedback.objects.all().order_by("-creado_en")
+    serializer_class = SugerenciaFeedbackSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        perfil = getattr(user, "perfil", None)
+        if user.is_superuser or (perfil and perfil.rol == PerfilUsuario.ROL_ADMIN):
+            return SugerenciaFeedback.objects.all().order_by("-creado_en")
+        return SugerenciaFeedback.objects.filter(usuario=user).order_by("-creado_en")
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        perfil = getattr(user, "perfil", None)
+        nombre = perfil.nombre_completo if perfil else (user.get_full_name() or user.username)
+        rol = perfil.get_rol_display() if perfil else "Usuario"
+        serializer.save(
+            usuario=user,
+            nombre_autor=nombre,
+            correo_autor=user.email or "",
+            rol_autor=rol,
+        )
+
+    @action(detail=True, methods=["patch"], permission_classes=[IsAdminOrDev])
+    def resolver(self, request, pk=None):
+        sugerencia = self.get_object()
+        estado = request.data.get("estado")
+        respuesta = request.data.get("respuesta_soporte")
+        if estado:
+            sugerencia.estado = estado
+        if respuesta is not None:
+            sugerencia.respuesta_soporte = str(respuesta).strip()
+        sugerencia.save()
+        return Response(SugerenciaFeedbackSerializer(sugerencia).data)
 

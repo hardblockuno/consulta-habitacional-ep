@@ -12,6 +12,8 @@ import {
   UserPlus,
   Users,
   XCircle,
+  MessageSquarePlus,
+  Clock,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../api/client.js";
@@ -22,6 +24,7 @@ import { ErrorState, LoadingState } from "../components/StateViews.jsx";
 export default function AdminSoporte() {
   const [diagnostico, setDiagnostico] = useState(null);
   const [usuarios, setUsuarios] = useState([]);
+  const [sugerencias, setSugerencias] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [guardandoUsuarioId, setGuardandoUsuarioId] = useState(null);
@@ -43,10 +46,15 @@ export default function AdminSoporte() {
 
   function cargarDatos() {
     setLoading(true);
-    Promise.all([api.get("/auth/diagnostico/"), api.get("/auth/usuarios/")])
-      .then(([diagRes, usersRes]) => {
+    Promise.all([
+      api.get("/auth/diagnostico/"),
+      api.get("/auth/usuarios/"),
+      api.get("/feedback/"),
+    ])
+      .then(([diagRes, usersRes, sugRes]) => {
         setDiagnostico(diagRes.data);
         setUsuarios(usersRes.data?.results || usersRes.data || []);
+        setSugerencias(sugRes.data?.results || sugRes.data || []);
         setError("");
       })
       .catch(() => {
@@ -126,6 +134,18 @@ export default function AdminSoporte() {
       cargarDatos();
     } catch (err) {
       alert("Error al crear usuario. Verifica que el correo institucional sea válido y no esté registrado.");
+    }
+  }
+
+  async function handleResolverSugerencia(id, nuevoEstado) {
+    try {
+      await api.patch(`/feedback/${id}/resolver/`, { estado: nuevoEstado });
+      setSugerencias((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, estado: nuevoEstado } : s))
+      );
+      mostrarFeedback("Estado de sugerencia actualizado.");
+    } catch {
+      alert("No fue posible actualizar la sugerencia.");
     }
   }
 
@@ -323,6 +343,87 @@ export default function AdminSoporte() {
             </tbody>
           </table>
         </div>
+      </Section>
+
+      {/* Buzón de Sugerencias y Experiencias de Usuario */}
+      <Section title="Buzón de Sugerencias y Experiencias de Usuario">
+        {sugerencias.length === 0 ? (
+          <p className="text-xs text-slate-500 py-3 text-center">
+            No hay sugerencias registradas aún por los profesionales del equipo.
+          </p>
+        ) : (
+          <div className="overflow-x-auto -mx-4 -mb-4">
+            <table className="min-w-full divide-y divide-slate-100 text-xs">
+              <thead className="bg-slate-50/60 text-left text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                <tr>
+                  <th className="px-4 py-2">Módulo / Ruta</th>
+                  <th className="px-4 py-2">Autor</th>
+                  <th className="px-4 py-2">Tipo</th>
+                  <th className="px-4 py-2">Propuesta / Sugerencia</th>
+                  <th className="px-4 py-2 text-center">Estado</th>
+                  <th className="px-4 py-2 text-right">Acción</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {sugerencias.map((s) => (
+                  <tr key={s.id} className="hover:bg-slate-50/50 transition">
+                    <td className="px-4 py-2.5 font-medium text-slate-900">
+                      <div>{s.modulo}</div>
+                      <div className="font-mono text-[10px] text-slate-400">{s.ruta}</div>
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-800">
+                      <div>{s.nombre_autor || s.autor_username || "Usuario"}</div>
+                      <div className="text-[10px] text-slate-400">
+                        {s.rol_autor} · {s.correo_autor}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span className="inline-flex rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-700">
+                        {s.tipo_display || s.tipo}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-700 max-w-xs break-words">
+                      {s.mensaje}
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                          s.estado === "implementado"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : s.estado === "revisado"
+                            ? "bg-amber-50 text-amber-700 border border-amber-200"
+                            : "bg-slate-100 text-slate-700 border border-slate-200"
+                        }`}
+                      >
+                        {s.estado_display || s.estado}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-right space-x-1 whitespace-nowrap">
+                      {s.estado !== "revisado" && s.estado !== "implementado" && (
+                        <button
+                          type="button"
+                          onClick={() => handleResolverSugerencia(s.id, "revisado")}
+                          className="rounded border border-slate-200 bg-white px-2 py-1 text-[10px] font-medium text-slate-700 hover:bg-slate-50 shadow-2xs"
+                        >
+                          En Revisión
+                        </button>
+                      )}
+                      {s.estado !== "implementado" && (
+                        <button
+                          type="button"
+                          onClick={() => handleResolverSugerencia(s.id, "implementado")}
+                          className="rounded bg-slate-900 px-2 py-1 text-[10px] font-medium text-white hover:bg-slate-800 shadow-2xs"
+                        >
+                          Implementada
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Section>
 
       {/* Modal / Formulario para Crear Usuario */}

@@ -405,3 +405,50 @@ def asegurar_perfil_usuario(sender, instance, created, **kwargs):
                 "nombre_completo": instance.get_full_name() or instance.username,
             },
         )
+
+
+class SugerenciaFeedback(TimeStampedModel):
+    TIPO_MEJORA = "mejora"
+    TIPO_PROBLEMA = "problema"
+    TIPO_IDEA = "idea"
+    TIPO_CHOICES = [
+        (TIPO_MEJORA, "Sugerencia de Mejora"),
+        (TIPO_PROBLEMA, "Reporte de Problema / Observación"),
+        (TIPO_IDEA, "Nueva Funcionalidad"),
+    ]
+
+    ESTADO_PENDIENTE = "pendiente"
+    ESTADO_REVISADO = "revisado"
+    ESTADO_IMPLEMENTADO = "implementado"
+    ESTADO_DESCARTADO = "descartado"
+    ESTADO_CHOICES = [
+        (ESTADO_PENDIENTE, "Pendiente"),
+        (ESTADO_REVISADO, "En Revisión"),
+        (ESTADO_IMPLEMENTADO, "Implementada"),
+        (ESTADO_DESCARTADO, "Descartada"),
+    ]
+
+    usuario = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sugerencias",
+    )
+    nombre_autor = models.CharField(max_length=255, blank=True)
+    correo_autor = models.EmailField(blank=True)
+    rol_autor = models.CharField(max_length=50, blank=True)
+
+    modulo = models.CharField(max_length=150)
+    ruta = models.CharField(max_length=255, blank=True)
+    tipo = models.CharField(max_length=30, choices=TIPO_CHOICES, default=TIPO_MEJORA)
+    mensaje = models.TextField()
+    estado = models.CharField(max_length=30, choices=ESTADO_CHOICES, default=ESTADO_PENDIENTE)
+    respuesta_soporte = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-creado_en"]
+
+    def __str__(self):
+        return f"[{self.modulo}] {self.get_tipo_display()} - {self.nombre_autor or 'Anónimo'}"
+
