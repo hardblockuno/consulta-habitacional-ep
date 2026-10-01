@@ -25,7 +25,7 @@ export default function Reportes() {
   return (
     <div className="space-y-5">
       <div>
-        <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Plan Social · Consolidado</p>
+        <p className="text-xs font-medium uppercase tracking-wider text-slate-400">SIGEP · Reportes y Auditoría</p>
         <h1 className="text-lg font-semibold text-slate-900 tracking-tight">Reportes y Auditoría</h1>
       </div>
 

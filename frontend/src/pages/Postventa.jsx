@@ -108,6 +108,16 @@ function BandejaEP() {
 
   return (
     <div className="space-y-5">
+      {/* Encabezado */}
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
+          SIGEP · Área Técnica
+        </p>
+        <h1 className="text-lg font-semibold tracking-tight text-slate-900">
+          Gestión de Postventa Habitacional
+        </h1>
+      </div>
+
       {/* Tarjetas de Métricas - Estilo Linear */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-lg border border-slate-200/90 bg-white p-3.5 shadow-2xs">

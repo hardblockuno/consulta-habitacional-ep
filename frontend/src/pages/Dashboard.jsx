@@ -64,7 +64,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Plan Social · Panel Operativo</p>
+        <p className="text-xs font-medium uppercase tracking-wider text-slate-400">SIGEP · Área Social</p>
         <h1 className="text-lg font-semibold text-slate-900 tracking-tight">Resumen General</h1>
       </div>
 

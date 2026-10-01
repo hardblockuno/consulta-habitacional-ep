@@ -35,7 +35,7 @@ export default function Alertas() {
   return (
     <div className="space-y-4">
       <div>
-        <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Plan Social · Monitoreo</p>
+        <p className="text-xs font-medium uppercase tracking-wider text-slate-400">SIGEP · Monitoreo y Alertas</p>
         <h1 className="text-lg font-semibold text-slate-900 tracking-tight">Alertas Normativas</h1>
       </div>
 

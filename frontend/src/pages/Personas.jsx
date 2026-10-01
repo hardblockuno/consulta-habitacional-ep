@@ -57,9 +57,9 @@ export default function Personas() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Padrón Social</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-slate-400">SIGEP · Área Social</p>
           <h1 className="mt-0.5 text-lg font-semibold tracking-tight text-slate-900">
-            {comite ? `Padrón de socios: ${comite}` : "Buscar persona en padrón"}
+            {comite ? `Padrón de socios: ${comite}` : "Padrón de Familias y Postulantes"}
           </h1>
           {comite && (
             <div className="mt-1.5 flex items-center gap-2">

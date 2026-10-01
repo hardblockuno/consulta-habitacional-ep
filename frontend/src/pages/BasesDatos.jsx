@@ -28,7 +28,7 @@ export default function BasesDatos() {
         <div>
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-medium tracking-wider uppercase text-slate-400">
-              Área Social
+              SIGEP · Área Social
             </span>
             <span className="text-slate-300">·</span>
             <span className="text-[11px] font-medium text-slate-500">Gestión de nóminas</span>

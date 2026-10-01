@@ -1,7 +1,6 @@
 import {
   AlertTriangle,
   ArrowRight,
-  Bot,
   CheckCircle2,
   FileCheck,
   FileSearch,
@@ -48,8 +47,8 @@ export default function ExtraerRukan() {
       const res = await api.get("/rukan/ia-estado/");
       setEstadoMotor({
         disponible: res.data?.disponible ?? true,
-        proveedor: res.data?.provider || "Tesseract / IA",
-        mensaje: res.data?.mensaje || "Motor de extracción OCR / IA listo",
+        proveedor: res.data?.provider || "Motor OCR RUKAN",
+        mensaje: res.data?.mensaje || "Servicio de extracción documental listo",
       });
     } catch {
       setEstadoMotor({
@@ -120,7 +119,7 @@ export default function ExtraerRukan() {
         <div>
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-medium tracking-wider uppercase text-slate-400">
-              Área Social
+              SIGEP · Área Social
             </span>
             <span className="text-slate-300">·</span>
             <span className="text-[11px] font-medium text-slate-500">Integración MINVU / SERVIU</span>

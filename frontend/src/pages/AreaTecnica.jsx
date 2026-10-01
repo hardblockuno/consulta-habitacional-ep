@@ -82,7 +82,7 @@ export default function AreaTecnica() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Plan Social · Área Técnica</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-slate-400">SIGEP · Área Técnica</p>
           <h1 className="text-lg font-semibold text-slate-900 tracking-tight">Proyectos y Terrenos</h1>
         </div>
 
