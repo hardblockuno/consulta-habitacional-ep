@@ -1,4 +1,7 @@
+from django.contrib.auth.models import User
 from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.utils import timezone
 
 
@@ -358,3 +361,47 @@ class TicketPostventa(TimeStampedModel):
         elif self.estado != self.ESTADO_RESUELTA:
             self.fecha_resolucion = None
         super().save(*args, **kwargs)
+
+
+class PerfilUsuario(TimeStampedModel):
+    ROL_ADMIN = "admin"
+    ROL_COORDINADOR = "coordinador"
+    ROL_SOCIAL = "social"
+    ROL_TECNICO = "tecnico"
+    ROL_CHOICES = [
+        (ROL_ADMIN, "Administrador / Soporte"),
+        (ROL_COORDINADOR, "Coordinador General / Gerencia"),
+        (ROL_SOCIAL, "Profesional Área Social"),
+        (ROL_TECNICO, "Profesional Área Técnica"),
+    ]
+
+    usuario = models.OneToOneField(User, on_delete=models.CASCADE, related_name="perfil")
+    rol = models.CharField(
+        max_length=20,
+        choices=ROL_CHOICES,
+        default=ROL_SOCIAL,
+        db_index=True,
+    )
+    nombre_completo = models.CharField(max_length=255, blank=True)
+    cargo = models.CharField(max_length=150, blank=True)
+    telefono = models.CharField(max_length=40, blank=True)
+    activo = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["usuario__username"]
+
+    def __str__(self):
+        return f"{self.usuario.username} ({self.get_rol_display()})"
+
+
+@receiver(post_save, sender=User)
+def asegurar_perfil_usuario(sender, instance, created, **kwargs):
+    if created:
+        rol = PerfilUsuario.ROL_ADMIN if instance.is_superuser else PerfilUsuario.ROL_SOCIAL
+        PerfilUsuario.objects.get_or_create(
+            usuario=instance,
+            defaults={
+                "rol": rol,
+                "nombre_completo": instance.get_full_name() or instance.username,
+            },
+        )

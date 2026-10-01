@@ -1,19 +1,33 @@
 from decimal import Decimal, InvalidOperation
 
+from django.contrib.auth import authenticate
+from django.contrib.auth.models import User
 from django.db.models import Avg, Count, Q
 from django.utils import timezone
-from rest_framework import mixins, parsers, status, viewsets
+from rest_framework import mixins, parsers, permissions, status, viewsets
+from rest_framework.authtoken.models import Token
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Ahorro, Alerta, Comite, Documento, ImportacionExcel, Persona, TicketPostventa
+from .models import (
+    Ahorro,
+    Alerta,
+    Comite,
+    Documento,
+    ImportacionExcel,
+    PerfilUsuario,
+    Persona,
+    TicketPostventa,
+)
 from .serializers import (
     AlertaSerializer,
     ImportacionExcelSerializer,
+    PerfilUsuarioSerializer,
     PersonaDetailSerializer,
     PersonaListSerializer,
     TicketPostventaSerializer,
+    UsuarioRegistroSerializer,
 )
 from .services.excel_importer import (
     ImportacionError,
@@ -485,3 +499,230 @@ class TicketPostventaViewSet(viewsets.ModelViewSet):
             "resueltas": resueltas,
             "urgentes": urgentes,
         })
+
+
+class RegistroAPIView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = UsuarioRegistroSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        perfil = serializer.save()
+        token, _ = Token.objects.get_or_create(user=perfil.usuario)
+        return Response(
+            {
+                "token": token.key,
+                "usuario": PerfilUsuarioSerializer(perfil).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class LoginAPIView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        username = str(request.data.get("username", "")).strip()
+        password = str(request.data.get("password", "")).strip()
+
+        if not username or not password:
+            return Response(
+                {"detail": "Debe ingresar usuario o correo y contraseña."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if "@" in username:
+            matched_user = User.objects.filter(email__iexact=username).first()
+            if matched_user:
+                username = matched_user.username
+
+        user = authenticate(username=username, password=password)
+        if not user:
+            return Response(
+                {"detail": "Credenciales inválidas. Verifique usuario y contraseña."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        if not user.is_active:
+            return Response(
+                {"detail": "La cuenta se encuentra inactiva. Contacte al administrador."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        perfil, _ = PerfilUsuario.objects.get_or_create(
+            usuario=user,
+            defaults={
+                "rol": PerfilUsuario.ROL_ADMIN if user.is_superuser else PerfilUsuario.ROL_SOCIAL,
+                "nombre_completo": user.get_full_name() or user.username,
+            },
+        )
+
+        if not perfil.activo:
+            return Response(
+                {"detail": "El perfil de usuario se encuentra suspendido."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        token, _ = Token.objects.get_or_create(user=user)
+        return Response({
+            "token": token.key,
+            "usuario": PerfilUsuarioSerializer(perfil).data,
+        })
+
+
+class PerfilAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        perfil, _ = PerfilUsuario.objects.get_or_create(
+            usuario=request.user,
+            defaults={
+                "rol": PerfilUsuario.ROL_ADMIN if request.user.is_superuser else PerfilUsuario.ROL_SOCIAL,
+                "nombre_completo": request.user.get_full_name() or request.user.username,
+            },
+        )
+        return Response(PerfilUsuarioSerializer(perfil).data)
+
+
+class LogoutAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        Token.objects.filter(user=request.user).delete()
+        return Response({"detail": "Sesión cerrada correctamente."})
+
+
+class IsAdminOrDev(permissions.BasePermission):
+    def has_permission(self, request, view):
+        if not (request.user and request.user.is_authenticated):
+            return False
+        if request.user.is_superuser:
+            return True
+        perfil = getattr(request.user, "perfil", None)
+        return bool(perfil and perfil.rol == PerfilUsuario.ROL_ADMIN)
+
+
+class UsuariosGestionViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAdminOrDev]
+    queryset = PerfilUsuario.objects.select_related("usuario").all().order_by("-creado_en")
+    serializer_class = PerfilUsuarioSerializer
+
+    def update(self, request, *args, **kwargs):
+        perfil = self.get_object()
+        rol = request.data.get("rol")
+        activo = request.data.get("activo")
+        cargo = request.data.get("cargo")
+        telefono = request.data.get("telefono")
+        nombre_completo = request.data.get("nombre_completo")
+
+        if rol in dict(PerfilUsuario.ROL_CHOICES):
+            perfil.rol = rol
+        if activo is not None:
+            perfil.activo = bool(activo)
+            perfil.usuario.is_active = bool(activo)
+            perfil.usuario.save(update_fields=["is_active"])
+        if cargo is not None:
+            perfil.cargo = str(cargo).strip()
+        if telefono is not None:
+            perfil.telefono = str(telefono).strip()
+        if nombre_completo is not None:
+            perfil.nombre_completo = str(nombre_completo).strip()
+            perfil.usuario.first_name = perfil.nombre_completo
+            perfil.usuario.save(update_fields=["first_name"])
+
+        perfil.save()
+        return Response(PerfilUsuarioSerializer(perfil).data)
+
+    @action(detail=True, methods=["post"])
+    def reset_password(self, request, pk=None):
+        perfil = self.get_object()
+        nueva_password = request.data.get("nueva_password", "").strip()
+        if len(nueva_password) < 6:
+            return Response(
+                {"detail": "La nueva contraseña debe tener al menos 6 caracteres."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        perfil.usuario.set_password(nueva_password)
+        perfil.usuario.save()
+        Token.objects.filter(user=perfil.usuario).delete()
+        return Response({"detail": f"Contraseña actualizada para {perfil.usuario.username}."})
+
+
+class SistemaDiagnosticoAPIView(APIView):
+    permission_classes = [IsAdminOrDev]
+
+    def get(self, request):
+        from django.conf import settings
+        import sys
+
+        ocr_status = {}
+        try:
+            ocr_status = rukan_ai_status()
+        except Exception as exc:
+            ocr_status = {"disponible": False, "error": str(exc)}
+
+        total_usuarios = User.objects.count()
+        usuarios_por_rol = list(
+            PerfilUsuario.objects.values("rol")
+            .annotate(total=Count("id"))
+            .order_by("rol")
+        )
+
+        db_engine = settings.DATABASES["default"]["ENGINE"].split(".")[-1]
+
+        return Response({
+            "sistema": {
+                "plataforma": "Plan Social · Sistema EP",
+                "version": "1.2.0",
+                "python": sys.version.split()[0],
+                "base_datos": db_engine,
+                "debug_activo": settings.DEBUG,
+                "timezone": settings.TIME_ZONE,
+                "servidor_tiempo": timezone.now().isoformat(),
+            },
+            "estadisticas_globales": {
+                "total_comites": Comite.objects.count(),
+                "total_personas": Persona.objects.count(),
+                "total_documentos": Documento.objects.count(),
+                "total_alertas_activas": Alerta.objects.filter(activa=True).count(),
+                "total_tickets_postventa": TicketPostventa.objects.count(),
+                "total_usuarios": total_usuarios,
+                "usuarios_por_rol": usuarios_por_rol,
+            },
+            "motor_ocr_rukan": ocr_status,
+        })
+
+
+class DashboardCoordinacionAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        resumen_gral = dashboard_resumen_data()
+        tickets_resumen = {
+            "total": TicketPostventa.objects.count(),
+            "recibidas": TicketPostventa.objects.filter(estado=TicketPostventa.ESTADO_RECIBIDA).count(),
+            "en_gestion": TicketPostventa.objects.filter(estado=TicketPostventa.ESTADO_EN_GESTION).count(),
+            "resueltas": TicketPostventa.objects.filter(estado=TicketPostventa.ESTADO_RESUELTA).count(),
+            "urgentes": TicketPostventa.objects.filter(urgencia=TicketPostventa.URGENCIA_URGENTE).count(),
+        }
+
+        total_ahorro = Ahorro.objects.aggregate(total=Avg("monto_actual"))["total"] or Decimal("0")
+
+        return Response({
+            "general": resumen_gral,
+            "postventa": tickets_resumen,
+            "metricas_ejecutivas": {
+                "comites_activos": Comite.objects.filter(activo=True).count(),
+                "total_familias": resumen_gral["total_personas"],
+                "familias_aptas": resumen_gral["personas_aptas"],
+                "porcentaje_aptos": round((resumen_gral["personas_aptas"] / resumen_gral["total_personas"] * 100), 1) if resumen_gral["total_personas"] > 0 else 0,
+                "observadas": resumen_gral["observadas"],
+                "bloqueadas": resumen_gral["bloqueadas"],
+                "alertas_criticas": resumen_gral["alertas_criticas"],
+                "ahorro_insuficiente": resumen_gral["ahorro_insuficiente"],
+            },
+            "comites": resumen_gral.get("comites_resumen", []),
+        })
+

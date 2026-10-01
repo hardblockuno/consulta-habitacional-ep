@@ -442,3 +442,61 @@ class ImportadorExcelTests(TestCase):
                 impacta_estado=False,
             ).exists()
         )
+
+
+class RolesYAutenticacionTests(TestCase):
+    def test_registro_usuario_con_rol(self):
+        resp = self.client.post(
+            "/api/auth/registro/",
+            {
+                "username": "tecnico.juan",
+                "email": "juan@plansocial.cl",
+                "password": "Password123!",
+                "nombre_completo": "Juan Pérez",
+                "rol": "tecnico",
+                "cargo": "Arquitecto Inspector",
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 201)
+        self.assertIn("token", resp.data)
+        self.assertEqual(resp.data["usuario"]["rol"], "tecnico")
+        self.assertEqual(resp.data["usuario"]["nombre_completo"], "Juan Pérez")
+
+    def test_login_y_perfil_usuario(self):
+        self.client.post(
+            "/api/auth/registro/",
+            {
+                "username": "social.maria",
+                "email": "maria@plansocial.cl",
+                "password": "Password123!",
+                "nombre_completo": "María González",
+                "rol": "social",
+            },
+            content_type="application/json",
+        )
+
+        login_resp = self.client.post(
+            "/api/auth/login/",
+            {"username": "social.maria", "password": "Password123!"},
+            content_type="application/json",
+        )
+        self.assertEqual(login_resp.status_code, 200)
+        token = login_resp.data["token"]
+
+        perfil_resp = self.client.get(
+            "/api/auth/perfil/",
+            HTTP_AUTHORIZATION=f"Token {token}",
+        )
+        self.assertEqual(perfil_resp.status_code, 200)
+        self.assertEqual(perfil_resp.data["rol"], "social")
+        self.assertFalse(perfil_resp.data["es_admin"])
+
+    def test_login_fallido_credenciales_invalidas(self):
+        resp = self.client.post(
+            "/api/auth/login/",
+            {"username": "inexistente", "password": "wrong"},
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 401)
+

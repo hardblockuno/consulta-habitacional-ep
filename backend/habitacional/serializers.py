@@ -1,3 +1,4 @@
+from django.contrib.auth.models import User
 from rest_framework import serializers
 
 from .models import (
@@ -7,6 +8,7 @@ from .models import (
     Comite,
     Documento,
     ImportacionExcel,
+    PerfilUsuario,
     TicketPostventa,
     Observacion,
     Persona,
@@ -271,3 +273,82 @@ class TicketPostventaSerializer(serializers.ModelSerializer):
             "actualizado_en",
         ]
         read_only_fields = ["id", "codigo", "fecha_resolucion", "creado_en", "actualizado_en"]
+
+
+class PerfilUsuarioSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source="usuario.username", read_only=True)
+    email = serializers.EmailField(source="usuario.email", read_only=True)
+    rol_display = serializers.CharField(source="get_rol_display", read_only=True)
+    es_admin = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PerfilUsuario
+        fields = [
+            "id",
+            "username",
+            "email",
+            "rol",
+            "rol_display",
+            "nombre_completo",
+            "cargo",
+            "telefono",
+            "activo",
+            "es_admin",
+            "creado_en",
+        ]
+
+    def get_es_admin(self, obj):
+        return obj.rol == PerfilUsuario.ROL_ADMIN or obj.usuario.is_superuser
+
+
+class UsuarioRegistroSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=150)
+    email = serializers.EmailField(required=False, allow_blank=True)
+    password = serializers.CharField(write_only=True, min_length=6)
+    nombre_completo = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    rol = serializers.ChoiceField(
+        choices=PerfilUsuario.ROL_CHOICES,
+        default=PerfilUsuario.ROL_SOCIAL,
+    )
+    cargo = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    telefono = serializers.CharField(max_length=40, required=False, allow_blank=True)
+
+    def validate_username(self, value):
+        val = value.strip().lower()
+        if User.objects.filter(username__iexact=val).exists():
+            raise serializers.ValidationError("Este nombre de usuario ya está registrado.")
+        return val
+
+    def validate_email(self, value):
+        if value:
+            val = value.strip().lower()
+            if User.objects.filter(email__iexact=val).exists():
+                raise serializers.ValidationError("Este correo ya está en uso por otra cuenta.")
+            return val
+        return ""
+
+    def create(self, validated_data):
+        username = validated_data["username"]
+        email = validated_data.get("email", "")
+        password = validated_data["password"]
+        nombre_completo = validated_data.get("nombre_completo", "")
+        rol = validated_data.get("rol", PerfilUsuario.ROL_SOCIAL)
+        cargo = validated_data.get("cargo", "")
+        telefono = validated_data.get("telefono", "")
+
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password,
+            first_name=nombre_completo,
+        )
+
+        perfil, _ = PerfilUsuario.objects.get_or_create(usuario=user)
+        perfil.rol = rol
+        perfil.nombre_completo = nombre_completo
+        perfil.cargo = cargo
+        perfil.telefono = telefono
+        perfil.activo = True
+        perfil.save()
+
+        return perfil
