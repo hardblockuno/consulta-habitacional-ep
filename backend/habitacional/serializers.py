@@ -19,7 +19,7 @@ from .models import (
 
 
 class ComiteSerializer(serializers.ModelSerializer):
-    total_personas = serializers.IntegerField(read_only=True)
+    total_personas = serializers.IntegerField(read_only=True, default=0)
 
     class Meta:
         model = Comite
@@ -31,6 +31,8 @@ class ComiteSerializer(serializers.ModelSerializer):
             "origen",
             "activo",
             "total_personas",
+            "creado_en",
+            "actualizado_en",
         ]
 
 

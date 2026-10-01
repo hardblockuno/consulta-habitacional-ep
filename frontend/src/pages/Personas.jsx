@@ -78,6 +78,12 @@ export default function Personas() {
               >
                 (Quitar filtro)
               </button>
+              <Link
+                to="/bases-datos?tab=comites"
+                className="text-[11px] font-medium text-slate-500 hover:text-slate-800"
+              >
+                · Gestionar comités
+              </Link>
             </div>
           )}
         </div>

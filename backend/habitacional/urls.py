@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     AlertaViewSet,
+    ComiteViewSet,
     DashboardCoordinacionAPIView,
     DashboardResumenAPIView,
     ImportarExcelAPIView,
@@ -22,6 +23,7 @@ from .views import (
 )
 
 router = DefaultRouter()
+router.register("comites", ComiteViewSet, basename="comites")
 router.register("personas", PersonaViewSet, basename="personas")
 router.register("alertas", AlertaViewSet, basename="alertas")
 router.register("postventa/tickets", TicketPostventaViewSet, basename="postventa-tickets")

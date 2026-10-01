@@ -7,7 +7,7 @@ import pandas as pd
 from django.test import TestCase
 from django.utils import timezone
 
-from .models import Alerta, Documento, ImportacionExcel, Persona
+from .models import Alerta, Comite, Documento, ImportacionExcel, Persona
 from .services.excel_importer import construir_mapa_columnas, importar_excel, importar_observaciones_excel
 
 
@@ -544,5 +544,54 @@ class RolesYAutenticacionTests(TestCase):
         self.assertEqual(sug_resp.data["modulo"], "Organización de la Demanda")
         self.assertEqual(sug_resp.data["estado"], "pendiente")
         self.assertEqual(sug_resp.data["nombre_autor"], "Profesional Demanda")
+
+    def test_comite_list_y_eliminacion_en_cascada(self):
+        # Crear usuario para autenticación
+        reg_resp = self.client.post(
+            "/api/auth/registro/",
+            {
+                "email": "coordinador@plansocial.cl",
+                "password": "Password123!",
+                "nombre_completo": "Coordinador Comités",
+                "rol": "coordinador",
+            },
+            content_type="application/json",
+        )
+        token = reg_resp.data["token"]
+        auth_header = {"HTTP_AUTHORIZATION": f"Token {token}"}
+
+        # Crear comité y personas vinculadas
+        comite = Comite.objects.create(nombre="Comité Los Pinos", comuna="Temuco")
+        p1 = Persona.objects.create(
+            comite=comite,
+            rut="12345678-9",
+            nombre="Juan Perez",
+        )
+        p2 = Persona.objects.create(
+            comite=comite,
+            rut="98765432-1",
+            nombre="Maria Soto",
+        )
+
+        # 1. Verificar listado de comités con conteo de personas
+        list_resp = self.client.get("/api/comites/", **auth_header)
+        self.assertEqual(list_resp.status_code, 200)
+        comite_item = next(
+            (c for c in list_resp.data if c["id"] == comite.id),
+            None,
+        )
+        self.assertIsNotNone(comite_item)
+        self.assertEqual(comite_item["nombre"], "Comité Los Pinos")
+        self.assertEqual(comite_item["total_personas"], 2)
+
+        # 2. Eliminar comité vía API DELETE
+        del_resp = self.client.delete(f"/api/comites/{comite.id}/", **auth_header)
+        self.assertEqual(del_resp.status_code, 200)
+        self.assertEqual(del_resp.data["personas_eliminadas"], 2)
+
+        # 3. Confirmar que el comité y las personas fueron eliminados de la BD
+        self.assertFalse(Comite.objects.filter(id=comite.id).exists())
+        self.assertFalse(Persona.objects.filter(id=p1.id).exists())
+        self.assertFalse(Persona.objects.filter(id=p2.id).exists())
 
 

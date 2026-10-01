@@ -1,24 +1,38 @@
-import { FileSpreadsheet, Search, Upload } from "lucide-react";
+import { Building2, Search, Upload } from "lucide-react";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import GestionComites from "../components/GestionComites.jsx";
 import Importar from "./Importar.jsx";
 import Personas from "./Personas.jsx";
 
 export default function BasesDatos() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = searchParams.get("tab") === "importar" ? "importar" : "personas";
+  const currentTabParam = searchParams.get("tab");
+  const initialTab =
+    currentTabParam === "importar"
+      ? "importar"
+      : currentTabParam === "comites"
+      ? "comites"
+      : "personas";
   const [tab, setTab] = useState(initialTab);
 
   function handleTabChange(nextTab) {
     setTab(nextTab);
     const newParams = new URLSearchParams(searchParams);
-    if (nextTab === "importar") {
-      newParams.set("tab", "importar");
-    } else {
+    if (nextTab === "personas") {
       newParams.delete("tab");
+    } else {
+      newParams.set("tab", nextTab);
     }
     setSearchParams(newParams);
+  }
+
+  function handleFiltrarPorComite(nombreComite) {
+    const newParams = new URLSearchParams();
+    newParams.set("comite", nombreComite);
+    setSearchParams(newParams);
+    setTab("personas");
   }
 
   return (
@@ -50,7 +64,19 @@ export default function BasesDatos() {
             }`}
           >
             <Search size={13} />
-            Padrón de personas
+            Padrón de socios
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTabChange("comites")}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
+              tab === "comites"
+                ? "bg-white text-slate-900 shadow-2xs"
+                : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <Building2 size={13} />
+            Gestión de comités
           </button>
           <button
             type="button"
@@ -67,9 +93,15 @@ export default function BasesDatos() {
         </div>
       </div>
 
-      {/* Contenido según pestaña */}
+      {/* Contenido según pestaña activa */}
       <div>
-        {tab === "personas" ? <Personas /> : <Importar />}
+        {tab === "personas" && <Personas />}
+        {tab === "comites" && (
+          <GestionComites onSelectComite={handleFiltrarPorComite} />
+        )}
+        {tab === "importar" && (
+          <Importar onVerPadron={handleFiltrarPorComite} />
+        )}
       </div>
     </div>
   );

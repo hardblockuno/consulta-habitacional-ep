@@ -2,6 +2,7 @@ from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.db import transaction
 from django.db.models import Avg, Count, Q
 from django.utils import timezone
 from rest_framework import mixins, parsers, permissions, status, viewsets
@@ -23,6 +24,7 @@ from .models import (
 )
 from .serializers import (
     AlertaSerializer,
+    ComiteSerializer,
     ImportacionExcelSerializer,
     PerfilUsuarioSerializer,
     PersonaDetailSerializer,
@@ -43,6 +45,41 @@ from .services.rukan_ai import (
     extraer_rukan_con_ia,
     rukan_ai_status,
 )
+
+
+class ComiteViewSet(viewsets.ModelViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = ComiteSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        queryset = (
+            Comite.objects.annotate(total_personas=Count("personas"))
+            .order_by("nombre")
+        )
+        q = self.request.query_params.get("q", "").strip()
+        comuna = self.request.query_params.get("comuna", "").strip()
+        if q:
+            queryset = queryset.filter(Q(nombre__icontains=q) | Q(comuna__icontains=q))
+        if comuna:
+            queryset = queryset.filter(comuna__icontains=comuna)
+        return queryset
+
+    @transaction.atomic
+    def destroy(self, request, *args, **kwargs):
+        comite = self.get_object()
+        personas_count = comite.personas.count()
+        nombre_comite = comite.nombre
+        comite.personas.all().delete()
+        comite.delete()
+        return Response(
+            {
+                "detail": f"Comité '{nombre_comite}' y {personas_count} registros de socios asociados han sido eliminados correctamente.",
+                "comite_eliminado": nombre_comite,
+                "personas_eliminadas": personas_count,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class PersonaViewSet(viewsets.ReadOnlyModelViewSet):
