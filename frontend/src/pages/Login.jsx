@@ -49,7 +49,7 @@ export default function Login() {
             className="mx-auto h-24 w-auto object-contain"
           />
           <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
-            Entidad Patrocinante Plan Social
+            Sistema de Información y Gestión EP
           </p>
         </div>
 

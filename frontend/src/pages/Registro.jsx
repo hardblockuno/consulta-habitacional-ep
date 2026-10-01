@@ -64,7 +64,7 @@ export default function Registro() {
             className="mx-auto h-24 w-auto object-contain"
           />
           <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
-            Creación de Cuenta · Plan Social
+            Crear cuenta
           </p>
         </div>
 
