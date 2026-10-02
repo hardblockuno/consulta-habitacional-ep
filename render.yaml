@@ -7,7 +7,7 @@ services:
     plan: free
     rootDir: backend
     buildCommand: "chmod +x build.sh && ./build.sh"
-    startCommand: "gunicorn config.wsgi:application"
+    startCommand: "gunicorn config.wsgi:application --workers 2 --timeout 300"
     healthCheckPath: "/"
     envVars:
       - key: DATABASE_URL

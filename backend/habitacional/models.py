@@ -113,11 +113,12 @@ class Persona(TimeStampedModel):
         return max(edad, 0)
 
     def actualizar_estado_general(self):
-        alertas = self.alertas.filter(activa=True)
-        alertas_estado = alertas.filter(impacta_estado=True)
-        if alertas_estado.filter(severidad=Alerta.SEVERIDAD_CRITICA).exists():
+        severidades = set(
+            self.alertas.filter(activa=True, impacta_estado=True).values_list("severidad", flat=True)
+        )
+        if Alerta.SEVERIDAD_CRITICA in severidades:
             estado = self.ESTADO_BLOQUEADA
-        elif alertas_estado.filter(severidad=Alerta.SEVERIDAD_PREVENTIVA).exists():
+        elif Alerta.SEVERIDAD_PREVENTIVA in severidades:
             estado = self.ESTADO_OBSERVADA
         else:
             estado = self.ESTADO_APTA

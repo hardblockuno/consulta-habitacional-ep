@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 import {
   api,
   CONNECTION_ERROR_MESSAGE,
+  getConnectionErrorMessage,
   isConnectionOrNetworkError,
 } from "../api/client.js";
 import { ErrorState } from "../components/StateViews.jsx";
@@ -87,6 +88,7 @@ export default function Importar({ onVerPadron }) {
         })
         .catch(() => {});
     } catch (err) {
+      const status = err.response?.status;
       const errMsg = String(err.message || "").toLowerCase();
       const errCode = String(err.code || "").toUpperCase();
       const isConnectionError =
@@ -102,18 +104,24 @@ export default function Importar({ onVerPadron }) {
           errCode !== "ECONNABORTED" &&
           !errMsg.includes("timeout"));
 
-      let msg = isConnectionError
-        ? err.userFriendlyMessage || CONNECTION_ERROR_MESSAGE
-        : err.response?.data?.detail ||
+      let msg = "";
+      if (status === 502 || status === 504) {
+        msg = "El servidor en la nube está iniciando o completando el proceso. Por favor, reintenta en unos instantes.";
+      } else if (status === 401) {
+        msg = "Tu sesión ha expirado o no estás autenticado. Inicia sesión nuevamente para continuar.";
+      } else if (isConnectionError) {
+        msg = err.userFriendlyMessage || getConnectionErrorMessage();
+      } else if (
+        err.code === "ECONNABORTED" ||
+        errMsg.includes("timeout")
+      ) {
+        msg = "El procesamiento de la planilla tomó más tiempo del esperado. Por favor, reintenta.";
+      } else {
+        msg =
+          err.response?.data?.detail ||
           (err.response?.data?.errores && err.response?.data?.errores[0]?.error) ||
           err.message ||
           "No se pudo importar la planilla.";
-
-      if (
-        err.code === "ECONNABORTED" ||
-        String(err.message || "").toLowerCase().includes("timeout")
-      ) {
-        msg = "El procesamiento de la planilla tomó más tiempo del esperado. Por favor, reintenta.";
       }
       setError(msg);
     } finally {

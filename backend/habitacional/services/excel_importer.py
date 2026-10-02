@@ -467,27 +467,49 @@ def importar_excel(
     omitidos = 0
     errores = []
 
-    for posicion, (_, fila) in enumerate(df.iterrows(), start=header_index + 2):
-        try:
-            with transaction.atomic():
+    # Precarga en lote de personas existentes para máxima velocidad en Neon y Render
+    ruts_candidatos = []
+    col_rut = mapa.get("rut")
+    col_dv = mapa.get("dv")
+    for _, fila in df.iterrows():
+        r = normalizar_rut(
+            fila.get(col_rut) if col_rut else None,
+            fila.get(col_dv) if col_dv else None,
+        )
+        if r:
+            ruts_candidatos.append(r)
+
+    personas_existentes = {}
+    if ruts_candidatos:
+        for p in (
+            Persona.objects.filter(rut__in=ruts_candidatos)
+            .select_related("comite", "caracterizacion_social", "rsh", "ahorro", "postulacion")
+            .prefetch_related("documentos")
+        ):
+            personas_existentes[p.rut] = p
+
+    with transaction.atomic():
+        for posicion, (_, fila) in enumerate(df.iterrows(), start=header_index + 2):
+            try:
                 resultado = procesar_fila(
                     fila=fila,
                     columnas=columnas,
                     mapa=mapa,
                     comite=comite,
                     ahorro_minimo=ahorro_minimo,
+                    personas_existentes=personas_existentes,
                 )
-        except Exception as exc:
-            errores.append({"fila": posicion, "error": str(exc)})
-            omitidos += 1
-            continue
+            except Exception as exc:
+                errores.append({"fila": posicion, "error": str(exc)})
+                omitidos += 1
+                continue
 
-        if resultado == "creado":
-            creados += 1
-        elif resultado == "actualizado":
-            actualizados += 1
-        else:
-            omitidos += 1
+            if resultado == "creado":
+                creados += 1
+            elif resultado == "actualizado":
+                actualizados += 1
+            else:
+                omitidos += 1
 
     importacion.creados = creados
     importacion.actualizados = actualizados
@@ -861,7 +883,7 @@ def encontrar_columna(columnas, aliases, exclude=None):
     return None
 
 
-def procesar_fila(*, fila, columnas, mapa, comite, ahorro_minimo):
+def procesar_fila(*, fila, columnas, mapa, comite, ahorro_minimo, personas_existentes=None):
     desplazamiento = detectar_desplazamiento(fila, columnas, mapa)
 
     def valor(campo):
@@ -905,15 +927,23 @@ def procesar_fila(*, fila, columnas, mapa, comite, ahorro_minimo):
         "datos_originales": serializar_fila(fila),
     }
 
-    persona, creado = Persona.objects.update_or_create(
-        rut=rut,
-        defaults=datos,
-    )
+    if personas_existentes is not None and rut in personas_existentes:
+        persona = personas_existentes[rut]
+        for campo, val in datos.items():
+            setattr(persona, campo, val)
+        persona.save()
+        creado = False
+    else:
+        persona, creado = Persona.objects.update_or_create(
+            rut=rut,
+            defaults=datos,
+        )
+        if personas_existentes is not None:
+            personas_existentes[rut] = persona
 
     hijos = extraer_hijos(fila)
-    actualizar_relaciones(persona, valor, ahorro_minimo, hijos)
-    generar_alertas(persona, valor, hijos)
-    persona.actualizar_estado_general()
+    caracterizacion = actualizar_relaciones(persona, valor, ahorro_minimo, hijos)
+    generar_alertas(persona, valor, hijos, caracterizacion=caracterizacion)
 
     return "creado" if creado else "actualizado"
 
@@ -1230,55 +1260,93 @@ def actualizar_relaciones(persona, valor, ahorro_minimo, hijos):
     valor_integrantes = valor("integrantes")
     integrantes = parse_integrantes(valor_integrantes) or parse_integrantes(valor_grupo_familiar)
     grupo_familiar = limpiar_string(valor_grupo_familiar or valor_integrantes or (integrantes if integrantes is not None else ""))
+    
+    caracterizacion = getattr(persona, "caracterizacion_social", None)
     if comuna or parentesco or tipo_familia or grupo_familiar or integrantes is not None or hijos:
-        CaracterizacionSocial.objects.update_or_create(
-            persona=persona,
-            defaults={
-                "comuna": comuna,
-                "parentesco": parentesco,
-                "tipo_familia": tipo_familia,
-                "grupo_familiar": grupo_familiar,
-                "integrantes": integrantes,
-                "hijos": hijos,
-            },
-        )
+        if caracterizacion:
+            caracterizacion.comuna = comuna
+            caracterizacion.parentesco = parentesco
+            caracterizacion.tipo_familia = tipo_familia
+            caracterizacion.grupo_familiar = grupo_familiar
+            caracterizacion.integrantes = integrantes
+            caracterizacion.hijos = hijos
+            caracterizacion.save()
+        else:
+            caracterizacion, _ = CaracterizacionSocial.objects.update_or_create(
+                persona=persona,
+                defaults={
+                    "comuna": comuna,
+                    "parentesco": parentesco,
+                    "tipo_familia": tipo_familia,
+                    "grupo_familiar": grupo_familiar,
+                    "integrantes": integrantes,
+                    "hijos": hijos,
+                },
+            )
+            persona.caracterizacion_social = caracterizacion
 
     rsh_porcentaje = parse_decimal(valor("rsh"))
     if rsh_porcentaje is not None and Decimal("0") < rsh_porcentaje <= Decimal("1.0"):
         rsh_porcentaje = (rsh_porcentaje * 100).quantize(Decimal("0.01"))
-    RSH.objects.update_or_create(
-        persona=persona,
-        defaults={
-            "porcentaje": rsh_porcentaje,
-            "tramo": limpiar_string(valor("rsh")),
-            "es_preferente": bool(rsh_porcentaje is not None and rsh_porcentaje <= 40),
-        },
-    )
+    
+    rsh = getattr(persona, "rsh", None)
+    if rsh:
+        rsh.porcentaje = rsh_porcentaje
+        rsh.tramo = limpiar_string(valor("rsh"))
+        rsh.es_preferente = bool(rsh_porcentaje is not None and rsh_porcentaje <= 40)
+        rsh.save()
+    else:
+        rsh, _ = RSH.objects.update_or_create(
+            persona=persona,
+            defaults={
+                "porcentaje": rsh_porcentaje,
+                "tramo": limpiar_string(valor("rsh")),
+                "es_preferente": bool(rsh_porcentaje is not None and rsh_porcentaje <= 40),
+            },
+        )
+        persona.rsh = rsh
 
     ahorro_monto = parse_decimal(valor("ahorro"))
-    Ahorro.objects.update_or_create(
-        persona=persona,
-        defaults={
-            "numero_cuenta": limpiar_string(valor("numero_cuenta")),
-            "banco": limpiar_string(valor("banco")),
-            "monto_actual": ahorro_monto,
-            "ahorro_minimo": ahorro_minimo,
-            "insuficiente": bool(ahorro_monto is not None and ahorro_monto < ahorro_minimo),
-        },
-    )
+    ahorro = getattr(persona, "ahorro", None)
+    if ahorro:
+        ahorro.numero_cuenta = limpiar_string(valor("numero_cuenta"))
+        ahorro.banco = limpiar_string(valor("banco"))
+        ahorro.monto_actual = ahorro_monto
+        ahorro.ahorro_minimo = ahorro_minimo
+        ahorro.insuficiente = bool(ahorro_monto is not None and ahorro_monto < ahorro_minimo)
+        ahorro.save()
+    else:
+        ahorro, _ = Ahorro.objects.update_or_create(
+            persona=persona,
+            defaults={
+                "numero_cuenta": limpiar_string(valor("numero_cuenta")),
+                "banco": limpiar_string(valor("banco")),
+                "monto_actual": ahorro_monto,
+                "ahorro_minimo": ahorro_minimo,
+                "insuficiente": bool(ahorro_monto is not None and ahorro_monto < ahorro_minimo),
+            },
+        )
+        persona.ahorro = ahorro
 
     minvu_conecta = parse_decimal(valor("minvu_conecta"))
     if minvu_conecta is not None and Decimal("0") < minvu_conecta <= Decimal("1.0"):
         minvu_conecta = (minvu_conecta * 100).quantize(Decimal("0.01"))
     decreto_comite = getattr(persona.comite, "decreto", "DS49") or "DS49"
-    Postulacion.objects.update_or_create(
-        persona=persona,
-        defaults={
-            "minvu_conecta": minvu_conecta,
-            "estado": "",
-            "programa": decreto_comite,
-        },
-    )
+    postulacion = getattr(persona, "postulacion", None)
+    if postulacion:
+        postulacion.minvu_conecta = minvu_conecta
+        postulacion.programa = decreto_comite
+        postulacion.save()
+    else:
+        postulacion, _ = Postulacion.objects.update_or_create(
+            persona=persona,
+            defaults={
+                "minvu_conecta": minvu_conecta,
+                "estado": "",
+                "programa": decreto_comite,
+            },
+        )
+        persona.postulacion = postulacion
 
     fecha_vencimiento = parse_fecha(valor("cedula_vencimiento"))
     if fecha_vencimiento:
@@ -1293,12 +1361,14 @@ def actualizar_relaciones(persona, valor, ahorro_minimo, hijos):
             },
         )
 
+    return caracterizacion
 
-def generar_alertas(persona, valor, hijos=None):
+
+def generar_alertas(persona, valor, hijos=None, caracterizacion=None):
     Alerta.objects.filter(persona=persona, origen=ORIGEN_IMPORTACION).delete()
 
     fecha_vencimiento = parse_fecha(valor("cedula_vencimiento"))
-    crear_alertas_persona(persona, fecha_vencimiento, hijos or [])
+    crear_alertas_persona(persona, fecha_vencimiento, hijos or [], caracterizacion=caracterizacion)
     persona.actualizar_estado_general()
 
 
@@ -1318,7 +1388,7 @@ def regenerar_alertas_persona(persona):
     persona.actualizar_estado_general()
 
 
-def crear_alertas_persona(persona, fecha_vencimiento, hijos=None):
+def crear_alertas_persona(persona, fecha_vencimiento, hijos=None, caracterizacion=None):
     if fecha_vencimiento:
         hoy = timezone.localdate()
         dias = (fecha_vencimiento - hoy).days
@@ -1363,7 +1433,7 @@ def crear_alertas_persona(persona, fecha_vencimiento, hijos=None):
         )
 
     decreto = (getattr(persona.comite, "decreto", "DS49") or "DS49").upper()
-    if postulacion_es_unipersonal(persona):
+    if postulacion_es_unipersonal(persona, caracterizacion=caracterizacion):
         if decreto == "DS49":
             criterios = criterios_excepcion_unipersonal(persona)
             if criterios:
@@ -1462,8 +1532,9 @@ def persona_tiene_etnia(persona):
     )
 
 
-def postulacion_es_unipersonal(persona):
-    caracterizacion = CaracterizacionSocial.objects.filter(persona=persona).first()
+def postulacion_es_unipersonal(persona, caracterizacion=None):
+    if caracterizacion is None:
+        caracterizacion = getattr(persona, "caracterizacion_social", None) or CaracterizacionSocial.objects.filter(persona=persona).first()
     if not caracterizacion:
         return False
     integrantes = parse_integrantes(caracterizacion.integrantes) or parse_integrantes(caracterizacion.grupo_familiar)

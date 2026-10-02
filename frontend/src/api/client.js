@@ -1,7 +1,20 @@
 import axios from "axios";
 
-export const CONNECTION_ERROR_MESSAGE =
-  "No se pudo conectar con el servidor local en el puerto 8000. Asegúrate de que el backend esté iniciado.";
+export function getConnectionErrorMessage() {
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (
+      host.includes("onrender.com") ||
+      host.includes("github.io") ||
+      (!host.includes("localhost") && host !== "127.0.0.1" && host !== "0.0.0.0")
+    ) {
+      return "No se pudo conectar con el servidor en la nube. El servicio podría estar iniciando o la conexión tardó más de lo esperado. Por favor, reintenta en unos instantes.";
+    }
+  }
+  return "No se pudo conectar con el servidor local en el puerto 8000. Asegúrate de que el backend esté iniciado.";
+}
+
+export const CONNECTION_ERROR_MESSAGE = getConnectionErrorMessage();
 
 export function isConnectionOrNetworkError(error) {
   if (!error) return false;
@@ -34,7 +47,7 @@ export function getApiBaseUrl() {
 
 export const api = axios.create({
   baseURL: getApiBaseUrl(),
-  timeout: 60000,
+  timeout: 120000,
 });
 
 api.interceptors.request.use((config) => {
@@ -55,8 +68,9 @@ api.interceptors.response.use(
   (error) => {
     if (isConnectionOrNetworkError(error)) {
       error.isConnectionError = true;
-      error.userFriendlyMessage = CONNECTION_ERROR_MESSAGE;
-      error.message = CONNECTION_ERROR_MESSAGE;
+      const friendlyMsg = getConnectionErrorMessage();
+      error.userFriendlyMessage = friendlyMsg;
+      error.message = friendlyMsg;
     }
     return Promise.reject(error);
   }
