@@ -488,6 +488,9 @@ def importar_excel(
         ):
             personas_existentes[p.rut] = p
 
+        # Limpiar alertas previas de importación en bloque para evitar consultas DELETE por cada fila
+        Alerta.objects.filter(persona__rut__in=ruts_candidatos, origen=ORIGEN_IMPORTACION).delete()
+
     with transaction.atomic():
         for posicion, (_, fila) in enumerate(df.iterrows(), start=header_index + 2):
             try:
@@ -943,7 +946,7 @@ def procesar_fila(*, fila, columnas, mapa, comite, ahorro_minimo, personas_exist
 
     hijos = extraer_hijos(fila)
     caracterizacion = actualizar_relaciones(persona, valor, ahorro_minimo, hijos)
-    generar_alertas(persona, valor, hijos, caracterizacion=caracterizacion)
+    generar_alertas(persona, valor, hijos, caracterizacion=caracterizacion, limpiar_previas=False)
 
     return "creado" if creado else "actualizado"
 
@@ -1364,12 +1367,15 @@ def actualizar_relaciones(persona, valor, ahorro_minimo, hijos):
     return caracterizacion
 
 
-def generar_alertas(persona, valor, hijos=None, caracterizacion=None):
-    Alerta.objects.filter(persona=persona, origen=ORIGEN_IMPORTACION).delete()
+def generar_alertas(persona, valor, hijos=None, caracterizacion=None, limpiar_previas=True):
+    if limpiar_previas:
+        Alerta.objects.filter(persona=persona, origen=ORIGEN_IMPORTACION).delete()
 
     fecha_vencimiento = parse_fecha(valor("cedula_vencimiento"))
-    crear_alertas_persona(persona, fecha_vencimiento, hijos or [], caracterizacion=caracterizacion)
-    persona.actualizar_estado_general()
+    estado_calculado = crear_alertas_persona(persona, fecha_vencimiento, hijos or [], caracterizacion=caracterizacion)
+    if estado_calculado and persona.estado_general != estado_calculado:
+        persona.estado_general = estado_calculado
+        persona.save(update_fields=["estado_general", "actualizado_en"])
 
 
 def regenerar_alertas_persona(persona):
@@ -1389,6 +1395,9 @@ def regenerar_alertas_persona(persona):
 
 
 def crear_alertas_persona(persona, fecha_vencimiento, hijos=None, caracterizacion=None):
+    tiene_critica = False
+    tiene_preventiva = False
+
     if fecha_vencimiento:
         hoy = timezone.localdate()
         dias = (fecha_vencimiento - hoy).days
@@ -1400,6 +1409,7 @@ def crear_alertas_persona(persona, fecha_vencimiento, hijos=None, caracterizacio
                 "Cédula vencida",
                 f"Cédula vencida el {fecha_vencimiento.isoformat()}.",
             )
+            tiene_critica = True
         elif dias <= 30:
             crear_alerta(
                 persona,
@@ -1408,6 +1418,7 @@ def crear_alertas_persona(persona, fecha_vencimiento, hijos=None, caracterizacio
                 "Cédula por vencer",
                 f"Cédula vence el {fecha_vencimiento.isoformat()}.",
             )
+            tiene_preventiva = True
 
     if persona.discapacidad:
         crear_alerta(
@@ -1458,6 +1469,7 @@ def crear_alertas_persona(persona, fecha_vencimiento, hijos=None, caracterizacio
                     ),
                     impacta_estado=True,
                 )
+                tiene_critica = True
         elif decreto == "DS01":
             crear_alerta(
                 persona,
@@ -1491,7 +1503,7 @@ def crear_alertas_persona(persona, fecha_vencimiento, hijos=None, caracterizacio
                 Alerta.TIPO_SOCIAL,
                 Alerta.SEVERIDAD_PREVENTIVA,
                 "Postulación Proyecto Integración Social (DS19)",
-                "Postulación unipersonal asociada a proyecto DS19. Requiere cupo seleccionado en el conjunto habitacional.",
+                "Postulante unipersonal asociada a proyecto DS19. Requiere cupo seleccionado en el conjunto habitacional.",
                 impacta_estado=False,
             )
 
@@ -1506,6 +1518,12 @@ def crear_alertas_persona(persona, fecha_vencimiento, hijos=None, caracterizacio
             detalle_revision_hijo(hijo),
             impacta_estado=False,
         )
+
+    if tiene_critica:
+        return Persona.ESTADO_BLOQUEADA
+    elif tiene_preventiva:
+        return Persona.ESTADO_OBSERVADA
+    return Persona.ESTADO_APTA
 
 
 def persona_tiene_etnia(persona):
