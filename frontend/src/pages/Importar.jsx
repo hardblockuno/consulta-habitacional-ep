@@ -71,7 +71,9 @@ export default function Importar({ onVerPadron }) {
     setError("");
     setResultado(null);
     try {
-      const response = await api.post("/importar/excel/", formData);
+      const response = await api.post("/importar/excel/", formData, {
+        timeout: 300000,
+      });
       setResultado(response.data);
       api
         .get("/comites/")
@@ -81,11 +83,17 @@ export default function Importar({ onVerPadron }) {
         })
         .catch(() => {});
     } catch (err) {
-      const msg =
+      let msg =
         err.response?.data?.detail ||
         (err.response?.data?.errores && err.response?.data?.errores[0]?.error) ||
         err.message ||
         "No se pudo importar la planilla.";
+      if (
+        err.code === "ECONNABORTED" ||
+        String(err.message || "").toLowerCase().includes("timeout")
+      ) {
+        msg = "El procesamiento de la planilla tomó más tiempo del esperado. Por favor, reintenta.";
+      }
       setError(msg);
     } finally {
       setLoading(false);

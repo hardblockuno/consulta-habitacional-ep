@@ -56,6 +56,7 @@ export default function ExtraerAhorro() {
       formData.append("archivo", archivoAhorro);
       const res = await api.post("/importar/observaciones/", formData, {
         headers: { "Content-Type": "multipart/form-data" },
+        timeout: 300000,
       });
       setMensajeSubida(
         `Planilla procesada con éxito: ${res.data?.filas_procesadas ?? "varias"} filas actualizadas.`

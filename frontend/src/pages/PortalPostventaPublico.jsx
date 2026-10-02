@@ -142,6 +142,7 @@ function FormularioPublico() {
 
       const res = await api.post("/postventa/tickets/", formData, {
         headers: { "Content-Type": "multipart/form-data" },
+        timeout: 120000,
       });
 
       setTicketCreado(res.data);

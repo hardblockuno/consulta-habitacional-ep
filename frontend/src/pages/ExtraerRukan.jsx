@@ -76,6 +76,7 @@ export default function ExtraerRukan() {
     try {
       const res = await api.post("/rukan/ia-extraer/", formData, {
         headers: { "Content-Type": "multipart/form-data" },
+        timeout: 300000,
       });
 
       const data = res.data;
