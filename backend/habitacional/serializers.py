@@ -150,6 +150,16 @@ class PersonaListSerializer(serializers.ModelSerializer):
         decimal_places=2,
         read_only=True,
     )
+    ahorro_numero_cuenta = serializers.CharField(
+        source="ahorro.numero_cuenta",
+        read_only=True,
+        default="",
+    )
+    ahorro_banco = serializers.CharField(
+        source="ahorro.banco",
+        read_only=True,
+        default="",
+    )
     alertas_activas = serializers.IntegerField(read_only=True)
 
     class Meta:
@@ -171,6 +181,8 @@ class PersonaListSerializer(serializers.ModelSerializer):
             "estado_general",
             "rsh_porcentaje",
             "ahorro_monto",
+            "ahorro_numero_cuenta",
+            "ahorro_banco",
             "alertas_activas",
         ]
 

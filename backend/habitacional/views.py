@@ -911,3 +911,108 @@ class SugerenciaFeedbackViewSet(viewsets.ModelViewSet):
         sugerencia.save()
         return Response(SugerenciaFeedbackSerializer(sugerencia).data)
 
+
+class ExtraerAhorroNominaAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        comite_nombre = request.query_params.get("comite", "").strip()
+        comite_id = request.query_params.get("comite_id", "").strip()
+        q = request.query_params.get("q", "").strip()
+        banco_filtro = request.query_params.get("banco", "").strip()
+        estado_filtro = request.query_params.get("estado", "").strip()
+
+        qs = Persona.objects.select_related("ahorro", "comite").order_by("nombre")
+
+        if comite_id and comite_id.isdigit():
+            qs = qs.filter(comite_id=int(comite_id))
+        elif comite_nombre and comite_nombre.lower() != "todos":
+            qs = qs.filter(comite__nombre__iexact=comite_nombre)
+
+        # Resumen general del conjunto antes de filtros de texto
+        total_socios = qs.count()
+        con_cuenta_count = qs.exclude(ahorro__numero_cuenta__isnull=True).exclude(ahorro__numero_cuenta="").count()
+        sin_cuenta_count = total_socios - con_cuenta_count
+
+        # Bancos presentes
+        bancos_data = (
+            qs.exclude(ahorro__banco__isnull=True)
+            .exclude(ahorro__banco="")
+            .values("ahorro__banco")
+            .annotate(total=Count("id"))
+            .order_by("-total")
+        )
+        bancos_resumen = [{"banco": b["ahorro__banco"].strip(), "total": b["total"]} for b in bancos_data]
+
+        # Filtros de texto o banco
+        if q:
+            qs = qs.filter(
+                Q(rut__icontains=q)
+                | Q(nombre__icontains=q)
+                | Q(ahorro__numero_cuenta__icontains=q)
+                | Q(ahorro__banco__icontains=q)
+            )
+
+        if banco_filtro and banco_filtro.lower() != "todos":
+            qs = qs.filter(ahorro__banco__iexact=banco_filtro)
+
+        if estado_filtro == "con_cuenta":
+            qs = qs.exclude(ahorro__numero_cuenta__isnull=True).exclude(ahorro__numero_cuenta="")
+        elif estado_filtro == "sin_cuenta":
+            qs = qs.filter(Q(ahorro__numero_cuenta__isnull=True) | Q(ahorro__numero_cuenta=""))
+
+        # Serialización de los socios
+        socios = []
+        for p in qs:
+            ahorro_obj = getattr(p, "ahorro", None)
+            num_cuenta = (ahorro_obj.numero_cuenta or "").strip() if ahorro_obj else ""
+            banco = (ahorro_obj.banco or "").strip() if ahorro_obj else ""
+            monto = str(ahorro_obj.monto_actual) if (ahorro_obj and ahorro_obj.monto_actual is not None) else None
+            minimo = str(ahorro_obj.ahorro_minimo) if (ahorro_obj and ahorro_obj.ahorro_minimo is not None) else "10.00"
+
+            socios.append({
+                "id": p.id,
+                "rut": p.rut,
+                "nombre": p.nombre,
+                "numero_cuenta": num_cuenta,
+                "banco": banco,
+                "monto_actual": monto,
+                "ahorro_minimo": minimo,
+                "comite_nombre": p.comite.nombre if p.comite else "",
+                "comite_comuna": p.comite.comuna if p.comite else "",
+                "telefono": p.telefono or "",
+                "correo": p.correo or "",
+            })
+
+        # Información del comité seleccionado si aplica
+        comite_info = None
+        if comite_id and comite_id.isdigit():
+            c_obj = Comite.objects.filter(id=int(comite_id)).first()
+            if c_obj:
+                comite_info = {
+                    "id": c_obj.id,
+                    "nombre": c_obj.nombre,
+                    "comuna": c_obj.comuna,
+                    "decreto": c_obj.decreto,
+                }
+        elif comite_nombre and comite_nombre.lower() != "todos":
+            c_obj = Comite.objects.filter(nombre__iexact=comite_nombre).first()
+            if c_obj:
+                comite_info = {
+                    "id": c_obj.id,
+                    "nombre": c_obj.nombre,
+                    "comuna": c_obj.comuna,
+                    "decreto": c_obj.decreto,
+                }
+
+        return Response({
+            "comite": comite_info,
+            "resumen": {
+                "total_socios": total_socios,
+                "con_cuenta": con_cuenta_count,
+                "sin_cuenta": sin_cuenta_count,
+                "bancos": bancos_resumen,
+            },
+            "socios": socios,
+        })
+

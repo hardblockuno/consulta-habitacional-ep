@@ -915,6 +915,34 @@ class ImportarExcelAPIViewRobustnessTests(TestCase):
         self.assertEqual(response.data.get("estado"), ImportacionExcel.ESTADO_ERROR)
         self.assertIn("Encabezado RUT no encontrado", response.data["errores"][0]["error"])
 
+    def test_extraer_ahorro_nomina_por_comite(self):
+        from rest_framework.test import APIRequestFactory, force_authenticate
+        from django.contrib.auth.models import User
+        from habitacional.models import Ahorro, Comite, Persona
+        from habitacional.views import ExtraerAhorroNominaAPIView
+
+        user = User.objects.create_user(username="test_ahorro_user", password="secretpassword")
+        comite = Comite.objects.create(nombre="Comite Ahorro Test", comuna="Perquenco", decreto="DS49")
+        p1 = Persona.objects.create(rut="11111111-1", nombre="JUAN PEREZ", comite=comite)
+        Ahorro.objects.create(persona=p1, numero_cuenta="12345678", banco="ESTADO", monto_actual=Decimal("15.5"))
+        p2 = Persona.objects.create(rut="22222222-2", nombre="MARIA SOTO", comite=comite)
+        Ahorro.objects.create(persona=p2, numero_cuenta="87654321", banco="SANTANDER", monto_actual=None)
+
+        factory = APIRequestFactory()
+        request = factory.get("/api/ahorro/nomina/", {"comite": "Comite Ahorro Test"})
+        force_authenticate(request, user=user)
+
+        view = ExtraerAhorroNominaAPIView.as_view()
+        response = view(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["resumen"]["total_socios"], 2)
+        self.assertEqual(response.data["resumen"]["con_cuenta"], 2)
+        self.assertEqual(len(response.data["socios"]), 2)
+        self.assertEqual(response.data["socios"][0]["nombre"], "JUAN PEREZ")
+        self.assertEqual(response.data["socios"][0]["numero_cuenta"], "12345678")
+        self.assertEqual(response.data["socios"][0]["banco"], "ESTADO")
+
 
 
 

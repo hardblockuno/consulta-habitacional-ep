@@ -6,6 +6,7 @@ from .views import (
     ComiteViewSet,
     DashboardCoordinacionAPIView,
     DashboardResumenAPIView,
+    ExtraerAhorroNominaAPIView,
     ImportarExcelAPIView,
     ImportarObservacionesExcelAPIView,
     LoginAPIView,
@@ -41,7 +42,9 @@ urlpatterns = [
     # Dashboards de Áreas
     path("dashboard/coordinacion/", DashboardCoordinacionAPIView.as_view(), name="dashboard-coordinacion"),
     path("dashboard/resumen/", DashboardResumenAPIView.as_view(), name="dashboard-resumen"),
+    # Reportes y Ahorro
     path("reportes/resumen/", ReportesResumenAPIView.as_view(), name="reportes-resumen"),
+    path("ahorro/nomina/", ExtraerAhorroNominaAPIView.as_view(), name="ahorro-nomina"),
     # Importaciones y OCR
     path("importar/excel/", ImportarExcelAPIView.as_view(), name="importar-excel"),
     path(
