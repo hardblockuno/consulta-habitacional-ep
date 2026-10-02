@@ -55,9 +55,7 @@ export default function Importar({ onVerPadron }) {
     setError("");
     setResultado(null);
     try {
-      const response = await api.post("/importar/excel/", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const response = await api.post("/importar/excel/", formData);
       setResultado(response.data);
       // Actualizar comités disponibles
       api.get("/comites/").then((res) => {
@@ -65,7 +63,12 @@ export default function Importar({ onVerPadron }) {
         setComitesExistentes(list);
       }).catch(() => {});
     } catch (err) {
-      setError(err.response?.data?.detail || "No se pudo importar la planilla Excel.");
+      const msg =
+        err.response?.data?.detail ||
+        (err.response?.data?.errores && err.response?.data?.errores[0]?.error) ||
+        err.message ||
+        "No se pudo importar la planilla Excel.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -85,14 +88,15 @@ export default function Importar({ onVerPadron }) {
     setErrorObservaciones("");
     setResultadoObservaciones(null);
     try {
-      const response = await api.post("/importar/observaciones/", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const response = await api.post("/importar/observaciones/", formData);
       setResultadoObservaciones(response.data);
     } catch (err) {
-      setErrorObservaciones(
-        err.response?.data?.detail || "No se pudieron cargar las observaciones."
-      );
+      const msg =
+        err.response?.data?.detail ||
+        (err.response?.data?.errores && err.response?.data?.errores[0]?.error) ||
+        err.message ||
+        "No se pudieron cargar las observaciones.";
+      setErrorObservaciones(msg);
     } finally {
       setLoadingObservaciones(false);
     }

@@ -86,14 +86,7 @@ if DATABASE_URL:
             conn_health_checks=True,
         )
     }
-elif os.getenv("USE_SQLITE", "0") == "1":
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": APP_DATA_DIR / "consulta_habitacional.sqlite3",
-        }
-    }
-else:
+elif os.getenv("USE_POSTGRES", "0") == "1":
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
@@ -102,6 +95,13 @@ else:
             "PASSWORD": os.getenv("POSTGRES_PASSWORD", "consulta_password"),
             "HOST": os.getenv("POSTGRES_HOST", "localhost"),
             "PORT": os.getenv("POSTGRES_PORT", "5432"),
+        }
+    }
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": APP_DATA_DIR / "consulta_habitacional.sqlite3",
         }
     }
 
