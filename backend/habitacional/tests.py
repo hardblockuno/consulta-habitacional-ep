@@ -594,4 +594,27 @@ class RolesYAutenticacionTests(TestCase):
         self.assertFalse(Persona.objects.filter(id=p1.id).exists())
         self.assertFalse(Persona.objects.filter(id=p2.id).exists())
 
+    def test_analizador_hibrido_y_excepciones_unipersonales_serviu(self):
+        from habitacional.services.gemini_excel_analyzer import evaluar_excepcion_unipersonal_serviu
+
+        # 1. Adulto mayor (65 años) -> Habilitado
+        res1 = evaluar_excepcion_unipersonal_serviu(edad=65, persona_mayor=True)
+        self.assertTrue(res1["habilitado_serviu"])
+        self.assertIn("Adulto Mayor", res1["detalle"])
+
+        # 2. Joven de 25 años Mapuche -> Habilitado
+        res2 = evaluar_excepcion_unipersonal_serviu(edad=25, etnia="Mapuche")
+        self.assertTrue(res2["habilitado_serviu"])
+        self.assertIn("Pueblo Originario", res2["detalle"])
+
+        # 3. Persona de 40 años con discapacidad -> Habilitada
+        res3 = evaluar_excepcion_unipersonal_serviu(edad=40, tiene_discapacidad=True)
+        self.assertTrue(res3["habilitado_serviu"])
+        self.assertIn("Discapacidad", res3["detalle"])
+
+        # 4. Persona de 30 años sin ninguna excepción -> No habilitado (Alerta crítica)
+        res4 = evaluar_excepcion_unipersonal_serviu(edad=30, persona_mayor=False, tiene_discapacidad=False, etnia="")
+        self.assertFalse(res4["habilitado_serviu"])
+        self.assertIn("No cumple causales", res4["detalle"])
+
 

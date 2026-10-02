@@ -4,6 +4,8 @@ import {
   CheckCircle2,
   FileSpreadsheet,
   FileText,
+  ShieldCheck,
+  Sparkles,
   Upload,
   X,
 } from "lucide-react";
@@ -119,6 +121,42 @@ export default function Importar({ onVerPadron }) {
 
   return (
     <div className="space-y-6">
+      {/* Banner de Motor Híbrido Inteligente */}
+      <div className="rounded-lg border border-indigo-100 bg-gradient-to-r from-indigo-50/70 via-slate-50 to-emerald-50/60 p-4">
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-indigo-600 text-white shadow-2xs">
+              <Sparkles size={16} />
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-semibold text-slate-900">
+                  Motor Híbrido Activo · Gemini AI + Validador SERVIU DS49
+                </h3>
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-800">
+                  <ShieldCheck size={11} />
+                  Modo Cuota Cero
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Análisis semántico en 1 sola llamada con detección de los 10 factores clave para vivienda social
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-1.5 pt-2 border-t border-indigo-100/60 text-[10px] text-slate-600">
+          <span className="rounded bg-white px-2 py-0.5 border border-slate-200/80">RUT y Nombres</span>
+          <span className="rounded bg-white px-2 py-0.5 border border-slate-200/80">Edad / Adulto Mayor</span>
+          <span className="rounded bg-white px-2 py-0.5 border border-slate-200/80">Discapacidad (Socio e Hijos)</span>
+          <span className="rounded bg-white px-2 py-0.5 border border-slate-200/80">Banco y N° Cta. Ahorro</span>
+          <span className="rounded bg-white px-2 py-0.5 border border-slate-200/80">% RSH Preferente</span>
+          <span className="rounded bg-white px-2 py-0.5 border border-slate-200/80">MINVU Conecta</span>
+          <span className="rounded bg-white px-2 py-0.5 border border-slate-200/80">Pueblo Originario / Mapuche</span>
+          <span className="rounded bg-white px-2 py-0.5 border border-indigo-200 text-indigo-700 font-medium">Auditoría Unipersonales DS49</span>
+        </div>
+      </div>
+
       {/* Carga principal de base de socios */}
       <Section title="Carga de Planilla de Socios (Excel)">
         <form onSubmit={onSubmit} className="space-y-4">

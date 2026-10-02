@@ -245,6 +245,9 @@ COLUMN_ALIASES = {
         "nucleofam",
     ],
     "ahorro": ["ahorro", "saldoahorro", "montoahorro", "ahorrodia", "ahorroal", "saldoctaahorro"],
+    "banco": ["banco", "entidad", "institucion", "bancocuenta", "bancoahorro", "bancoahorros"],
+    "numero_cuenta": ["ncuenta", "numerocuenta", "nrocuenta", "libreta", "nrolibreta", "nlibreta", "cuentarut", "ctarut", "nroctarut", "ncta"],
+    "minvu_conecta": ["minvuconecta", "conecta", "puntajeconecta", "rankingconecta", "prioridadconecta", "indiceconecta", "porcentajeconecta"],
     "cedula_vencimiento": [
         "vencimientocedula",
         "cedulavence",
@@ -331,6 +334,30 @@ def importar_excel(
     df = limpiar_dataframe(df)
     columnas = list(df.columns)
     mapa = construir_mapa_columnas(columnas)
+
+    # Motor Híbrido: Asistencia semántica de Gemini en 1 sola llamada (con caché por hash de columnas)
+    try:
+        from .gemini_excel_analyzer import analizar_esquema_con_gemini
+        muestra = df.head(3).to_dict(orient="records")
+        mapeo_gemini = analizar_esquema_con_gemini(columnas, muestra)
+        if mapeo_gemini:
+            campos_clave = [
+                ("banco", "banco"),
+                ("numero_cuenta", "numero_cuenta"),
+                ("minvu_conecta", "minvu_conecta"),
+                ("discapacidad", "discapacidad_titular"),
+                ("etnia", "etnia_indigena"),
+                ("rsh", "rsh_porcentaje"),
+                ("integrantes", "integrantes"),
+                ("tipo_familia", "tipo_familia"),
+                ("ahorro", "ahorro_monto"),
+            ]
+            for campo_local, campo_gemini in campos_clave:
+                col_g = mapeo_gemini.get(campo_gemini)
+                if col_g and col_g in columnas and not mapa.get(campo_local):
+                    mapa[campo_local] = col_g
+    except Exception:
+        pass
     validar_columnas_minimas(mapa)
 
     nombre_comite = comite_nombre or deducir_nombre_comite(importacion.nombre_archivo, hoja)
@@ -1225,16 +1252,30 @@ def crear_alertas_persona(persona, fecha_vencimiento, hijos=None):
             impacta_estado=False,
         )
 
-    criterios = criterios_excepcion_unipersonal(persona)
-    if postulacion_es_unipersonal(persona) and criterios:
-        crear_alerta(
-            persona,
-            Alerta.TIPO_SOCIAL,
-            Alerta.SEVERIDAD_PREVENTIVA,
-            "Criterio de excepción unipersonal",
-            f"Postulación unipersonal con criterio de excepción: {', '.join(criterios)}.",
-            impacta_estado=False,
-        )
+    if postulacion_es_unipersonal(persona):
+        criterios = criterios_excepcion_unipersonal(persona)
+        if criterios:
+            crear_alerta(
+                persona,
+                Alerta.TIPO_SOCIAL,
+                Alerta.SEVERIDAD_PREVENTIVA,
+                "Criterio de excepción unipersonal",
+                f"Postulación unipersonal habilitada por excepción legal DS49: {', '.join(criterios)}.",
+                impacta_estado=False,
+            )
+        else:
+            crear_alerta(
+                persona,
+                Alerta.TIPO_SOCIAL,
+                Alerta.SEVERIDAD_CRITICA,
+                "Unipersonal sin excepción legal SERVIU",
+                (
+                    "Postulante unipersonal (1 integrante) menor de 60 años sin causal de excepción legal "
+                    "(sin discapacidad ni calidad indígena acreditada). SERVIU rechazará postulación individual "
+                    "si no incorpora un núcleo familiar."
+                ),
+                impacta_estado=True,
+            )
 
     for hijo in hijos or []:
         if not hijo.get("requiere_revision_documental"):
@@ -1301,6 +1342,8 @@ def criterios_excepcion_unipersonal(persona):
         criterios.append("Adulto mayor")
     if persona_tiene_etnia(persona):
         criterios.append("Etnia / pueblo originario")
+    if persona.discapacidad:
+        criterios.append("Discapacidad acreditada")
     return criterios
 
 
