@@ -19,10 +19,21 @@ export function isConnectionOrNetworkError(error) {
   );
 }
 
+export function getApiBaseUrl() {
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host.includes("onrender.com") || host.includes("github.io")) {
+      return "https://consulta-habitacional-api.onrender.com/api";
+    }
+  }
+  return import.meta.env.DEV ? "/api" : "http://127.0.0.1:8000/api";
+}
+
 export const api = axios.create({
-  baseURL:
-    import.meta.env.VITE_API_BASE_URL ||
-    (import.meta.env.DEV ? "/api" : "http://127.0.0.1:8000/api"),
+  baseURL: getApiBaseUrl(),
   timeout: 60000,
 });
 

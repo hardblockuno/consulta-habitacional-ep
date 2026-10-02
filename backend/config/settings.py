@@ -25,13 +25,25 @@ RENDER_EXTERNAL_HOSTNAME = os.getenv("RENDER_EXTERNAL_HOSTNAME")
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 
+CSRF_DEFAULT_ORIGINS = [
+    "https://hardblockuno.github.io",
+    "https://consulta-habitacional-web.onrender.com",
+    "https://*.onrender.com",
+]
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
     for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")
     if origin.strip()
 ]
+for origin in CSRF_DEFAULT_ORIGINS:
+    if origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(origin)
+
 if RENDER_EXTERNAL_HOSTNAME:
-    CSRF_TRUSTED_ORIGINS.append(f"https://{RENDER_EXTERNAL_HOSTNAME}")
+    origin = f"https://{RENDER_EXTERNAL_HOSTNAME}"
+    if origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(origin)
+
 if DEBUG:
     for dev_origin in (
         "http://localhost:5173",
@@ -148,7 +160,7 @@ CORS_ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.getenv(
         "CORS_ALLOWED_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173,https://hardblockuno.github.io,null",
+        "http://localhost:5173,http://127.0.0.1:5173,https://hardblockuno.github.io,https://consulta-habitacional-web.onrender.com,null",
     ).split(",")
     if origin.strip()
 ]
