@@ -9,16 +9,14 @@ import Personas from "./Personas.jsx";
 export default function BasesDatos() {
   const [searchParams, setSearchParams] = useSearchParams();
   const currentTabParam = searchParams.get("tab");
-  const initialTab =
+  const tab =
     currentTabParam === "importar"
       ? "importar"
       : currentTabParam === "comites"
       ? "comites"
       : "personas";
-  const [tab, setTab] = useState(initialTab);
 
   function handleTabChange(nextTab) {
-    setTab(nextTab);
     const newParams = new URLSearchParams(searchParams);
     if (nextTab === "personas") {
       newParams.delete("tab");
@@ -30,9 +28,8 @@ export default function BasesDatos() {
 
   function handleFiltrarPorComite(nombreComite) {
     const newParams = new URLSearchParams();
-    newParams.set("comite", nombreComite);
+    if (nombreComite) newParams.set("comite", nombreComite);
     setSearchParams(newParams);
-    setTab("personas");
   }
 
   return (

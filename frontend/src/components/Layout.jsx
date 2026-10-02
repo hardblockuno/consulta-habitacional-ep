@@ -148,8 +148,8 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-screen bg-slate-50/60 text-slate-800 antialiased">
-      {/* Sidebar para desktop */}
-      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-slate-200/80 bg-white px-4 py-5 overflow-y-auto xl:flex xl:flex-col xl:justify-between">
+      {/* Sidebar para desktop y laptop */}
+      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-slate-200/80 bg-white px-4 py-5 overflow-y-auto lg:flex lg:flex-col lg:justify-between">
         <div>
           {/* Logo / Encabezado */}
           <div className="flex items-center gap-2.5 pb-5 border-b border-slate-100">
@@ -211,9 +211,9 @@ export default function Layout({ children }) {
 
       {/* Drawer móvil con Backdrop */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 xl:hidden">
+        <div className="fixed inset-0 z-50 lg:hidden">
           <div
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"
             onClick={() => setMobileOpen(false)}
           />
           <aside className="fixed inset-y-0 left-0 w-72 max-w-[85vw] bg-white p-5 border-r border-slate-200/80 shadow-2xl flex flex-col justify-between overflow-y-auto">
@@ -288,9 +288,9 @@ export default function Layout({ children }) {
       )}
 
       {/* Contenido principal */}
-      <div className="xl:pl-64">
+      <div className="lg:pl-64">
         {/* Header responsive para móvil y tablet */}
-        <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/95 px-4 py-3 backdrop-blur xl:hidden shadow-2xs">
+        <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/95 px-4 py-3 backdrop-blur lg:hidden shadow-2xs">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <button

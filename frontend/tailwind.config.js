@@ -7,6 +7,9 @@ export default {
         sans: ["Inter", "ui-sans-serif", "system-ui", "Segoe UI", "sans-serif"]
       },
       boxShadow: {
+        "2xs": "0 1px 2px 0 rgba(15, 23, 42, 0.05)",
+        xs: "0 1px 3px 0 rgba(15, 23, 42, 0.08), 0 1px 2px -1px rgba(15, 23, 42, 0.04)",
+        card: "0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 4px 12px 0 rgba(15, 23, 42, 0.02)",
         soft: "0 16px 40px rgba(15, 23, 42, 0.08)"
       }
     }

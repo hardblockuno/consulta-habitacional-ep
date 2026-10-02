@@ -148,14 +148,14 @@ export default function Personas() {
         <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
-              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
+              <thead className="bg-slate-50/80 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200">
                 <tr>
                   <th className="px-4 py-3">Persona</th>
                   <th className="px-4 py-3">Comité</th>
                   <th className="px-4 py-3">Estado</th>
-                  <th className="px-4 py-3">RSH</th>
-                  <th className="px-4 py-3">Ahorro</th>
-                  <th className="px-4 py-3">Alertas</th>
+                  <th className="px-4 py-3 text-right">RSH</th>
+                  <th className="px-4 py-3 text-right">Ahorro</th>
+                  <th className="px-4 py-3 text-right">Alertas</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -177,9 +177,15 @@ export default function Personas() {
                     <td className="px-4 py-3">
                       <StatusBadge value={persona.estado_general} />
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-700">{percent(persona.rsh_porcentaje)}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-700">{money(persona.ahorro_monto)}</td>
-                    <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-900">{persona.alertas_activas}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-xs font-medium text-slate-700">
+                      {percent(persona.rsh_porcentaje)}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-xs font-medium text-slate-700">
+                      {money(persona.ahorro_monto)}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-xs font-semibold text-slate-900">
+                      {persona.alertas_activas}
+                    </td>
                   </tr>
                 ))}
               </tbody>
