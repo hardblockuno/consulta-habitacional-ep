@@ -1,7 +1,28 @@
 import axios from "axios";
 
+export const CONNECTION_ERROR_MESSAGE =
+  "No se pudo conectar con el servidor local en el puerto 8000. Asegúrate de que el backend esté iniciado.";
+
+export function isConnectionOrNetworkError(error) {
+  if (!error) return false;
+  const msg = String(error.message || "").toLowerCase();
+  const code = String(error.code || "").toUpperCase();
+  return (
+    code === "ERR_NETWORK" ||
+    code === "ECONNREFUSED" ||
+    code === "ERR_CONNECTION_REFUSED" ||
+    code === "ENOTFOUND" ||
+    msg.includes("network error") ||
+    msg.includes("connection refused") ||
+    msg.includes("failed to fetch") ||
+    (!error.response && Boolean(error.request) && code !== "ECONNABORTED" && !msg.includes("timeout"))
+  );
+}
+
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api",
+  baseURL:
+    import.meta.env.VITE_API_BASE_URL ||
+    (import.meta.env.DEV ? "/api" : "http://127.0.0.1:8000/api"),
   timeout: 60000,
 });
 
@@ -17,6 +38,19 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (isConnectionOrNetworkError(error)) {
+      error.isConnectionError = true;
+      error.userFriendlyMessage = CONNECTION_ERROR_MESSAGE;
+      error.message = CONNECTION_ERROR_MESSAGE;
+    }
+    return Promise.reject(error);
+  }
+);
+
 
 /* ==========================================================================
    DEDUPLICACIÓN DE PETICIONES IN-FLIGHT Y CACHÉ EN MEMORIA PARA LECTURAS (GET)

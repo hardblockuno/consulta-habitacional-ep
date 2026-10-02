@@ -11,7 +11,11 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { api } from "../api/client.js";
+import {
+  api,
+  CONNECTION_ERROR_MESSAGE,
+  isConnectionOrNetworkError,
+} from "../api/client.js";
 import { ErrorState } from "../components/StateViews.jsx";
 
 const DECRETOS = [
@@ -83,11 +87,28 @@ export default function Importar({ onVerPadron }) {
         })
         .catch(() => {});
     } catch (err) {
-      let msg =
-        err.response?.data?.detail ||
-        (err.response?.data?.errores && err.response?.data?.errores[0]?.error) ||
-        err.message ||
-        "No se pudo importar la planilla.";
+      const errMsg = String(err.message || "").toLowerCase();
+      const errCode = String(err.code || "").toUpperCase();
+      const isConnectionError =
+        err.isConnectionError ||
+        isConnectionOrNetworkError(err) ||
+        errCode === "ERR_NETWORK" ||
+        errCode === "ECONNREFUSED" ||
+        errCode === "ERR_CONNECTION_REFUSED" ||
+        errMsg.includes("network error") ||
+        errMsg.includes("connection refused") ||
+        (!err.response &&
+          Boolean(err.request) &&
+          errCode !== "ECONNABORTED" &&
+          !errMsg.includes("timeout"));
+
+      let msg = isConnectionError
+        ? err.userFriendlyMessage || CONNECTION_ERROR_MESSAGE
+        : err.response?.data?.detail ||
+          (err.response?.data?.errores && err.response?.data?.errores[0]?.error) ||
+          err.message ||
+          "No se pudo importar la planilla.";
+
       if (
         err.code === "ECONNABORTED" ||
         String(err.message || "").toLowerCase().includes("timeout")

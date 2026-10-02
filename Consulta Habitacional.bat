@@ -62,14 +62,15 @@ if errorlevel 1 if not exist "C:\Program Files\Tesseract-OCR\tesseract.exe" (
   exit /b 1
 )
 
-"%PYTHON%" "%BACKEND%\esperar_api.py" --segundos 1 --provider tesseract >nul 2>nul
+"%PYTHON%" "%BACKEND%\esperar_api.py" --segundos 2 >nul 2>nul
 if errorlevel 1 (
   "%PYTHON%" "%BACKEND%\detener_api_anterior.py" >nul 2>nul
   if not exist "%PYTHONW%" set "PYTHONW=%PYTHON%"
   start "" "%PYTHONW%" "%BACKEND%\iniciar_api.py"
-  "%PYTHON%" "%BACKEND%\esperar_api.py" --segundos 35 --provider tesseract
+  "%PYTHON%" "%BACKEND%\esperar_api.py" --segundos 35
   if errorlevel 1 (
-    echo No fue posible iniciar la plataforma. Vuelve a abrir este archivo.
+    echo No fue posible iniciar la plataforma.
+    echo Revisa el archivo de registro en %%LOCALAPPDATA%%\ConsultaHabitacionalEP\api.log
     pause
     exit /b 1
   )

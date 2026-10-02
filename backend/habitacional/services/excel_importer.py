@@ -70,9 +70,38 @@ COLUMN_ALIASES = {
         "numdocumento",
         "dni",
     ],
+    "dv": [
+        "dv",
+        "digitoverificador",
+        "digito",
+        "dig",
+        "dvpostulante",
+        "dvtitular",
+        "dvsocio",
+        "dvbeneficiario",
+    ],
     "correo": ["correo", "email", "mail", "correoelectronico", "e-mail"],
-    "telefono": ["fono", "telefono", "telefonocelular", "celular", "contacto", "whatsapp", "ncontacto"],
-    "direccion": ["direccion", "domicilio", "direccionparticular", "domicilioparticular"],
+    "telefono": [
+        "fono",
+        "telefono",
+        "telefonocelular",
+        "celular",
+        "contacto",
+        "whatsapp",
+        "ncontacto",
+        "tel",
+        "fonopostulante",
+        "telefonopostulante",
+    ],
+    "direccion": [
+        "direccion",
+        "domicilio",
+        "direccionparticular",
+        "domicilioparticular",
+        "direccionrsh",
+        "domiciliorsh",
+        "direccionterreno",
+    ],
     "sexo": ["sexo", "genero"],
     "estado_civil": ["estadocivil", "ecivil"],
     "nacionalidad": ["nacionalidad", "macionalidad", "paisorigen"],
@@ -99,7 +128,7 @@ COLUMN_ALIASES = {
         "nacimiento",
         "fechadenacimiento",
     ],
-    "edad": ["edad", "edadpostulante"],
+    "edad": ["edad", "edadpostulante", "edadhoy", "edadtitular", "edadsocio"],
     "discapacidad": [
         "discapacidad",
         "discapacitado",
@@ -109,8 +138,6 @@ COLUMN_ALIASES = {
         "movilidadreducida",
     ],
     "neurodivergencia": ["neurodivergencia", "neurodivergente", "tea", "trastornoespectroautista"],
-    "numero_cuenta": ["ncuenta", "numerocuenta", "cuenta", "libreta", "nlibreta", "nrolibreta"],
-    "banco": ["banco", "institucionfinanciera", "entidadfinanciera"],
     "rsh": [
         "rsh",
         "registrosocial",
@@ -123,7 +150,6 @@ COLUMN_ALIASES = {
         "calificacionsocioeconomica",
         "cse",
     ],
-    "minvu_conecta": ["minvuconecta", "minvu", "foliominvu", "codigominvu"],
     "comuna": ["comuna", "comunapostulacion", "comunaproyecto", "comunadomicilio"],
     "parentesco": ["parentesco", "parentezco"],
     "tipo_familia": ["tipofamilia", "familia", "tipologiadefamilia", "tipologiafamilia"],
@@ -244,10 +270,56 @@ COLUMN_ALIASES = {
         "nucleohogar",
         "nucleofam",
     ],
-    "ahorro": ["ahorro", "saldoahorro", "montoahorro", "ahorrodia", "ahorroal", "saldoctaahorro"],
-    "banco": ["banco", "entidad", "institucion", "bancocuenta", "bancoahorro", "bancoahorros"],
-    "numero_cuenta": ["ncuenta", "numerocuenta", "nrocuenta", "libreta", "nrolibreta", "nlibreta", "cuentarut", "ctarut", "nroctarut", "ncta"],
-    "minvu_conecta": ["minvuconecta", "conecta", "puntajeconecta", "rankingconecta", "prioridadconecta", "indiceconecta", "porcentajeconecta"],
+    "ahorro": [
+        "ahorro",
+        "saldoahorro",
+        "montoahorro",
+        "ahorrodia",
+        "ahorroal",
+        "saldoctaahorro",
+        "ahorrototal",
+        "totalahorro",
+    ],
+    "banco": [
+        "banco",
+        "institucionfinanciera",
+        "entidadfinanciera",
+        "entidad",
+        "institucion",
+        "bancocuenta",
+        "bancoahorro",
+        "bancoahorros",
+    ],
+    "numero_cuenta": [
+        "ncuenta",
+        "numerocuenta",
+        "nrocuenta",
+        "nocuenta",
+        "cuenta",
+        "libreta",
+        "nrolibreta",
+        "nlibreta",
+        "cuentarut",
+        "ctarut",
+        "nroctarut",
+        "ncta",
+        "numcuenta",
+        "cuentabancaria",
+        "nrocuentabancaria",
+        "ctabancaria",
+    ],
+    "minvu_conecta": [
+        "minvuconecta",
+        "minvu",
+        "foliominvu",
+        "codigominvu",
+        "conecta",
+        "puntajeconecta",
+        "rankingconecta",
+        "prioridadconecta",
+        "indiceconecta",
+        "porcentajeconecta",
+    ],
     "cedula_vencimiento": [
         "vencimientocedula",
         "cedulavence",
@@ -276,6 +348,7 @@ MAIN_PERSON_EXCLUDES = [
     "menor",
     "integrante",
     "familiar",
+    "pariente",
 ]
 
 COLUMN_EXCLUDES = {
@@ -285,7 +358,7 @@ COLUMN_EXCLUDES = {
     "apellido_materno": MAIN_PERSON_EXCLUDES,
     "apellidos": MAIN_PERSON_EXCLUDES,
     "rut": MAIN_PERSON_EXCLUDES + ["vencimiento", "vence", "vigencia", "caducidad", "expiracion", "fecha", "nombre", "apellido"],
-    "fecha_nacimiento": MAIN_PERSON_EXCLUDES + ["vencimiento", "vence", "vigencia", "caducidad", "expiracion", "cedula", "ci"],
+    "fecha_nacimiento": MAIN_PERSON_EXCLUDES + ["vencimiento", "vence", "vigencia", "caducidad", "expiracion", "cedula", "vencimientoci"],
     "nacionalidad": MAIN_PERSON_EXCLUDES,
     "tipo_familia": [
         "grupo",
@@ -798,7 +871,7 @@ def procesar_fila(*, fila, columnas, mapa, comite, ahorro_minimo):
         return valor_columna(fila, columnas, columna, desplazamiento)
 
     nombre = componer_nombre_persona(valor, mapa)
-    rut = normalizar_rut(valor("rut"))
+    rut = normalizar_rut(valor("rut"), valor("dv"))
     if not nombre or not rut:
         return "omitido"
     if normalizar_texto(nombre) in {"nombre", "basecomite"}:
@@ -851,7 +924,10 @@ def procesar_fila_observaciones(*, fila, columnas, mapa, comite_nombre):
             return None
         return fila.get(columna)
 
-    rut = normalizar_rut(valor_columna_mapa(mapa.get("rut")))
+    rut = normalizar_rut(
+        valor_columna_mapa(mapa.get("rut")),
+        valor_columna_mapa(mapa.get("dv")),
+    )
     if not rut:
         return "omitido"
 
@@ -981,6 +1057,8 @@ def aplicar_correccion_observacion(persona, campo, raw_value):
         porcentaje = parse_decimal(raw_value)
         if porcentaje is None:
             return False
+        if Decimal("0") < porcentaje <= Decimal("1.0"):
+            porcentaje = (porcentaje * 100).quantize(Decimal("0.01"))
         rsh, _ = RSH.objects.get_or_create(persona=persona)
         if rsh.porcentaje == porcentaje:
             return False
@@ -998,6 +1076,8 @@ def aplicar_correccion_observacion(persona, campo, raw_value):
         minvu = parse_decimal(raw_value)
         if minvu is None:
             return False
+        if Decimal("0") < minvu <= Decimal("1.0"):
+            minvu = (minvu * 100).quantize(Decimal("0.01"))
         postulacion, _ = Postulacion.objects.get_or_create(persona=persona)
         if postulacion.minvu_conecta == minvu:
             return False
@@ -1164,6 +1244,8 @@ def actualizar_relaciones(persona, valor, ahorro_minimo, hijos):
         )
 
     rsh_porcentaje = parse_decimal(valor("rsh"))
+    if rsh_porcentaje is not None and Decimal("0") < rsh_porcentaje <= Decimal("1.0"):
+        rsh_porcentaje = (rsh_porcentaje * 100).quantize(Decimal("0.01"))
     RSH.objects.update_or_create(
         persona=persona,
         defaults={
@@ -1186,6 +1268,8 @@ def actualizar_relaciones(persona, valor, ahorro_minimo, hijos):
     )
 
     minvu_conecta = parse_decimal(valor("minvu_conecta"))
+    if minvu_conecta is not None and Decimal("0") < minvu_conecta <= Decimal("1.0"):
+        minvu_conecta = (minvu_conecta * 100).quantize(Decimal("0.01"))
     decreto_comite = getattr(persona.comite, "decreto", "DS49") or "DS49"
     Postulacion.objects.update_or_create(
         persona=persona,
@@ -1607,7 +1691,7 @@ def limpiar_string(valor):
     return texto.strip()
 
 
-def normalizar_rut(valor):
+def normalizar_rut(valor, dv=None):
     texto = limpiar_string(valor).upper()
     if not texto:
         return ""
@@ -1615,18 +1699,25 @@ def normalizar_rut(valor):
     limpio = re.sub(r"[^0-9K]", "", texto)
     if not limpio:
         return ""
-    if tuvo_guion and len(limpio) >= 2:
+
+    dv_texto = limpiar_string(dv).upper() if dv is not None else ""
+    dv_limpio = re.sub(r"[^0-9K]", "", dv_texto)
+
+    if dv_limpio and not tuvo_guion and len(limpio) >= 6:
+        cuerpo = limpio
+        dv_final = dv_limpio[-1]
+    elif tuvo_guion and len(limpio) >= 2:
         cuerpo = limpio[:-1]
-        dv = limpio[-1]
+        dv_final = limpio[-1]
     elif len(limpio) > 8:
         cuerpo = limpio[:-1]
-        dv = limpio[-1]
+        dv_final = limpio[-1]
     else:
         cuerpo = limpio
-        dv = calcular_dv(cuerpo)
-    if not cuerpo.isdigit() or not dv:
+        dv_final = calcular_dv(cuerpo)
+    if not cuerpo.isdigit() or not dv_final:
         return ""
-    return f"{int(cuerpo)}-{dv}"
+    return f"{int(cuerpo)}-{dv_final}"
 
 
 def calcular_dv(cuerpo):

@@ -1,3 +1,4 @@
+import logging
 from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth import authenticate
@@ -10,6 +11,8 @@ from rest_framework.authtoken.models import Token
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+logger = logging.getLogger(__name__)
 
 from .models import (
     Ahorro,
@@ -182,11 +185,18 @@ class ImportarExcelAPIView(APIView):
         if decreto not in dict(Comite.DECRETO_CHOICES):
             decreto = Comite.DECRETO_DS49
 
-        importacion = ImportacionExcel.objects.create(
-            archivo=archivo,
-            nombre_archivo=archivo.name,
-            decreto=decreto,
-        )
+        try:
+            importacion = ImportacionExcel.objects.create(
+                archivo=archivo,
+                nombre_archivo=archivo.name,
+                decreto=decreto,
+            )
+        except Exception as exc:
+            logger.exception("Error al inicializar registro de importación: %s", exc)
+            return Response(
+                {"detail": f"No se pudo guardar el archivo adjunto: {str(exc)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         try:
             resultado = importar_excel(
@@ -208,6 +218,18 @@ class ImportarExcelAPIView(APIView):
                 ImportacionExcelSerializer(importacion).data,
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        except Exception as exc:
+            logger.exception("Error inesperado al importar planilla Excel %s: %s", importacion.nombre_archivo, exc)
+            importacion.estado = ImportacionExcel.ESTADO_ERROR
+            importacion.errores = [{"fila": None, "error": f"Error inesperado al procesar la planilla: {str(exc)}"}]
+            importacion.finalizado_en = timezone.now()
+            importacion.save(
+                update_fields=["estado", "errores", "finalizado_en", "actualizado_en"]
+            )
+            return Response(
+                ImportacionExcelSerializer(importacion).data,
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         serializer = ImportacionExcelSerializer(resultado)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -224,10 +246,17 @@ class ImportarObservacionesExcelAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        importacion = ImportacionExcel.objects.create(
-            archivo=archivo,
-            nombre_archivo=archivo.name,
-        )
+        try:
+            importacion = ImportacionExcel.objects.create(
+                archivo=archivo,
+                nombre_archivo=archivo.name,
+            )
+        except Exception as exc:
+            logger.exception("Error al inicializar registro de observaciones: %s", exc)
+            return Response(
+                {"detail": f"No se pudo guardar el archivo adjunto: {str(exc)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         try:
             resultado = importar_observaciones_excel(
@@ -245,6 +274,18 @@ class ImportarObservacionesExcelAPIView(APIView):
             return Response(
                 ImportacionExcelSerializer(importacion).data,
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception as exc:
+            logger.exception("Error inesperado en observaciones Excel %s: %s", importacion.nombre_archivo, exc)
+            importacion.estado = ImportacionExcel.ESTADO_ERROR
+            importacion.errores = [{"fila": None, "error": f"Error inesperado al procesar observaciones: {str(exc)}"}]
+            importacion.finalizado_en = timezone.now()
+            importacion.save(
+                update_fields=["estado", "errores", "finalizado_en", "actualizado_en"]
+            )
+            return Response(
+                ImportacionExcelSerializer(importacion).data,
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
         serializer = ImportacionExcelSerializer(resultado)

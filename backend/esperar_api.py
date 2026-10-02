@@ -1,4 +1,4 @@
-"""Espera a que el backend local de Rukan quede disponible antes de abrir la web."""
+"""Espera a que el backend local de Consulta Habitacional quede disponible."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ RUKAN_AI_URL = "http://127.0.0.1:8000/api/rukan/ia-estado/"
 def api_disponible(url: str = RUKAN_AI_URL, provider: str = "") -> bool:
     request = Request(url, method="GET")
     try:
-        with urlopen(request, timeout=1) as response:
+        with urlopen(request, timeout=1.5) as response:
             if not provider:
                 return True
             payload = json.loads(response.read().decode("utf-8"))
@@ -40,7 +40,7 @@ def main() -> int:
     args = parser.parse_args()
     if esperar_api(max(1, args.segundos), args.provider.strip().lower()):
         return 0
-    print("La API local no inicio. Vuelve a abrir Consulta Habitacional.bat.")
+    print("La API local no inicio. Revisa el log o vuelve a abrir Consulta Habitacional.bat.")
     return 1
 
 

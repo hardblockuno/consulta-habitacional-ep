@@ -707,6 +707,216 @@ class RolesYAutenticacionTests(TestCase):
             self.assertFalse(p_ds01.alertas.filter(severidad=Alerta.SEVERIDAD_CRITICA).exists())
 
 
+class GeminiAnalyzerRobustnessTests(TestCase):
+    def test_gemini_timeout_is_3_point_5_seconds(self):
+        from habitacional.services.gemini_excel_analyzer import GEMINI_TIMEOUT_SECONDS
+        self.assertEqual(GEMINI_TIMEOUT_SECONDS, 3.5)
+
+    def test_gemini_http_503_fallback(self):
+        from unittest.mock import patch
+        from urllib.error import HTTPError
+        from io import BytesIO
+        from habitacional.services.gemini_excel_analyzer import analizar_esquema_con_gemini
+
+        http_503 = HTTPError(
+            url="https://generativelanguage.googleapis.com",
+            code=503,
+            msg="Service Unavailable",
+            hdrs={},
+            fp=BytesIO(b"Service Unavailable"),
+        )
+        with self.settings(ALLOW_GEMINI_TESTS=True, GEMINI_API_KEY="test-key"):
+            with patch("habitacional.services.gemini_excel_analyzer.urlopen", side_effect=http_503):
+                resultado = analizar_esquema_con_gemini(["RUT", "NOMBRE"], [{"RUT": "1-9", "NOMBRE": "Juan"}])
+                self.assertEqual(resultado, {})
+
+    def test_gemini_timeout_fallback(self):
+        from unittest.mock import patch
+        from habitacional.services.gemini_excel_analyzer import analizar_esquema_con_gemini
+
+        timeout_err = TimeoutError("The read operation timed out after 3.5 seconds")
+        with self.settings(ALLOW_GEMINI_TESTS=True, GEMINI_API_KEY="test-key"):
+            with patch("habitacional.services.gemini_excel_analyzer.urlopen", side_effect=timeout_err):
+                resultado = analizar_esquema_con_gemini(["RUT", "NOMBRE"], [{"RUT": "1-9", "NOMBRE": "Juan"}])
+                self.assertEqual(resultado, {})
+
+
+class PerquencoIngestionAuditTests(TestCase):
+    def test_reconocimiento_columnas_base_perquenco(self):
+        from habitacional.services.excel_importer import construir_mapa_columnas
+
+        columnas_perquenco = [
+            "Nº", "NOMBRE", "RUT", "DV", "FONO", "DIRECCION RSH", "ROL SII",
+            "DIRECCION TERRENO", "SUPERFICIE TERRENO", "FOJA", "NUMERO", "AÑO", "CBR",
+            "ETNIA", "SEXO", "ESTADO CIVIL", "NOMBRE CONYUGE", "RUT CONYUGE",
+            "FECHA DE NACIMIENTO CONYUGE", "SEXO CONYUGE", "PAIS",
+            "FECHA DE NACIMIENTO ", "EDAD HOY", "DISCAPACIDAD", "Nº CUENTA", "BANCO",
+            "UF AL MES SEP 2026", "UF AL DIA 01.10.2026", "RSH", "MINVU CONECTA",
+            "COMUNA", "GRUPO FAMILIAR", "PARENTEZCO", "TIPO FAMILIA", "EXCEPCION",
+            "DEFICIT HABITABILIDAD", "PROPIEDADES Y/O SUBSIDIOS", "SUBSIDIO DE ARRIENDO",
+            "TIPO VIVIENDA", "JUSTIFICACION 3º DORMITORIO CON AHORRO", "JUSTIFICACION",
+            "AHORRO", "CUENTA", "BANCO.1", "AHORRO DIA 25.8.25", "OBSERVACIONES",
+            "FACTOR AISLAMIENTO", "PARIENTE 1", "RUT 1", "estado civil", "FEC NAC 1",
+            "EDAD 1", "PARENTEZCO 1", "DISCAPACIDAD 1", "PARIENTE 2", "RUT 2",
+            "ESTADO CIVIL_1", "FEC NAC 2", "EDAD 2", "PARENTEZCO 2", "DISCAPACIDAD 2",
+        ]
+        mapa = construir_mapa_columnas(columnas_perquenco)
+
+        self.assertEqual(mapa.get("rut"), "RUT")
+        self.assertEqual(mapa.get("dv"), "DV")
+        self.assertEqual(mapa.get("nombre"), "NOMBRE")
+        self.assertEqual(mapa.get("fecha_nacimiento"), "FECHA DE NACIMIENTO ")
+        self.assertEqual(mapa.get("edad"), "EDAD HOY")
+        self.assertEqual(mapa.get("sexo"), "SEXO")
+        self.assertEqual(mapa.get("etnia"), "ETNIA")
+        self.assertEqual(mapa.get("telefono"), "FONO")
+        self.assertEqual(mapa.get("direccion"), "DIRECCION RSH")
+        self.assertEqual(mapa.get("discapacidad"), "DISCAPACIDAD")
+        self.assertEqual(mapa.get("numero_cuenta"), "Nº CUENTA")
+        self.assertEqual(mapa.get("banco"), "BANCO")
+        self.assertEqual(mapa.get("rsh"), "RSH")
+        self.assertEqual(mapa.get("minvu_conecta"), "MINVU CONECTA")
+        self.assertEqual(mapa.get("ahorro"), "AHORRO")
+        self.assertEqual(mapa.get("tipo_familia"), "TIPO FAMILIA")
+        self.assertEqual(mapa.get("parentesco"), "PARENTEZCO")
+
+    def test_normalizar_rut_con_columna_dv(self):
+        from habitacional.services.excel_importer import normalizar_rut
+
+        self.assertEqual(normalizar_rut("20393800", "4"), "20393800-4")
+        self.assertEqual(normalizar_rut("20353246", "6"), "20353246-6")
+        self.assertEqual(normalizar_rut("9809472", "5"), "9809472-5")
+        self.assertEqual(normalizar_rut("20393800-4", "4"), "20393800-4")
+        self.assertEqual(normalizar_rut("11111111", None), "11111111-1")
+
+    def test_escalado_porcentaje_rsh_fraccionario(self):
+        with TemporaryDirectory() as tmpdir:
+            archivo = Path(tmpdir) / "PERQUENCO_MINI.xlsx"
+            df = pd.DataFrame(
+                [
+                    ["NOMBRE", "RUT", "DV", "RSH", "MINVU CONECTA"],
+                    ["Postulante Preferente", "11111111", "1", 0.4, 0.4],
+                    ["Postulante No Preferente", "22222222", "2", 0.8, 0.8],
+                ]
+            )
+            with pd.ExcelWriter(archivo, engine="openpyxl") as writer:
+                df.to_excel(writer, index=False)
+
+            imp = ImportacionExcel.objects.create(archivo=str(archivo), nombre_archivo=archivo.name)
+            importar_excel(
+                importacion=imp,
+                archivo_path=archivo,
+                comite_nombre="Comité Fraccionarios",
+            )
+
+            p1 = Persona.objects.get(nombre="Postulante Preferente")
+            self.assertEqual(p1.rsh.porcentaje, Decimal("40.00"))
+            self.assertTrue(p1.rsh.es_preferente)
+            self.assertEqual(p1.postulacion.minvu_conecta, Decimal("40.00"))
+
+            p2 = Persona.objects.get(nombre="Postulante No Preferente")
+            self.assertEqual(p2.rsh.porcentaje, Decimal("80.00"))
+            self.assertFalse(p2.rsh.es_preferente)
+            self.assertEqual(p2.postulacion.minvu_conecta, Decimal("80.00"))
+
+    def test_ingesta_real_perquenco_si_existe(self):
+        ruta_perquenco = Path(r"C:\Users\lucas\Downloads\BASE PERQUENCO 01.10.2026.xlsx")
+        if not ruta_perquenco.exists():
+            return
+
+        imp = ImportacionExcel.objects.create(
+            archivo=str(ruta_perquenco),
+            nombre_archivo=ruta_perquenco.name,
+            decreto="DS49",
+        )
+        importar_excel(
+            importacion=imp,
+            archivo_path=ruta_perquenco,
+            comite_nombre="Comité Perquenco Real",
+            comuna="Perquenco",
+            decreto="DS49",
+        )
+
+        self.assertEqual(imp.total_filas, 155)
+        self.assertEqual(imp.estado, ImportacionExcel.ESTADO_COMPLETADA)
+        self.assertEqual(len(imp.errores), 0)
+
+        # Verificar titular Abigail con RUT y fecha nacimiento reales
+        abigail = Persona.objects.get(rut="20393800-4")
+        self.assertEqual(abigail.fecha_nacimiento.year, 2000)
+        self.assertEqual(abigail.edad, 26)
+        self.assertEqual(abigail.rsh.porcentaje, Decimal("40.00"))
+        self.assertTrue(abigail.rsh.es_preferente)
+        self.assertEqual(abigail.ahorro.banco, "ESTADO")
+        self.assertEqual(abigail.ahorro.numero_cuenta, "00130833110")
+
+        # Verificar Curin Concha con RSH 80% (no preferente) y Etnia Mapuche
+        curin = Persona.objects.get(rut="20353246-6")
+        self.assertEqual(curin.etnia, "MAPUCHE")
+        self.assertEqual(curin.rsh.porcentaje, Decimal("80.00"))
+        self.assertFalse(curin.rsh.es_preferente)
+
+
+class ImportarExcelAPIViewRobustnessTests(TestCase):
+    def test_importar_excel_sin_archivo_retorna_400(self):
+        from rest_framework.test import APIRequestFactory
+        from habitacional.views import ImportarExcelAPIView
+
+        factory = APIRequestFactory()
+        request = factory.post("/api/habitacional/importar-excel/", {})
+        view = ImportarExcelAPIView.as_view()
+        response = view(request)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("detail", response.data)
+
+    def test_importar_excel_error_inesperado_retorna_500_estructurado(self):
+        from unittest.mock import patch
+        from rest_framework.test import APIRequestFactory
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from habitacional.views import ImportarExcelAPIView
+
+        archivo = SimpleUploadedFile("test.xlsx", b"dummy content", content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        factory = APIRequestFactory()
+        request = factory.post(
+            "/api/habitacional/importar-excel/",
+            {"archivo": archivo, "comite_nombre": "Test 500"},
+            format="multipart",
+        )
+
+        with patch("habitacional.views.importar_excel", side_effect=RuntimeError("Fallo inesperado del sistema")):
+            view = ImportarExcelAPIView.as_view()
+            response = view(request)
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.data.get("estado"), ImportacionExcel.ESTADO_ERROR)
+        self.assertTrue(len(response.data.get("errores", [])) > 0)
+        self.assertIn("Fallo inesperado del sistema", response.data["errores"][0]["error"])
+
+    def test_importar_excel_error_de_importacion_retorna_400_estructurado(self):
+        from unittest.mock import patch
+        from rest_framework.test import APIRequestFactory
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from habitacional.services.excel_importer import ImportacionError
+        from habitacional.views import ImportarExcelAPIView
+
+        archivo = SimpleUploadedFile("test.xlsx", b"dummy content", content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        factory = APIRequestFactory()
+        request = factory.post(
+            "/api/habitacional/importar-excel/",
+            {"archivo": archivo, "comite_nombre": "Test 400"},
+            format="multipart",
+        )
+
+        with patch("habitacional.views.importar_excel", side_effect=ImportacionError("Encabezado RUT no encontrado")):
+            view = ImportarExcelAPIView.as_view()
+            response = view(request)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data.get("estado"), ImportacionExcel.ESTADO_ERROR)
+        self.assertIn("Encabezado RUT no encontrado", response.data["errores"][0]["error"])
+
+
+
 
 
 

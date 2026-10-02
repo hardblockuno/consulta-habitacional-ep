@@ -11,6 +11,7 @@ import hashlib
 import json
 import logging
 import os
+import socket
 from decimal import Decimal
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -23,6 +24,7 @@ logger = logging.getLogger(__name__)
 _CACHE_MAPEOS_EXCEL = {}
 
 DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
+GEMINI_TIMEOUT_SECONDS = 3.5
 GEMINI_API_URL_TEMPLATE = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
 
 
@@ -55,7 +57,7 @@ def analizar_esquema_con_gemini(columnas: list, muestra_filas: list, decreto: st
     - Calidad indígena / etnia (Mapuche, etc.)
     """
     import sys
-    if "test" in sys.argv:
+    if "test" in sys.argv and not getattr(settings, "ALLOW_GEMINI_TESTS", False):
         return {}
 
     api_key = get_gemini_api_key()
@@ -133,7 +135,7 @@ Si una columna no existe, usa null. Devuelve solo el JSON puro sin markdown."""
     )
 
     try:
-        with urlopen(req, timeout=30) as resp:
+        with urlopen(req, timeout=GEMINI_TIMEOUT_SECONDS) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             texto_respuesta = (
                 data.get("candidates", [{}])[0]
@@ -148,11 +150,13 @@ Si una columna no existe, usa null. Devuelve solo el JSON puro sin markdown."""
     except HTTPError as err:
         if err.code == 429:
             logger.warning("Cuota temporal de Gemini alcanzada (HTTP 429). Activando motor algorítmico local de respaldo.")
+        elif err.code == 503:
+            logger.warning("Servicio de Gemini no disponible (HTTP 503 Service Unavailable). Fallback inmediato a motor local determinista.")
         else:
-            logger.warning(f"Error HTTP en llamada a Gemini ({err.code}): {err.reason}. Fallback a motor local.")
+            logger.warning(f"Error HTTP en llamada a Gemini ({err.code}): {err.reason}. Fallback a motor local determinista.")
         return {}
-    except (URLError, Exception) as exc:
-        logger.warning(f"Error de conexión con Gemini ({exc}). Fallback a motor local.")
+    except (URLError, TimeoutError, socket.timeout, Exception) as exc:
+        logger.warning(f"Error o timeout ({GEMINI_TIMEOUT_SECONDS}s) en conexión con Gemini ({exc}). Fallback inmediato a motor local determinista.")
         return {}
 
 

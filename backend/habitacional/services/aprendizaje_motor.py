@@ -102,12 +102,34 @@ def evaluar_necesidad_de_ia(columnas: list, mapa_local: dict) -> tuple[bool, str
             continue
         columnas_sin_mapear.append(col)
 
+    campos_clave = [
+        "fecha_nacimiento",
+        "edad",
+        "rsh",
+        "ahorro",
+        "banco",
+        "numero_cuenta",
+        "discapacidad",
+        "etnia",
+        "grupo_familiar",
+        "integrantes",
+        "telefono",
+        "direccion",
+        "sexo",
+    ]
+    claves_presentes = sum(1 for c in campos_clave if mapa_local.get(c))
+
     # Si no hay columnas sustanciales sin mapear, o el mapa local cubre todo lo necesario
     if len(columnas_sin_mapear) == 0:
         return False, "Autonomía local completa: 100% de columnas identificadas por el motor determinista."
 
-    # Si hay columnas sustanciales sin mapear, se consulta a Gemini como tutor
-    return True, f"Se detectaron {len(columnas_sin_mapear)} columnas no estandarizadas: {', '.join(columnas_sin_mapear[:3])}."
+    # Regla de oro: Si la identidad y al menos 4 campos clave están resueltos localmente,
+    # el motor determinista asume el control sin gastar llamadas de IA ni arriesgar bloqueos
+    if claves_presentes >= 4:
+        return False, f"Autonomía local suficiente: Identidad y {claves_presentes} campos clave resueltos sin necesidad de IA."
+
+    # Si hay columnas sustanciales sin mapear y cobertura insuficiente, se consulta a Gemini
+    return True, f"Se detectaron {len(columnas_sin_mapear)} columnas no estandarizadas y cobertura parcial ({claves_presentes} campos clave): {', '.join(columnas_sin_mapear[:3])}."
 
 
 def destilar_y_guardar_lecciones_gemini(mapeo_gemini: dict, columnas: list, mapa_local_previo: dict) -> list:

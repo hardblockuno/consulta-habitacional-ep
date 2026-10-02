@@ -34,13 +34,29 @@ def proceso_en_puerto_8000() -> str:
     return ""
 
 
+def es_proceso_python(process_id: str) -> bool:
+    if not process_id or not process_id.isdigit():
+        return False
+    try:
+        result = subprocess.run(
+            ["tasklist", "/FI", f"PID eq {process_id}", "/FO", "CSV", "/NH"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        return "python" in result.stdout.lower()
+    except Exception:
+        return False
+
+
 def main() -> int:
-    if not es_api_de_la_plataforma():
-        return 0
     process_id = proceso_en_puerto_8000()
     if not process_id:
         return 0
-    subprocess.run(["taskkill", "/PID", process_id, "/T", "/F"], check=False, capture_output=True)
+
+    # Si responde a la plataforma o si es un proceso Python colgado ocupando el puerto 8000
+    if es_api_de_la_plataforma() or es_proceso_python(process_id):
+        subprocess.run(["taskkill", "/PID", process_id, "/T", "/F"], check=False, capture_output=True)
     return 0
 
 
