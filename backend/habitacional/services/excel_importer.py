@@ -317,6 +317,7 @@ def importar_excel(
     comite_nombre="",
     comuna="",
     ahorro_minimo=Decimal("10"),
+    decreto="DS49",
 ):
     try:
         excel = pd.ExcelFile(archivo_path)
@@ -335,6 +336,8 @@ def importar_excel(
     columnas = list(df.columns)
     mapa = construir_mapa_columnas(columnas)
 
+    decreto_limpio = (decreto or "DS49").strip().upper()
+
     # Motor Híbrido con Aprendizaje Activo:
     # 1. Evalúa si el motor determinista local ya puede resolver el 100% de forma autónoma (0 API calls)
     try:
@@ -347,7 +350,7 @@ def importar_excel(
         necesita_ia, motivo = evaluar_necesidad_de_ia(columnas, mapa)
         if necesita_ia:
             muestra = df.head(3).to_dict(orient="records")
-            mapeo_gemini = analizar_esquema_con_gemini(columnas, muestra)
+            mapeo_gemini = analizar_esquema_con_gemini(columnas, muestra, decreto=decreto_limpio)
             if mapeo_gemini:
                 # 2. Destilar y persistir lo aprendido para que el motor local lo recuerde siempre
                 destilar_y_guardar_lecciones_gemini(mapeo_gemini, columnas, mapa)
@@ -375,12 +378,16 @@ def importar_excel(
     comite, _ = Comite.objects.get_or_create(
         nombre=nombre_comite,
         comuna=comuna,
-        defaults={"origen": importacion.nombre_archivo},
+        defaults={"origen": importacion.nombre_archivo, "decreto": decreto_limpio},
     )
+    if decreto_limpio and comite.decreto != decreto_limpio:
+        comite.decreto = decreto_limpio
+        comite.save(update_fields=["decreto", "actualizado_en"])
 
     importacion.hoja = hoja
+    importacion.decreto = decreto_limpio
     importacion.total_filas = len(df)
-    importacion.save(update_fields=["hoja", "total_filas", "actualizado_en"])
+    importacion.save(update_fields=["hoja", "decreto", "total_filas", "actualizado_en"])
 
     creados = 0
     actualizados = 0
@@ -1179,12 +1186,13 @@ def actualizar_relaciones(persona, valor, ahorro_minimo, hijos):
     )
 
     minvu_conecta = parse_decimal(valor("minvu_conecta"))
+    decreto_comite = getattr(persona.comite, "decreto", "DS49") or "DS49"
     Postulacion.objects.update_or_create(
         persona=persona,
         defaults={
             "minvu_conecta": minvu_conecta,
             "estado": "",
-            "programa": "",
+            "programa": decreto_comite,
         },
     )
 
@@ -1270,29 +1278,67 @@ def crear_alertas_persona(persona, fecha_vencimiento, hijos=None):
             impacta_estado=False,
         )
 
+    decreto = (getattr(persona.comite, "decreto", "DS49") or "DS49").upper()
     if postulacion_es_unipersonal(persona):
-        criterios = criterios_excepcion_unipersonal(persona)
-        if criterios:
+        if decreto == "DS49":
+            criterios = criterios_excepcion_unipersonal(persona)
+            if criterios:
+                crear_alerta(
+                    persona,
+                    Alerta.TIPO_SOCIAL,
+                    Alerta.SEVERIDAD_PREVENTIVA,
+                    "Criterio de excepción unipersonal",
+                    f"Postulación unipersonal habilitada por excepción legal DS49: {', '.join(criterios)}.",
+                    impacta_estado=False,
+                )
+            else:
+                crear_alerta(
+                    persona,
+                    Alerta.TIPO_SOCIAL,
+                    Alerta.SEVERIDAD_CRITICA,
+                    "Unipersonal sin excepción legal SERVIU",
+                    (
+                        "Postulante unipersonal (1 integrante) menor de 60 años sin causal de excepción legal "
+                        "(sin discapacidad ni calidad indígena acreditada). SERVIU rechazará postulación individual "
+                        "si no incorpora un núcleo familiar."
+                    ),
+                    impacta_estado=True,
+                )
+        elif decreto == "DS01":
             crear_alerta(
                 persona,
                 Alerta.TIPO_SOCIAL,
                 Alerta.SEVERIDAD_PREVENTIVA,
-                "Criterio de excepción unipersonal",
-                f"Postulación unipersonal habilitada por excepción legal DS49: {', '.join(criterios)}.",
+                "Postulación unipersonal DS01 (Sectores Medios)",
+                "Postulante unipersonal admitido en subsidio DS01 Sectores Medios. Verificar tramo correspondiente (1, 2 o 3) y capacidad crediticia o de ahorro.",
                 impacta_estado=False,
             )
-        else:
+        elif decreto == "DS27":
             crear_alerta(
                 persona,
                 Alerta.TIPO_SOCIAL,
-                Alerta.SEVERIDAD_CRITICA,
-                "Unipersonal sin excepción legal SERVIU",
-                (
-                    "Postulante unipersonal (1 integrante) menor de 60 años sin causal de excepción legal "
-                    "(sin discapacidad ni calidad indígena acreditada). SERVIU rechazará postulación individual "
-                    "si no incorpora un núcleo familiar."
-                ),
-                impacta_estado=True,
+                Alerta.SEVERIDAD_PREVENTIVA,
+                "Postulación unipersonal a Mejoramiento (DS27)",
+                "Postulante unipersonal admitido en programa de Mejoramiento y Equipamiento DS27. Requiere acreditar tenencia de la vivienda.",
+                impacta_estado=False,
+            )
+        elif decreto == "DS10":
+            crear_alerta(
+                persona,
+                Alerta.TIPO_SOCIAL,
+                Alerta.SEVERIDAD_PREVENTIVA,
+                "Postulación unipersonal Habitabilidad Rural (DS10)",
+                "Postulante unipersonal admitido en subsidio rural DS10. Requiere acreditar tenencia de terreno o arraigo rural.",
+                impacta_estado=False,
+            )
+        elif decreto == "DS19":
+            crear_alerta(
+                persona,
+                Alerta.TIPO_SOCIAL,
+                Alerta.SEVERIDAD_PREVENTIVA,
+                "Postulación Proyecto Integración Social (DS19)",
+                "Postulación unipersonal asociada a proyecto DS19. Requiere cupo seleccionado en el conjunto habitacional.",
+                impacta_estado=False,
             )
 
     for hijo in hijos or []:

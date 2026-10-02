@@ -20,6 +20,7 @@ from .models import (
 
 class ComiteSerializer(serializers.ModelSerializer):
     total_personas = serializers.IntegerField(read_only=True, default=0)
+    decreto_display = serializers.CharField(source="get_decreto_display", read_only=True)
 
     class Meta:
         model = Comite
@@ -29,11 +30,14 @@ class ComiteSerializer(serializers.ModelSerializer):
             "comuna",
             "region",
             "origen",
+            "decreto",
+            "decreto_display",
             "activo",
             "total_personas",
             "creado_en",
             "actualizado_en",
         ]
+
 
 
 class CaracterizacionSocialSerializer(serializers.ModelSerializer):
@@ -132,6 +136,7 @@ class AlertaSerializer(serializers.ModelSerializer):
 class PersonaListSerializer(serializers.ModelSerializer):
     comite_nombre = serializers.CharField(source="comite.nombre", read_only=True)
     comite_comuna = serializers.CharField(source="comite.comuna", read_only=True)
+    comite_decreto = serializers.CharField(source="comite.decreto", read_only=True)
     postulacion_unipersonal = serializers.SerializerMethodField()
     rsh_porcentaje = serializers.DecimalField(
         source="rsh.porcentaje",
@@ -158,6 +163,7 @@ class PersonaListSerializer(serializers.ModelSerializer):
             "etnia",
             "comite_nombre",
             "comite_comuna",
+            "comite_decreto",
             "edad",
             "persona_mayor",
             "discapacidad",
@@ -167,6 +173,7 @@ class PersonaListSerializer(serializers.ModelSerializer):
             "ahorro_monto",
             "alertas_activas",
         ]
+
 
     def get_postulacion_unipersonal(self, obj):
         caracterizacion = getattr(obj, "caracterizacion_social", None)
@@ -231,12 +238,16 @@ class PersonaDetailSerializer(serializers.ModelSerializer):
 
 
 class ImportacionExcelSerializer(serializers.ModelSerializer):
+    decreto_display = serializers.CharField(source="get_decreto_display", read_only=True)
+
     class Meta:
         model = ImportacionExcel
         fields = [
             "id",
             "nombre_archivo",
             "hoja",
+            "decreto",
+            "decreto_display",
             "estado",
             "total_filas",
             "creados",
@@ -246,6 +257,7 @@ class ImportacionExcelSerializer(serializers.ModelSerializer):
             "creado_en",
             "finalizado_en",
         ]
+
 
 
 class TicketPostventaSerializer(serializers.ModelSerializer):

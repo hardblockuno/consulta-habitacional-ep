@@ -5,11 +5,20 @@ import { Link } from "react-router-dom";
 import { api } from "../api/client.js";
 import { EmptyState, ErrorState, LoadingState } from "./StateViews.jsx";
 
+const DECRETO_COLORS = {
+  DS49: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  DS01: "bg-blue-50 text-blue-700 border-blue-200",
+  DS19: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  DS27: "bg-amber-50 text-amber-700 border-amber-200",
+  DS10: "bg-teal-50 text-teal-700 border-teal-200",
+};
+
 export default function GestionComites({ onSelectComite }) {
   const [comites, setComites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busqueda, setBusqueda] = useState("");
+  const [filtroDecreto, setFiltroDecreto] = useState("todos");
 
   // Estado para el modal de eliminación
   const [comiteAEliminar, setComiteAEliminar] = useState(null);
@@ -54,6 +63,8 @@ export default function GestionComites({ onSelectComite }) {
   }
 
   const comitesFiltrados = comites.filter((c) => {
+    const matchDecreto = filtroDecreto === "todos" || (c.decreto || "DS49") === filtroDecreto;
+    if (!matchDecreto) return false;
     const q = busqueda.toLowerCase().trim();
     if (!q) return true;
     return (
@@ -71,21 +82,37 @@ export default function GestionComites({ onSelectComite }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-sm font-semibold tracking-tight text-slate-900">
-            Comités Registrados ({comites.length})
+            Comités Registrados ({comitesFiltrados.length}{filtroDecreto !== "todos" ? ` de ${comites.length}` : ""})
           </h2>
           <p className="text-xs text-slate-500">
             Total de {totalFamilias.toLocaleString("es-CL")} socios y familias distribuidos en el sistema
           </p>
         </div>
 
-        <div className="relative w-full sm:w-72">
-          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
-          <input
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar comité o comuna..."
-            className="h-9 w-full rounded-md border border-slate-200 bg-white pl-9 pr-3 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 focus:outline-none transition-all"
-          />
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Selector de filtro por Decreto */}
+          <select
+            value={filtroDecreto}
+            onChange={(e) => setFiltroDecreto(e.target.value)}
+            className="h-9 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-2xs focus:border-slate-800 focus:outline-none cursor-pointer"
+          >
+            <option value="todos">Todos los decretos</option>
+            <option value="DS49">DS49 · Fondo Solidario</option>
+            <option value="DS01">DS01 · Sectores Medios</option>
+            <option value="DS19">DS19 · Integración Social</option>
+            <option value="DS27">DS27 · Mejoramiento</option>
+            <option value="DS10">DS10 · Habitabilidad Rural</option>
+          </select>
+
+          <div className="relative w-full sm:w-60">
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+            <input
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar comité o comuna..."
+              className="h-9 w-full rounded-md border border-slate-200 bg-white pl-9 pr-3 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 focus:outline-none transition-all"
+            />
+          </div>
         </div>
       </div>
 
@@ -125,6 +152,9 @@ export default function GestionComites({ onSelectComite }) {
                       </p>
                     </div>
                   </div>
+                  <span className={`shrink-0 inline-flex items-center rounded px-2 py-0.5 text-[10px] font-semibold border ${DECRETO_COLORS[c.decreto] || "bg-slate-100 text-slate-700 border-slate-200"}`}>
+                    {c.decreto || "DS49"}
+                  </span>
                 </div>
 
                 <div className="mt-4 flex items-center gap-4 rounded-md bg-slate-50 p-2.5">

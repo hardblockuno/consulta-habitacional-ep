@@ -59,10 +59,13 @@ class ComiteViewSet(viewsets.ModelViewSet):
         )
         q = self.request.query_params.get("q", "").strip()
         comuna = self.request.query_params.get("comuna", "").strip()
+        decreto = self.request.query_params.get("decreto", "").strip()
         if q:
             queryset = queryset.filter(Q(nombre__icontains=q) | Q(comuna__icontains=q))
         if comuna:
             queryset = queryset.filter(comuna__icontains=comuna)
+        if decreto:
+            queryset = queryset.filter(decreto__iexact=decreto)
         return queryset
 
     @transaction.atomic
@@ -165,9 +168,14 @@ class ImportarExcelAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        decreto = str(request.data.get("decreto") or "DS49").strip().upper()
+        if decreto not in dict(Comite.DECRETO_CHOICES):
+            decreto = Comite.DECRETO_DS49
+
         importacion = ImportacionExcel.objects.create(
             archivo=archivo,
             nombre_archivo=archivo.name,
+            decreto=decreto,
         )
 
         try:
@@ -177,6 +185,7 @@ class ImportarExcelAPIView(APIView):
                 comite_nombre=request.data.get("comite_nombre", "").strip(),
                 comuna=request.data.get("comuna", "").strip(),
                 ahorro_minimo=ahorro_minimo,
+                decreto=decreto,
             )
         except ImportacionError as exc:
             importacion.estado = ImportacionExcel.ESTADO_ERROR
@@ -357,6 +366,8 @@ def dashboard_resumen_data(comite=None):
                 "id": c.id,
                 "nombre": c.nombre,
                 "comuna": c.comuna,
+                "decreto": getattr(c, "decreto", "DS49") or "DS49",
+                "decreto_display": c.get_decreto_display() if hasattr(c, "get_decreto_display") else "DS49",
                 "total_personas": c_total,
                 "aptas": c_aptas,
                 "observadas": c_observadas,

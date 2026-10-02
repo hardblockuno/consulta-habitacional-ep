@@ -655,6 +655,58 @@ class RolesYAutenticacionTests(TestCase):
                 self.assertGreaterEqual(stats["total_alias_aprendidos_permanentes"], 1)
                 self.assertIn("banco", stats["detalle_por_campo"])
 
+    def test_importacion_con_decreto_diferenciado_ds01_vs_ds49(self):
+        # 1. Unipersonal sin excepción en DS49 queda bloqueado (Alerta crítica SERVIU)
+        with TemporaryDirectory() as tmpdir:
+            archivo_ds49 = Path(tmpdir) / "COMITE_DS49.xlsx"
+            df = pd.DataFrame(
+                [
+                    ["NOMBRE", "RUT", "EDAD", "INTEGRANTES"],
+                    ["Postulante Solo DS49", "12345678", 32, 1],
+                ]
+            )
+            with pd.ExcelWriter(archivo_ds49, engine="openpyxl") as writer:
+                df.to_excel(writer, index=False, sheet_name="BASE")
+
+            imp_ds49 = ImportacionExcel.objects.create(archivo=str(archivo_ds49), nombre_archivo=archivo_ds49.name)
+            importar_excel(
+                importacion=imp_ds49,
+                archivo_path=archivo_ds49,
+                comite_nombre="Comité Fondo Solidario",
+                comuna="Temuco",
+                decreto="DS49",
+            )
+            p_ds49 = Persona.objects.get(nombre="Postulante Solo DS49")
+            self.assertEqual(p_ds49.comite.decreto, "DS49")
+            self.assertEqual(p_ds49.estado_general, Persona.ESTADO_BLOQUEADA)
+            self.assertTrue(p_ds49.alertas.filter(severidad=Alerta.SEVERIDAD_CRITICA).exists())
+
+        # 2. Unipersonal sin excepción en DS01 NO queda bloqueado (Habilitado para sectores medios)
+        with TemporaryDirectory() as tmpdir:
+            archivo_ds01 = Path(tmpdir) / "COMITE_DS01.xlsx"
+            df = pd.DataFrame(
+                [
+                    ["NOMBRE", "RUT", "EDAD", "INTEGRANTES"],
+                    ["Postulante Solo DS01", "87654321", 32, 1],
+                ]
+            )
+            with pd.ExcelWriter(archivo_ds01, engine="openpyxl") as writer:
+                df.to_excel(writer, index=False, sheet_name="BASE")
+
+            imp_ds01 = ImportacionExcel.objects.create(archivo=str(archivo_ds01), nombre_archivo=archivo_ds01.name)
+            importar_excel(
+                importacion=imp_ds01,
+                archivo_path=archivo_ds01,
+                comite_nombre="Comité Sectores Medios",
+                comuna="Temuco",
+                decreto="DS01",
+            )
+            p_ds01 = Persona.objects.get(nombre="Postulante Solo DS01")
+            self.assertEqual(p_ds01.comite.decreto, "DS01")
+            self.assertEqual(p_ds01.estado_general, Persona.ESTADO_APTA)
+            self.assertFalse(p_ds01.alertas.filter(severidad=Alerta.SEVERIDAD_CRITICA).exists())
+
+
 
 
 

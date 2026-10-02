@@ -41,7 +41,7 @@ def obtener_hash_columnas(columnas: list) -> str:
     return hashlib.md5(cadena.encode("utf-8")).hexdigest()
 
 
-def analizar_esquema_con_gemini(columnas: list, muestra_filas: list) -> dict:
+def analizar_esquema_con_gemini(columnas: list, muestra_filas: list, decreto: str = "DS49") -> dict:
     """Realiza un análisis semántico de la planilla mediante una ÚNICA llamada a Gemini.
     
     Identifica las columnas correspondientes a:
@@ -63,7 +63,8 @@ def analizar_esquema_con_gemini(columnas: list, muestra_filas: list) -> dict:
         logger.info("GEMINI_API_KEY no configurada. Usando motor algorítmico local.")
         return {}
 
-    hash_cols = obtener_hash_columnas(columnas)
+    decreto_str = (decreto or "DS49").upper()
+    hash_cols = f"{obtener_hash_columnas(columnas)}_{decreto_str}"
     if hash_cols in _CACHE_MAPEOS_EXCEL:
         logger.info("Mapeo obtenido desde caché en memoria (0 llamadas a Gemini).")
         return _CACHE_MAPEOS_EXCEL[hash_cols]
@@ -80,8 +81,9 @@ def analizar_esquema_con_gemini(columnas: list, muestra_filas: list) -> dict:
             if v is not None and str(v).strip() != "" and not str(v).startswith("Unnamed:")
         })
 
-    prompt = f"""Eres un perito experto en subsidios habitacionales del MINVU (Chile) y procesamiento de planillas Excel de comités de vivienda (DS49).
+    prompt = f"""Eres un perito experto en subsidios habitacionales del MINVU (Chile) y procesamiento de planillas Excel de postulaciones y comités habitacionales (Decreto: {decreto_str}).
 Analiza las columnas y la muestra de datos de esta planilla para determinar a qué campo corresponde cada columna.
+
 
 Columnas disponibles en el Excel:
 {json.dumps(columnas, ensure_ascii=False)}
@@ -154,15 +156,29 @@ Si una columna no existe, usa null. Devuelve solo el JSON puro sin markdown."""
         return {}
 
 
-def evaluar_excepcion_unipersonal_serviu(*, edad: int = None, persona_mayor: bool = False, tiene_discapacidad: bool = False, etnia: str = "", observaciones: str = "") -> dict:
+def evaluar_excepcion_unipersonal_serviu(*, edad: int = None, persona_mayor: bool = False, tiene_discapacidad: bool = False, etnia: str = "", observaciones: str = "", decreto: str = "DS49") -> dict:
     """Evalúa localmente (0 tokens consumidos) si un postulante unipersonal (1 integrante)
-    cumple con las excepciones legales del DS49 MINVU para postular de forma individual:
+    cumple con las reglas según el decreto habitacional correspondiente:
     
+    DS49:
     1. Adulto Mayor (≥ 60 años).
     2. Discapacidad acreditada (COMPIN / RND).
     3. Calidad Indígena (CONADI / Pueblo Originario Mapuche, Aymara, etc.).
     4. Víctima de violencia política (Valech / Rettig).
+
+    DS01 / DS27 / DS10 / DS19:
+    Reglas específicas donde el núcleo unipersonal no tiene la restricción de vulnerabilidad del DS49.
     """
+    decreto_str = (decreto or "DS49").upper()
+
+    if decreto_str != "DS49":
+        return {
+            "es_unipersonal": True,
+            "habilitado_serviu": True,
+            "causales": [f"Reglamento {decreto_str}"],
+            "detalle": f"Postulante unipersonal habilitado conforme a la reglamentación del decreto {decreto_str}.",
+        }
+
     es_mayor = bool(persona_mayor or (edad is not None and edad >= 60))
     es_discapacidad = bool(tiene_discapacidad)
 
@@ -195,6 +211,7 @@ def evaluar_excepcion_unipersonal_serviu(*, edad: int = None, persona_mayor: boo
         "causales": causales,
         "detalle": detalle,
     }
+
 
 
 def auditar_comite_post_importacion(resumen: dict) -> dict:

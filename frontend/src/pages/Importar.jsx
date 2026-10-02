@@ -15,10 +15,59 @@ import { api } from "../api/client.js";
 import Section from "../components/Section.jsx";
 import { ErrorState } from "../components/StateViews.jsx";
 
+const DECRETOS = [
+  {
+    id: "DS49",
+    sigla: "DS49",
+    nombre: "Fondo Solidario de Elección de Vivienda",
+    subtitulo: "Sin deuda hipotecaria · Vulnerabilidad RSH ≤ 40% · Exige causal legal para unipersonales",
+    ahorroSugerido: "10 a 15 UF",
+    unipersonalDetalle: "Exige excepción estricta: Adulto Mayor (≥60), Discapacidad o Indígena (CONADI)",
+    colorBadge: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  },
+  {
+    id: "DS01",
+    sigla: "DS01",
+    nombre: "Sectores Medios (Tramos 1, 2 y 3)",
+    subtitulo: "Ahorro previo + crédito complementario · RSH hasta 60%, 80% o 90% · Unipersonales admitidos",
+    ahorroSugerido: "30 a 80 UF",
+    unipersonalDetalle: "Admitidos por tramo (Tramo 1, 2 y 3) con acreditación de ahorro y crédito",
+    colorBadge: "bg-blue-50 text-blue-700 border-blue-200",
+  },
+  {
+    id: "DS19",
+    sigla: "DS19",
+    nombre: "Integración Social y Territorial",
+    subtitulo: "Conjuntos inmobiliarios mixtos con cupos para familias vulnerables y sectores medios",
+    ahorroSugerido: "10 a 30 UF",
+    unipersonalDetalle: "Admitidos según tipología de vivienda y cupo del proyecto",
+    colorBadge: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  },
+  {
+    id: "DS27",
+    sigla: "DS27",
+    nombre: "Mejoramiento de Vivienda y Barrios",
+    subtitulo: "Obras comunitarias, envolventes térmicas PDA, techumbres y ampliación · Propietarios actuales",
+    ahorroSugerido: "1 a 5 UF",
+    unipersonalDetalle: "Admitidos sin restricción familiar para propietarios o asignatarios residentes",
+    colorBadge: "bg-amber-50 text-amber-700 border-amber-200",
+  },
+  {
+    id: "DS10",
+    sigla: "DS10",
+    nombre: "Habitabilidad Rural",
+    subtitulo: "Construcción o mejora en zonas rurales y localidades aisladas · Terreno propio o cesión",
+    ahorroSugerido: "10 UF",
+    unipersonalDetalle: "Admitidos acreditando tenencia legal de terreno rural y arraigo territorial",
+    colorBadge: "bg-teal-50 text-teal-700 border-teal-200",
+  },
+];
+
 export default function Importar({ onVerPadron }) {
   const [archivo, setArchivo] = useState(null);
   const [comiteNombre, setComiteNombre] = useState("");
   const [comuna, setComuna] = useState("");
+  const [decreto, setDecreto] = useState("DS49");
   const [loading, setLoading] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [error, setError] = useState("");
@@ -42,6 +91,17 @@ export default function Importar({ onVerPadron }) {
       .catch(() => {});
   }, []);
 
+  function handleSelectComiteInput(nombre) {
+    setComiteNombre(nombre);
+    const encontrado = comitesExistentes.find(
+      (c) => c.nombre?.toLowerCase().trim() === nombre?.toLowerCase().trim()
+    );
+    if (encontrado) {
+      if (encontrado.comuna && !comuna) setComuna(encontrado.comuna);
+      if (encontrado.decreto) setDecreto(encontrado.decreto);
+    }
+  }
+
   async function onSubmit(event) {
     event.preventDefault();
     if (!archivo) {
@@ -52,6 +112,7 @@ export default function Importar({ onVerPadron }) {
     formData.append("archivo", archivo);
     formData.append("comite_nombre", comiteNombre);
     formData.append("comuna", comuna);
+    formData.append("decreto", decreto);
 
     setLoading(true);
     setError("");
@@ -119,6 +180,8 @@ export default function Importar({ onVerPadron }) {
     }
   }
 
+  const decretoActual = DECRETOS.find((d) => d.id === decreto) || DECRETOS[0];
+
   return (
     <div className="space-y-6">
       {/* Banner de Motor Híbrido Inteligente */}
@@ -131,15 +194,18 @@ export default function Importar({ onVerPadron }) {
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-xs font-semibold text-slate-900">
-                  Motor Híbrido Activo · Gemini AI + Validador SERVIU DS49
+                  Motor Híbrido Activo · Gemini AI + Validador SERVIU {decretoActual.sigla}
                 </h3>
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-800">
                   <ShieldCheck size={11} />
                   Modo Cuota Cero
                 </span>
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold border ${decretoActual.colorBadge}`}>
+                  {decretoActual.sigla}
+                </span>
               </div>
               <p className="text-[11px] text-slate-500">
-                Análisis semántico en 1 sola llamada con detección de los 10 factores clave para vivienda social
+                {decretoActual.subtitulo}
               </p>
             </div>
           </div>
@@ -150,37 +216,59 @@ export default function Importar({ onVerPadron }) {
           <span className="rounded bg-white px-2 py-0.5 border border-slate-200/80">Edad / Adulto Mayor</span>
           <span className="rounded bg-white px-2 py-0.5 border border-slate-200/80">Discapacidad (Socio e Hijos)</span>
           <span className="rounded bg-white px-2 py-0.5 border border-slate-200/80">Banco y N° Cta. Ahorro</span>
-          <span className="rounded bg-white px-2 py-0.5 border border-slate-200/80">% RSH Preferente</span>
+          <span className="rounded bg-white px-2 py-0.5 border border-slate-200/80">% RSH</span>
           <span className="rounded bg-white px-2 py-0.5 border border-slate-200/80">MINVU Conecta</span>
           <span className="rounded bg-white px-2 py-0.5 border border-slate-200/80">Pueblo Originario / Mapuche</span>
-          <span className="rounded bg-white px-2 py-0.5 border border-indigo-200 text-indigo-700 font-medium">Auditoría Unipersonales DS49</span>
+          <span className="rounded bg-white px-2 py-0.5 border border-indigo-200 text-indigo-700 font-medium">
+            Regla Unipersonales: {decretoActual.unipersonalDetalle}
+          </span>
         </div>
       </div>
 
       {/* Carga principal de base de socios */}
       <Section title="Carga de Planilla de Socios (Excel)">
         <form onSubmit={onSubmit} className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
+              <label className="block">
+                <span className="text-[11px] font-medium text-slate-700">Decreto Habitacional MINVU</span>
+                <select
+                  value={decreto}
+                  onChange={(e) => setDecreto(e.target.value)}
+                  className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-[13px] font-medium text-slate-900 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 focus:outline-none transition-all cursor-pointer"
+                >
+                  {DECRETOS.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.sigla} · {d.nombre}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="mt-1 text-[11px] text-slate-400">
+                Aplica la reglamentación y reglas de negocio del decreto.
+              </p>
+            </div>
+
             <div>
               <label className="block">
                 <span className="text-[11px] font-medium text-slate-700">Comité</span>
                 <input
                   list="lista-comites"
                   value={comiteNombre}
-                  onChange={(e) => setComiteNombre(e.target.value)}
+                  onChange={(e) => handleSelectComiteInput(e.target.value)}
                   placeholder="Seleccionar o escribir nombre de comité..."
                   className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 focus:outline-none transition-all"
                 />
                 <datalist id="lista-comites">
                   {comitesExistentes.map((c) => (
                     <option key={c.id} value={c.nombre}>
-                      {c.comuna ? `(${c.comuna})` : ""}
+                      {c.decreto ? `[${c.decreto}] ` : ""}{c.comuna ? `(${c.comuna})` : ""}
                     </option>
                   ))}
                 </datalist>
               </label>
               <p className="mt-1 text-[11px] text-slate-400">
-                Puedes seleccionar un comité existente o ingresar un nuevo nombre.
+                Puedes seleccionar un comité existente o ingresar uno nuevo.
               </p>
             </div>
 
@@ -278,10 +366,13 @@ export default function Importar({ onVerPadron }) {
       {/* Resultado de la importación */}
       {resultado && (
         <Section title="Resumen de Carga">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-xs font-semibold text-emerald-800">
               <CheckCircle2 size={18} className="text-emerald-600" />
               Proceso finalizado ({resultado.estado})
+              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${decretoActual.colorBadge}`}>
+                Decreto {resultado.decreto || decreto}
+              </span>
             </div>
             {comiteNombre && onVerPadron && (
               <button

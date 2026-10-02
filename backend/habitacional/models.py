@@ -14,10 +14,29 @@ class TimeStampedModel(models.Model):
 
 
 class Comite(TimeStampedModel):
+    DECRETO_DS49 = "DS49"
+    DECRETO_DS01 = "DS01"
+    DECRETO_DS19 = "DS19"
+    DECRETO_DS27 = "DS27"
+    DECRETO_DS10 = "DS10"
+    DECRETO_CHOICES = [
+        (DECRETO_DS49, "DS49 · Fondo Solidario de Elección de Vivienda"),
+        (DECRETO_DS01, "DS01 · Sectores Medios (Tramos 1, 2 y 3)"),
+        (DECRETO_DS19, "DS19 · Integración Social y Territorial"),
+        (DECRETO_DS27, "DS27 · Mejoramiento de Vivienda y Barrios"),
+        (DECRETO_DS10, "DS10 · Habitabilidad Rural"),
+    ]
+
     nombre = models.CharField(max_length=255)
     comuna = models.CharField(max_length=120, blank=True)
     region = models.CharField(max_length=120, blank=True, default="La Araucania")
     origen = models.CharField(max_length=255, blank=True)
+    decreto = models.CharField(
+        max_length=20,
+        choices=DECRETO_CHOICES,
+        default=DECRETO_DS49,
+        db_index=True,
+    )
     activo = models.BooleanField(default=True)
 
     class Meta:
@@ -30,7 +49,8 @@ class Comite(TimeStampedModel):
         ]
 
     def __str__(self):
-        return self.nombre
+        return f"{self.nombre} ({self.decreto})"
+
 
 
 class Persona(TimeStampedModel):
@@ -274,6 +294,12 @@ class ImportacionExcel(TimeStampedModel):
     archivo = models.FileField(upload_to="importaciones/")
     nombre_archivo = models.CharField(max_length=255)
     hoja = models.CharField(max_length=120, blank=True)
+    decreto = models.CharField(
+        max_length=20,
+        choices=Comite.DECRETO_CHOICES,
+        default=Comite.DECRETO_DS49,
+        blank=True,
+    )
     estado = models.CharField(
         max_length=30,
         choices=ESTADO_CHOICES,

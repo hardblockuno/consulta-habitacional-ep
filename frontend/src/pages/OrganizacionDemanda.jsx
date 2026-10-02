@@ -102,7 +102,7 @@ export default function OrganizacionDemanda() {
               <option value="">Todos los comités (Consolidado)</option>
               {comitesResumen.map((c) => (
                 <option key={c.id} value={c.nombre}>
-                  {c.nombre} ({c.total_personas} familias)
+                  {c.decreto ? `[${c.decreto}] ` : ""}{c.nombre} ({c.total_personas} familias)
                 </option>
               ))}
             </select>
@@ -307,7 +307,20 @@ export default function OrganizacionDemanda() {
                 <tbody className="divide-y divide-slate-100">
                   {comitesResumen.map((c) => (
                     <tr key={c.id} className="hover:bg-slate-50/80 transition">
-                      <td className="px-4 py-3 font-bold text-slate-900">{c.nombre}</td>
+                      <td className="px-4 py-3 font-bold text-slate-900">
+                        <div className="flex items-center gap-2">
+                          <span>{c.nombre}</span>
+                          <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold border ${
+                            c.decreto === "DS49" ? "bg-indigo-50 text-indigo-700 border-indigo-200" :
+                            c.decreto === "DS01" ? "bg-blue-50 text-blue-700 border-blue-200" :
+                            c.decreto === "DS19" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                            c.decreto === "DS27" ? "bg-amber-50 text-amber-700 border-amber-200" :
+                            "bg-teal-50 text-teal-700 border-teal-200"
+                          }`}>
+                            {c.decreto || "DS49"}
+                          </span>
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-slate-600">{c.comuna || "-"}</td>
                       <td className="px-4 py-3 font-semibold text-slate-900">{c.total_personas}</td>
                       <td className="px-4 py-3">
