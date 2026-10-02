@@ -617,4 +617,44 @@ class RolesYAutenticacionTests(TestCase):
         self.assertFalse(res4["habilitado_serviu"])
         self.assertIn("No cumple causales", res4["detalle"])
 
+    def test_aprendizaje_motor_persistencia_y_autonomia(self):
+        from habitacional.services.aprendizaje_motor import (
+            evaluar_necesidad_de_ia,
+            registrar_nuevo_aprendizaje,
+            cargar_alias_aprendidos,
+            destilar_y_guardar_lecciones_gemini,
+            estadisticas_aprendizaje,
+        )
+        from habitacional.services.excel_importer import construir_mapa_columnas
+
+        with TemporaryDirectory() as tmpdir:
+            with self.settings(APP_DATA_DIR=Path(tmpdir)):
+                # 1. Evaluar necesidad de IA con columnas estándar ya conocidas por el motor determinista
+                columnas_estandar = ["RUT", "NOMBRE", "EDAD", "BANCO", "NRO CUENTA", "RSH %"]
+                mapa_local = construir_mapa_columnas(columnas_estandar)
+                necesita_ia, motivo = evaluar_necesidad_de_ia(columnas_estandar, mapa_local)
+                # Debe determinar que NO necesita IA (0 tokens consumidos)
+                self.assertFalse(necesita_ia)
+
+                # 2. Registrar un alias no estándar aprendido
+                alias_raro = "ENTIDAD_BANCARIA_ASOCIADA"
+                guardado = registrar_nuevo_aprendizaje("banco", alias_raro, fuente="Test Unitario")
+                self.assertTrue(guardado)
+
+                # Verificar que no guarde duplicados
+                duplicado = registrar_nuevo_aprendizaje("banco", alias_raro, fuente="Test Unitario")
+                self.assertFalse(duplicado)
+
+                # 3. Comprobar que construir_mapa_columnas ahora reconoce la columna automáticamente
+                columnas_con_alias_aprendido = ["RUT", "NOMBRE", alias_raro]
+                nuevo_mapa = construir_mapa_columnas(columnas_con_alias_aprendido)
+                self.assertEqual(nuevo_mapa.get("banco"), alias_raro)
+
+                # 4. Verificar estadísticas de aprendizaje
+                stats = estadisticas_aprendizaje()
+                self.assertGreaterEqual(stats["total_alias_aprendidos_permanentes"], 1)
+                self.assertIn("banco", stats["detalle_por_campo"])
+
+
+
 

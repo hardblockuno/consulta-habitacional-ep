@@ -335,27 +335,38 @@ def importar_excel(
     columnas = list(df.columns)
     mapa = construir_mapa_columnas(columnas)
 
-    # Motor Híbrido: Asistencia semántica de Gemini en 1 sola llamada (con caché por hash de columnas)
+    # Motor Híbrido con Aprendizaje Activo:
+    # 1. Evalúa si el motor determinista local ya puede resolver el 100% de forma autónoma (0 API calls)
     try:
+        from .aprendizaje_motor import (
+            evaluar_necesidad_de_ia,
+            destilar_y_guardar_lecciones_gemini,
+        )
         from .gemini_excel_analyzer import analizar_esquema_con_gemini
-        muestra = df.head(3).to_dict(orient="records")
-        mapeo_gemini = analizar_esquema_con_gemini(columnas, muestra)
-        if mapeo_gemini:
-            campos_clave = [
-                ("banco", "banco"),
-                ("numero_cuenta", "numero_cuenta"),
-                ("minvu_conecta", "minvu_conecta"),
-                ("discapacidad", "discapacidad_titular"),
-                ("etnia", "etnia_indigena"),
-                ("rsh", "rsh_porcentaje"),
-                ("integrantes", "integrantes"),
-                ("tipo_familia", "tipo_familia"),
-                ("ahorro", "ahorro_monto"),
-            ]
-            for campo_local, campo_gemini in campos_clave:
-                col_g = mapeo_gemini.get(campo_gemini)
-                if col_g and col_g in columnas and not mapa.get(campo_local):
-                    mapa[campo_local] = col_g
+
+        necesita_ia, motivo = evaluar_necesidad_de_ia(columnas, mapa)
+        if necesita_ia:
+            muestra = df.head(3).to_dict(orient="records")
+            mapeo_gemini = analizar_esquema_con_gemini(columnas, muestra)
+            if mapeo_gemini:
+                # 2. Destilar y persistir lo aprendido para que el motor local lo recuerde siempre
+                destilar_y_guardar_lecciones_gemini(mapeo_gemini, columnas, mapa)
+
+                campos_clave = [
+                    ("banco", "banco"),
+                    ("numero_cuenta", "numero_cuenta"),
+                    ("minvu_conecta", "minvu_conecta"),
+                    ("discapacidad", "discapacidad_titular"),
+                    ("etnia", "etnia_indigena"),
+                    ("rsh", "rsh_porcentaje"),
+                    ("integrantes", "integrantes"),
+                    ("tipo_familia", "tipo_familia"),
+                    ("ahorro", "ahorro_monto"),
+                ]
+                for campo_local, campo_gemini in campos_clave:
+                    col_g = mapeo_gemini.get(campo_gemini)
+                    if col_g and col_g in columnas and not mapa.get(campo_local):
+                        mapa[campo_local] = col_g
     except Exception:
         pass
     validar_columnas_minimas(mapa)
@@ -595,9 +606,16 @@ def limpiar_dataframe(df):
 
 def construir_mapa_columnas(columnas):
     mapa = {}
+    try:
+        from .aprendizaje_motor import cargar_alias_aprendidos
+        alias_aprendidos = cargar_alias_aprendidos()
+    except Exception:
+        alias_aprendidos = {}
+
     for clave, aliases in COLUMN_ALIASES.items():
+        todos_los_aliases = list(aliases) + list(alias_aprendidos.get(clave, []))
         exclude = COLUMN_EXCLUDES.get(clave, [])
-        columna = encontrar_columna(columnas, aliases, exclude=exclude)
+        columna = encontrar_columna(columnas, todos_los_aliases, exclude=exclude)
         if columna:
             mapa[clave] = columna
     return mapa
