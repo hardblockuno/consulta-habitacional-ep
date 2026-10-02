@@ -54,40 +54,26 @@ export default function Personas() {
   }, [searchParams]);
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-slate-400">SIGEP · Área Social</p>
-          <h1 className="mt-0.5 text-lg font-semibold tracking-tight text-slate-900">
-            {comite ? `Padrón de socios: ${comite}` : "Padrón de Familias y Postulantes"}
-          </h1>
-          {comite && (
-            <div className="mt-1.5 flex items-center gap-2">
-              <span className="rounded border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
-                Comité: {comite}
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setComite("");
-                  const p = new URLSearchParams(searchParams);
-                  p.delete("comite");
-                  setSearchParams(p);
-                }}
-                className="text-[11px] font-medium text-slate-500 hover:text-slate-800"
-              >
-                (Quitar filtro)
-              </button>
-              <Link
-                to="/bases-datos?tab=comites"
-                className="text-[11px] font-medium text-slate-500 hover:text-slate-800"
-              >
-                · Gestionar comités
-              </Link>
-            </div>
-          )}
+    <div className="space-y-4">
+      {comite && (
+        <div className="flex items-center gap-2">
+          <span className="rounded border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
+            Comité: {comite}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setComite("");
+              const p = new URLSearchParams(searchParams);
+              p.delete("comite");
+              setSearchParams(p);
+            }}
+            className="text-xs text-slate-500 hover:text-slate-800 underline cursor-pointer"
+          >
+            Quitar filtro
+          </button>
         </div>
-      </div>
+      )}
 
       <section className="rounded-lg border border-slate-200/80 bg-white p-3.5 shadow-2xs">
         <div className="grid gap-2.5 md:grid-cols-[1fr_180px_200px_160px]">

@@ -40,13 +40,9 @@ export default function BasesDatos() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/80 pb-5">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-medium tracking-wider uppercase text-slate-400">
-              SIGEP · Área Social
-            </span>
-            <span className="text-slate-300">·</span>
-            <span className="text-[11px] font-medium text-slate-500">Gestión de nóminas</span>
-          </div>
+          <span className="text-[10px] font-medium tracking-wider uppercase text-slate-400">
+            SIGEP · Área Social
+          </span>
           <h1 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
             Bases de Datos
           </h1>
@@ -64,7 +60,7 @@ export default function BasesDatos() {
             }`}
           >
             <Search size={13} />
-            Padrón de socios
+            Padrón
           </button>
           <button
             type="button"
@@ -76,7 +72,7 @@ export default function BasesDatos() {
             }`}
           >
             <Building2 size={13} />
-            Gestión de comités
+            Comités
           </button>
           <button
             type="button"
@@ -88,7 +84,7 @@ export default function BasesDatos() {
             }`}
           >
             <Upload size={13} />
-            Cargar planilla Excel
+            Importar
           </button>
         </div>
       </div>
