@@ -249,9 +249,9 @@ const PersonRow = memo(function PersonRow({ persona }) {
 const PersonFlags = memo(function PersonFlags({ persona }) {
   const flags = useMemo(() => {
     const list = [];
-    if (persona.persona_mayor) flags.push({ label: "60+", title: "Persona mayor" });
-    if (persona.discapacidad) flags.push({ label: "DIS", title: "Persona con discapacidad" });
-    if (hasEtnia(persona)) flags.push({ label: "ETN", title: `Etnia o pueblo originario: ${persona.etnia}` });
+    if (persona.persona_mayor) list.push({ label: "60+", title: "Persona mayor" });
+    if (persona.discapacidad) list.push({ label: "DIS", title: "Persona con discapacidad" });
+    if (hasEtnia(persona)) list.push({ label: "ETN", title: `Etnia o pueblo originario: ${persona.etnia}` });
     if (persona.postulacion_unipersonal) list.push({ label: "UNI", title: "Postulación unipersonal" });
     return list;
   }, [persona.persona_mayor, persona.discapacidad, persona.etnia, persona.postulacion_unipersonal]);
