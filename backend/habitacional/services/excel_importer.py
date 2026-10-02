@@ -467,7 +467,7 @@ def importar_excel(
     omitidos = 0
     errores = []
 
-    # Precarga en lote de personas existentes para máxima velocidad en Neon y Render
+    # 1. Precarga en lote de personas existentes para máxima velocidad en Neon y Render
     ruts_candidatos = []
     col_rut = mapa.get("rut")
     col_dv = mapa.get("dv")
@@ -488,31 +488,289 @@ def importar_excel(
         ):
             personas_existentes[p.rut] = p
 
-        # Limpiar alertas previas de importación en bloque para evitar consultas DELETE por cada fila
         Alerta.objects.filter(persona__rut__in=ruts_candidatos, origen=ORIGEN_IMPORTACION).delete()
 
-    with transaction.atomic():
-        for posicion, (_, fila) in enumerate(df.iterrows(), start=header_index + 2):
-            try:
-                resultado = procesar_fila(
-                    fila=fila,
-                    columnas=columnas,
-                    mapa=mapa,
-                    comite=comite,
-                    ahorro_minimo=ahorro_minimo,
-                    personas_existentes=personas_existentes,
-                )
-            except Exception as exc:
-                errores.append({"fila": posicion, "error": str(exc)})
+    personas_update = []
+    personas_create = []
+    caracterizaciones_update = []
+    caracterizaciones_create = []
+    rsh_update = []
+    rsh_create = []
+    ahorro_update = []
+    ahorro_create = []
+    postulacion_update = []
+    postulacion_create = []
+    alertas_create = []
+    documentos_create = []
+    documentos_update = []
+
+    ahora = timezone.now()
+
+    for posicion, (_, fila) in enumerate(df.iterrows(), start=header_index + 2):
+        try:
+            desplazamiento = detectar_desplazamiento(fila, columnas, mapa)
+            def valor(campo):
+                col = mapa.get(campo)
+                return valor_columna(fila, columnas, col, desplazamiento) if col else None
+
+            nombre = componer_nombre_persona(valor, mapa)
+            rut = normalizar_rut(valor("rut"), valor("dv"))
+            if not nombre or not rut:
+                omitidos += 1
+                continue
+            if normalizar_texto(nombre) in {"nombre", "basecomite"}:
                 omitidos += 1
                 continue
 
-            if resultado == "creado":
-                creados += 1
-            elif resultado == "actualizado":
+            fecha_nac, edad = resolver_nacimiento_y_edad(valor("fecha_nacimiento"), valor("edad"), edad_minima=16)
+            datos = {
+                "nombre": nombre,
+                "rut": rut,
+                "comite": comite,
+                "correo": limpiar_string(valor("correo")),
+                "telefono": limpiar_string(valor("telefono")),
+                "direccion": limpiar_string(valor("direccion")),
+                "sexo": limpiar_string(valor("sexo")),
+                "estado_civil": limpiar_string(valor("estado_civil")),
+                "nacionalidad": limpiar_string(valor("nacionalidad")),
+                "etnia": limpiar_string(valor("etnia")),
+                "fecha_nacimiento": fecha_nac,
+                "edad": edad,
+                "persona_mayor": bool(edad is not None and edad >= 60),
+                "discapacidad": parse_booleano(valor("discapacidad")),
+                "neurodivergencia": parse_booleano(valor("neurodivergencia")),
+                "datos_originales": serializar_fila(fila),
+                "actualizado_en": ahora,
+            }
+
+            if rut in personas_existentes:
+                p = personas_existentes[rut]
+                for k, v in datos.items():
+                    setattr(p, k, v)
+                personas_update.append(p)
+                is_new = False
                 actualizados += 1
             else:
-                omitidos += 1
+                p = Persona(**datos)
+                personas_create.append(p)
+                personas_existentes[rut] = p
+                is_new = True
+                creados += 1
+
+            # Caracterización Social
+            comuna_val = limpiar_string(valor("comuna"))
+            parentesco_val = limpiar_string(valor("parentesco"))
+            tipo_fam_val = limpiar_string(valor("tipo_familia"))
+            val_gf = valor("grupo_familiar")
+            val_int = valor("integrantes")
+            integrantes_val = parse_integrantes(val_int) or parse_integrantes(val_gf)
+            gf_val = limpiar_string(val_gf or val_int or (integrantes_val if integrantes_val is not None else ""))
+            hijos_val = extraer_hijos(fila)
+
+            if not is_new and hasattr(p, "caracterizacion_social") and p.caracterizacion_social:
+                cs = p.caracterizacion_social
+                cs.comuna = comuna_val
+                cs.parentesco = parentesco_val
+                cs.tipo_familia = tipo_fam_val
+                cs.grupo_familiar = gf_val
+                cs.integrantes = integrantes_val
+                cs.hijos = hijos_val
+                cs.actualizado_en = ahora
+                caracterizaciones_update.append(cs)
+            else:
+                cs = CaracterizacionSocial(
+                    persona=p, comuna=comuna_val, parentesco=parentesco_val,
+                    tipo_familia=tipo_fam_val, grupo_familiar=gf_val,
+                    integrantes=integrantes_val, hijos=hijos_val
+                )
+                caracterizaciones_create.append(cs)
+                p.caracterizacion_social = cs
+
+            # RSH
+            rsh_pct = parse_decimal(valor("rsh"))
+            if rsh_pct is not None and Decimal("0") < rsh_pct <= Decimal("1.0"):
+                rsh_pct = (rsh_pct * 100).quantize(Decimal("0.01"))
+            if not is_new and hasattr(p, "rsh") and p.rsh:
+                rsh_obj = p.rsh
+                rsh_obj.porcentaje = rsh_pct
+                rsh_obj.tramo = limpiar_string(valor("rsh"))
+                rsh_obj.es_preferente = bool(rsh_pct is not None and rsh_pct <= 40)
+                rsh_obj.actualizado_en = ahora
+                rsh_update.append(rsh_obj)
+            else:
+                rsh_obj = RSH(
+                    persona=p, porcentaje=rsh_pct, tramo=limpiar_string(valor("rsh")),
+                    es_preferente=bool(rsh_pct is not None and rsh_pct <= 40)
+                )
+                rsh_create.append(rsh_obj)
+                p.rsh = rsh_obj
+
+            # Ahorro
+            ahorro_monto = parse_decimal(valor("ahorro"))
+            if not is_new and hasattr(p, "ahorro") and p.ahorro:
+                a_obj = p.ahorro
+                a_obj.numero_cuenta = limpiar_string(valor("numero_cuenta"))
+                a_obj.banco = limpiar_string(valor("banco"))
+                a_obj.monto_actual = ahorro_monto
+                a_obj.ahorro_minimo = ahorro_minimo
+                a_obj.insuficiente = bool(ahorro_monto is not None and ahorro_monto < ahorro_minimo)
+                a_obj.actualizado_en = ahora
+                ahorro_update.append(a_obj)
+            else:
+                a_obj = Ahorro(
+                    persona=p, numero_cuenta=limpiar_string(valor("numero_cuenta")),
+                    banco=limpiar_string(valor("banco")), monto_actual=ahorro_monto,
+                    ahorro_minimo=ahorro_minimo,
+                    insuficiente=bool(ahorro_monto is not None and ahorro_monto < ahorro_minimo)
+                )
+                ahorro_create.append(a_obj)
+                p.ahorro = a_obj
+
+            # Postulación
+            minvu_c = parse_decimal(valor("minvu_conecta"))
+            if minvu_c is not None and Decimal("0") < minvu_c <= Decimal("1.0"):
+                minvu_c = (minvu_c * 100).quantize(Decimal("0.01"))
+            if not is_new and hasattr(p, "postulacion") and p.postulacion:
+                post_obj = p.postulacion
+                post_obj.minvu_conecta = minvu_c
+                post_obj.programa = decreto_limpio
+                post_obj.actualizado_en = ahora
+                postulacion_update.append(post_obj)
+            else:
+                post_obj = Postulacion(
+                    persona=p, minvu_conecta=minvu_c, estado="", programa=decreto_limpio
+                )
+                postulacion_create.append(post_obj)
+                p.postulacion = post_obj
+
+            # Documentos
+            f_venc = parse_fecha(valor("cedula_vencimiento"))
+            if f_venc:
+                est_doc = estado_documento_por_fecha(f_venc)
+                doc_existente = p.documentos.filter(tipo=Documento.TIPO_CEDULA).first() if not is_new and hasattr(p, "documentos") else None
+                if doc_existente:
+                    doc_existente.estado = est_doc
+                    doc_existente.fecha_vencimiento = f_venc
+                    doc_existente.observaciones = "Detectado desde importacion Excel."
+                    doc_existente.actualizado_en = ahora
+                    documentos_update.append(doc_existente)
+                else:
+                    documentos_create.append(Documento(
+                        persona=p, tipo=Documento.TIPO_CEDULA, estado=est_doc,
+                        fecha_vencimiento=f_venc, observaciones="Detectado desde importacion Excel."
+                    ))
+
+            # Alertas en memoria
+            tiene_critica = False
+            tiene_prev = False
+            if f_venc:
+                dias = (f_venc - timezone.localdate()).days
+                if dias < 0:
+                    alertas_create.append(Alerta(persona=p, tipo=Alerta.TIPO_DOCUMENTAL, severidad=Alerta.SEVERIDAD_CRITICA,
+                                                 titulo="Cédula vencida", detalle=f"Cédula vencida el {f_venc.isoformat()}.",
+                                                 impacta_estado=True, origen=ORIGEN_IMPORTACION))
+                    tiene_critica = True
+                elif dias <= 30:
+                    alertas_create.append(Alerta(persona=p, tipo=Alerta.TIPO_DOCUMENTAL, severidad=Alerta.SEVERIDAD_PREVENTIVA,
+                                                 titulo="Cédula por vencer", detalle=f"Cédula vence el {f_venc.isoformat()}.",
+                                                 impacta_estado=True, origen=ORIGEN_IMPORTACION))
+                    tiene_prev = True
+
+            if p.discapacidad:
+                alertas_create.append(Alerta(persona=p, tipo=Alerta.TIPO_DOCUMENTAL, severidad=Alerta.SEVERIDAD_PREVENTIVA,
+                                             titulo="Revisar respaldo discapacidad", detalle="Validar certificado o antecedente.",
+                                             impacta_estado=False, origen=ORIGEN_IMPORTACION))
+            if persona_tiene_etnia(p):
+                alertas_create.append(Alerta(persona=p, tipo=Alerta.TIPO_DOCUMENTAL, severidad=Alerta.SEVERIDAD_PREVENTIVA,
+                                             titulo="Revisar certificado de acreditación indígena",
+                                             detalle="Revisar y confirmar certificado indígena.",
+                                             impacta_estado=False, origen=ORIGEN_IMPORTACION))
+
+            es_uni = (integrantes_val == 1) or (gf_val in {"1", "1 persona", "unipersonal", "solo"})
+            if es_uni:
+                if decreto_limpio == "DS49":
+                    crit = criterios_excepcion_unipersonal(p)
+                    if crit:
+                        alertas_create.append(Alerta(persona=p, tipo=Alerta.TIPO_SOCIAL, severidad=Alerta.SEVERIDAD_PREVENTIVA,
+                                                     titulo="Criterio de excepción unipersonal",
+                                                     detalle=f"Postulación unipersonal habilitada por excepción legal DS49: {', '.join(crit)}.",
+                                                     impacta_estado=False, origen=ORIGEN_IMPORTACION))
+                    else:
+                        alertas_create.append(Alerta(persona=p, tipo=Alerta.TIPO_SOCIAL, severidad=Alerta.SEVERIDAD_CRITICA,
+                                                     titulo="Unipersonal sin excepción legal SERVIU",
+                                                     detalle="Postulante unipersonal menor de 60 años sin causal de excepción legal.",
+                                                     impacta_estado=True, origen=ORIGEN_IMPORTACION))
+                        tiene_critica = True
+                else:
+                    alertas_create.append(Alerta(persona=p, tipo=Alerta.TIPO_SOCIAL, severidad=Alerta.SEVERIDAD_PREVENTIVA,
+                                                 titulo=f"Postulación unipersonal ({decreto_limpio})",
+                                                 detalle="Postulante unipersonal.",
+                                                 impacta_estado=False, origen=ORIGEN_IMPORTACION))
+
+            for hijo in hijos_val:
+                if not hijo.get("requiere_revision_documental"):
+                    continue
+                alertas_create.append(Alerta(
+                    persona=p, tipo=Alerta.TIPO_DOCUMENTAL, severidad=Alerta.SEVERIDAD_PREVENTIVA,
+                    titulo="Revisar hijo/a por mayoría de edad", detalle=detalle_revision_hijo(hijo),
+                    impacta_estado=False, origen=ORIGEN_IMPORTACION
+                ))
+
+            p.estado_general = (
+                Persona.ESTADO_BLOQUEADA if tiene_critica else (Persona.ESTADO_OBSERVADA if tiene_prev else Persona.ESTADO_APTA)
+            )
+
+        except Exception as exc:
+            errores.append({"fila": posicion, "error": str(exc)})
+            omitidos += 1
+            continue
+
+    with transaction.atomic():
+        if personas_create:
+            Persona.objects.bulk_create(personas_create, batch_size=500)
+            for obj_list in [caracterizaciones_create, rsh_create, ahorro_create, postulacion_create, alertas_create, documentos_create]:
+                for item in obj_list:
+                    if hasattr(item, "persona") and item.persona.pk:
+                        item.persona_id = item.persona.pk
+
+        if personas_update:
+            Persona.objects.bulk_update(personas_update, fields=[
+                "nombre", "comite", "correo", "telefono", "direccion", "sexo", "estado_civil",
+                "nacionalidad", "etnia", "fecha_nacimiento", "edad", "persona_mayor",
+                "discapacidad", "neurodivergencia", "datos_originales", "estado_general", "actualizado_en"
+            ], batch_size=500)
+
+        if caracterizaciones_create:
+            CaracterizacionSocial.objects.bulk_create(caracterizaciones_create, batch_size=500)
+        if caracterizaciones_update:
+            CaracterizacionSocial.objects.bulk_update(caracterizaciones_update, fields=[
+                "comuna", "parentesco", "tipo_familia", "grupo_familiar", "integrantes", "hijos", "actualizado_en"
+            ], batch_size=500)
+
+        if rsh_create:
+            RSH.objects.bulk_create(rsh_create, batch_size=500)
+        if rsh_update:
+            RSH.objects.bulk_update(rsh_update, fields=["porcentaje", "tramo", "es_preferente", "actualizado_en"], batch_size=500)
+
+        if ahorro_create:
+            Ahorro.objects.bulk_create(ahorro_create, batch_size=500)
+        if ahorro_update:
+            Ahorro.objects.bulk_update(ahorro_update, fields=[
+                "numero_cuenta", "banco", "monto_actual", "ahorro_minimo", "insuficiente", "actualizado_en"
+            ], batch_size=500)
+
+        if postulacion_create:
+            Postulacion.objects.bulk_create(postulacion_create, batch_size=500)
+        if postulacion_update:
+            Postulacion.objects.bulk_update(postulacion_update, fields=["minvu_conecta", "programa", "actualizado_en"], batch_size=500)
+
+        if documentos_create:
+            Documento.objects.bulk_create(documentos_create, batch_size=500)
+        if documentos_update:
+            Documento.objects.bulk_update(documentos_update, fields=["estado", "fecha_vencimiento", "observaciones", "actualizado_en"], batch_size=500)
+
+        if alertas_create:
+            Alerta.objects.bulk_create(alertas_create, batch_size=500)
 
     importacion.creados = creados
     importacion.actualizados = actualizados
