@@ -24,19 +24,35 @@ export default function Personas() {
   const debouncedComite = useDebounce(comiteInput, 350);
 
   const [personas, setPersonas] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [pagina, setPagina] = useState(1);
 
-  // Petición con AbortController usando valores debounced
+  // Reiniciar a página 1 cuando cambian los filtros
+  const prevFilterRef = useRef({ debouncedQuery, estado, filtro, debouncedComite });
+  useEffect(() => {
+    const prev = prevFilterRef.current;
+    if (
+      prev.debouncedQuery !== debouncedQuery ||
+      prev.estado !== estado ||
+      prev.filtro !== filtro ||
+      prev.debouncedComite !== debouncedComite
+    ) {
+      prevFilterRef.current = { debouncedQuery, estado, filtro, debouncedComite };
+      setPagina(1);
+    }
+  }, [debouncedQuery, estado, filtro, debouncedComite]);
+
+  // Petición con AbortController usando valores debounced y página
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
-    setPagina(1);
 
     api
       .get(debouncedQuery ? "/personas/buscar/" : "/personas/", {
         params: {
+          page: pagina,
           q: debouncedQuery || undefined,
           estado: estado || undefined,
           filtro: filtro || undefined,
@@ -45,7 +61,14 @@ export default function Personas() {
         signal: controller.signal,
       })
       .then((response) => {
-        setPersonas(listFromResponse(response.data));
+        if (response.data && typeof response.data === "object" && "count" in response.data) {
+          setPersonas(response.data.results || []);
+          setTotalCount(response.data.count || 0);
+        } else {
+          const list = listFromResponse(response.data);
+          setPersonas(list);
+          setTotalCount(list.length);
+        }
         setError("");
       })
       .catch((err) => {
@@ -54,7 +77,7 @@ export default function Personas() {
       .finally(() => setLoading(false));
 
     return () => controller.abort();
-  }, [debouncedQuery, estado, filtro, debouncedComite]);
+  }, [pagina, debouncedQuery, estado, filtro, debouncedComite]);
 
   useEffect(() => {
     if (window.matchMedia("(min-width: 700px)").matches) {
@@ -76,12 +99,7 @@ export default function Personas() {
     setSearchParams(p);
   };
 
-  // Paginación en cliente para limitar nodos DOM a < 250
-  const totalPaginas = Math.ceil(personas.length / PAGE_SIZE) || 1;
-  const personasPaginadas = useMemo(() => {
-    const inicio = (pagina - 1) * PAGE_SIZE;
-    return personas.slice(inicio, inicio + PAGE_SIZE);
-  }, [personas, pagina]);
+  const totalPaginas = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   return (
     <div className="space-y-4">
@@ -176,7 +194,7 @@ export default function Personas() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {personasPaginadas.map((persona) => (
+                {personas.map((persona) => (
                   <PersonRow key={persona.id} persona={persona} />
                 ))}
               </tbody>
@@ -186,12 +204,13 @@ export default function Personas() {
           {/* Barra de paginación optimizada */}
           <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50/50 px-4 py-2.5 text-xs text-slate-600">
             <span>
-              Mostrando <strong>{((pagina - 1) * PAGE_SIZE) + 1}</strong> a <strong>{Math.min(pagina * PAGE_SIZE, personas.length)}</strong> de <strong>{personas.length}</strong> socios
+              Mostrando <strong>{totalCount === 0 ? 0 : ((pagina - 1) * PAGE_SIZE) + 1}</strong> a{" "}
+              <strong>{Math.min(pagina * PAGE_SIZE, totalCount)}</strong> de <strong>{totalCount}</strong> socios
             </span>
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                disabled={pagina <= 1}
+                disabled={pagina <= 1 || loading}
                 onClick={() => setPagina((p) => Math.max(1, p - 1))}
                 className="inline-flex h-7 w-7 items-center justify-center rounded border border-slate-200 bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 cursor-pointer shadow-2xs"
               >
@@ -200,7 +219,7 @@ export default function Personas() {
               <span className="px-2 font-medium tabular-nums">Página {pagina} de {totalPaginas}</span>
               <button
                 type="button"
-                disabled={pagina >= totalPaginas}
+                disabled={pagina >= totalPaginas || loading}
                 onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
                 className="inline-flex h-7 w-7 items-center justify-center rounded border border-slate-200 bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 cursor-pointer shadow-2xs"
               >

@@ -27,7 +27,7 @@ export default function PersonaDetail() {
 
   return (
     <div className="space-y-5">
-      <Link to="/personas" className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors">
+      <Link to="/bases-datos" className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors">
         <ArrowLeft size={14} />
         Volver al padrón
       </Link>

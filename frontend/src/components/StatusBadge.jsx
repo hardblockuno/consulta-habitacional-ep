@@ -7,7 +7,8 @@ const dotStyles = {
 };
 
 export default function StatusBadge({ value }) {
-  const clean = value ? value.replaceAll("_", " ") : "";
+  const strVal = typeof value === "string" ? value : String(value || "");
+  const clean = strVal.replace(/_/g, " ").trim();
   const label = clean ? clean.charAt(0).toUpperCase() + clean.slice(1) : "Sin estado";
   const dotColor = dotStyles[value] || "bg-slate-400";
 
