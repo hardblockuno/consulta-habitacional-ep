@@ -3,7 +3,7 @@ from decimal import Decimal, InvalidOperation
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.db import transaction
-from django.db.models import Avg, Count, Q
+from django.db.models import Avg, Count, Prefetch, Q
 from django.utils import timezone
 from rest_framework import mixins, parsers, permissions, status, viewsets
 from rest_framework.authtoken.models import Token
@@ -86,25 +86,34 @@ class ComiteViewSet(viewsets.ModelViewSet):
 
 
 class PersonaViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = (
-        Persona.objects.select_related(
-            "comite",
-            "caracterizacion_social",
-            "rsh",
-            "ahorro",
-            "postulacion",
-        )
-        .prefetch_related("documentos", "observaciones", "alertas")
-        .annotate(alertas_activas=Count("alertas", filter=Q(alertas__activa=True)))
-    )
-
     def get_serializer_class(self):
         if self.action == "retrieve":
             return PersonaDetailSerializer
         return PersonaListSerializer
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        base_qs = (
+            Persona.objects.select_related(
+                "comite",
+                "caracterizacion_social",
+                "rsh",
+                "ahorro",
+                "postulacion",
+            )
+            .annotate(alertas_activas=Count("alertas", filter=Q(alertas__activa=True)))
+        )
+
+        if self.action == "retrieve":
+            return base_qs.prefetch_related(
+                "documentos",
+                "observaciones",
+                Prefetch(
+                    "alertas",
+                    queryset=Alerta.objects.select_related("persona__comite"),
+                ),
+            )
+
+        queryset = base_qs
         q = self.request.query_params.get("q", "").strip()
         estado = self.request.query_params.get("estado", "").strip()
         comite = self.request.query_params.get("comite", "").strip()
@@ -335,32 +344,87 @@ def dashboard_resumen_data(comite=None):
         personas = personas.filter(comite__nombre__iexact=comite)
         alertas_activas = alertas_activas.filter(persona__comite__nombre__iexact=comite)
 
-    # Detalle enriquecido por cada comité registrado
-    comites_qs = Comite.objects.all().order_by("nombre")
+    # 1. MÉTRICAS GLOBALES: 1 sola consulta SQL agregada
+    metricas = personas.aggregate(
+        total_personas=Count("id"),
+        personas_aptas=Count("id", filter=Q(estado_general=Persona.ESTADO_APTA)),
+        observadas=Count("id", filter=Q(estado_general=Persona.ESTADO_OBSERVADA)),
+        bloqueadas=Count("id", filter=Q(estado_general=Persona.ESTADO_BLOQUEADA)),
+        personas_mayores=Count("id", filter=Q(persona_mayor=True)),
+        discapacidad=Count("id", filter=Q(discapacidad=True)),
+        rsh_sobre_40=Count("id", filter=Q(rsh__porcentaje__gt=40)),
+        ahorro_insuficiente=Count("id", filter=Q(ahorro__insuficiente=True)),
+        cedulas_vencidas=Count(
+            "documentos",
+            filter=Q(
+                documentos__tipo=Documento.TIPO_CEDULA,
+                documentos__estado=Documento.ESTADO_VENCIDO,
+            ),
+        ),
+        cedulas_revision=Count(
+            "documentos",
+            filter=Q(
+                documentos__tipo=Documento.TIPO_CEDULA,
+                documentos__estado__in=[
+                    Documento.ESTADO_VENCIDO,
+                    Documento.ESTADO_POR_VENCER,
+                ],
+            ),
+        ),
+    )
+
+    alertas_metricas = alertas_activas.aggregate(
+        criticas=Count("id", filter=Q(severidad=Alerta.SEVERIDAD_CRITICA)),
+        preventivas=Count("id", filter=Q(severidad=Alerta.SEVERIDAD_PREVENTIVA)),
+    )
+
+    # 2. Precálculos agrupados por comité en 2 consultas únicas (Etnia y Unipersonal)
+    etnias_por_comite = dict(
+        filter_personas_con_etnia(Persona.objects.all())
+        .values("comite_id")
+        .annotate(c=Count("id"))
+        .values_list("comite_id", "c")
+    )
+    unip_por_comite = dict(
+        filter_personas_unipersonales(Persona.objects.all())
+        .values("comite_id")
+        .annotate(c=Count("id"))
+        .values_list("comite_id", "c")
+    )
+
+    # 3. Resumen por comité: 1 sola consulta SQL con agregaciones
+    comites_qs = (
+        Comite.objects.annotate(
+            total_personas=Count("personas"),
+            aptas=Count("personas", filter=Q(personas__estado_general=Persona.ESTADO_APTA)),
+            observadas=Count("personas", filter=Q(personas__estado_general=Persona.ESTADO_OBSERVADA)),
+            bloqueadas=Count("personas", filter=Q(personas__estado_general=Persona.ESTADO_BLOQUEADA)),
+            personas_mayores=Count("personas", filter=Q(personas__persona_mayor=True)),
+            discapacidad=Count("personas", filter=Q(personas__discapacidad=True)),
+            rsh_preferente=Count("personas", filter=Q(personas__rsh__porcentaje__lte=40)),
+            ahorro_promedio=Avg(
+                "personas__ahorro__monto_actual",
+                filter=Q(personas__ahorro__monto_actual__gt=0),
+            ),
+            cedulas_revision=Count(
+                "personas__documentos",
+                filter=Q(
+                    personas__documentos__tipo=Documento.TIPO_CEDULA,
+                    personas__documentos__estado__in=[
+                        Documento.ESTADO_VENCIDO,
+                        Documento.ESTADO_POR_VENCER,
+                    ],
+                ),
+            ),
+        )
+        .order_by("nombre")
+    )
+
     comites_resumen = []
     for c in comites_qs:
-        c_pers = c.personas.all()
-        c_total = c_pers.count()
+        c_total = c.total_personas
         if c_total == 0:
             continue
-        c_aptas = c_pers.filter(estado_general=Persona.ESTADO_APTA).count()
-        c_observadas = c_pers.filter(estado_general=Persona.ESTADO_OBSERVADA).count()
-        c_bloqueadas = c_pers.filter(estado_general=Persona.ESTADO_BLOQUEADA).count()
-        c_mayores = c_pers.filter(persona_mayor=True).count()
-        c_disc = c_pers.filter(discapacidad=True).count()
-        c_etnia = filter_personas_con_etnia(c_pers).count()
-        c_unip = filter_personas_unipersonales(c_pers).count()
-        c_rsh_pref = c_pers.filter(rsh__porcentaje__lte=40).count()
-        c_ahorro_prom = (
-            c_pers.filter(ahorro__monto_uf__gt=0).aggregate(prom=Avg("ahorro__monto_uf"))["prom"]
-            or 0
-        )
-        c_cedulas_rev = Documento.objects.filter(
-            persona__comite=c,
-            tipo=Documento.TIPO_CEDULA,
-            estado__in=[Documento.ESTADO_VENCIDO, Documento.ESTADO_POR_VENCER],
-        ).count()
-
         comites_resumen.append(
             {
                 "id": c.id,
@@ -369,49 +433,37 @@ def dashboard_resumen_data(comite=None):
                 "decreto": getattr(c, "decreto", "DS49") or "DS49",
                 "decreto_display": c.get_decreto_display() if hasattr(c, "get_decreto_display") else "DS49",
                 "total_personas": c_total,
-                "aptas": c_aptas,
-                "observadas": c_observadas,
-                "bloqueadas": c_bloqueadas,
-                "porcentaje_aptos": round((c_aptas / c_total) * 100) if c_total > 0 else 0,
-                "personas_mayores": c_mayores,
-                "discapacidad": c_disc,
-                "etnia": c_etnia,
-                "unipersonales": c_unip,
-                "rsh_preferente": c_rsh_pref,
-                "ahorro_promedio_uf": round(float(c_ahorro_prom), 1),
-                "cedulas_revision": c_cedulas_rev,
+                "aptas": c.aptas,
+                "observadas": c.observadas,
+                "bloqueadas": c.bloqueadas,
+                "porcentaje_aptos": round((c.aptas / c_total) * 100) if c_total > 0 else 0,
+                "personas_mayores": c.personas_mayores,
+                "discapacidad": c.discapacidad,
+                "etnia": etnias_por_comite.get(c.id, 0),
+                "unipersonales": unip_por_comite.get(c.id, 0),
+                "rsh_preferente": c.rsh_preferente,
+                "ahorro_promedio_uf": round(float(c.ahorro_promedio or 0), 1),
+                "cedulas_revision": c.cedulas_revision,
             }
         )
 
     return {
         "comite_filtrado": comite or None,
-        "total_personas": personas.count(),
-        "personas_aptas": personas.filter(estado_general=Persona.ESTADO_APTA).count(),
-        "observadas": personas.filter(estado_general=Persona.ESTADO_OBSERVADA).count(),
-        "bloqueadas": personas.filter(estado_general=Persona.ESTADO_BLOQUEADA).count(),
-        "personas_mayores": personas.filter(persona_mayor=True).count(),
-        "discapacidad": personas.filter(discapacidad=True).count(),
+        "total_personas": metricas["total_personas"] or 0,
+        "personas_aptas": metricas["personas_aptas"] or 0,
+        "observadas": metricas["observadas"] or 0,
+        "bloqueadas": metricas["bloqueadas"] or 0,
+        "personas_mayores": metricas["personas_mayores"] or 0,
+        "discapacidad": metricas["discapacidad"] or 0,
         "etnia": filter_personas_con_etnia(personas).count(),
         "unipersonales": filter_personas_unipersonales(personas).count(),
         "hijos_revision_18": count_personas_con_hijos_revision(personas),
-        "cedulas_revision": Documento.objects.filter(
-            persona__in=personas,
-            tipo=Documento.TIPO_CEDULA,
-            estado__in=[Documento.ESTADO_VENCIDO, Documento.ESTADO_POR_VENCER],
-        ).count(),
-        "rsh_sobre_40": personas.filter(rsh__porcentaje__gt=40).count(),
-        "ahorro_insuficiente": Ahorro.objects.filter(persona__in=personas, insuficiente=True).count(),
-        "cedulas_vencidas": Documento.objects.filter(
-            persona__in=personas,
-            tipo=Documento.TIPO_CEDULA,
-            estado=Documento.ESTADO_VENCIDO,
-        ).count(),
-        "alertas_criticas": alertas_activas.filter(
-            severidad=Alerta.SEVERIDAD_CRITICA
-        ).count(),
-        "alertas_preventivas": alertas_activas.filter(
-            severidad=Alerta.SEVERIDAD_PREVENTIVA
-        ).count(),
+        "cedulas_revision": metricas["cedulas_revision"] or 0,
+        "rsh_sobre_40": metricas["rsh_sobre_40"] or 0,
+        "ahorro_insuficiente": metricas["ahorro_insuficiente"] or 0,
+        "cedulas_vencidas": metricas["cedulas_vencidas"] or 0,
+        "alertas_criticas": alertas_metricas["criticas"] or 0,
+        "alertas_preventivas": alertas_metricas["preventivas"] or 0,
         "por_comite": list(
             personas.values("comite__nombre")
             .annotate(total=Count("id"))
@@ -451,13 +503,12 @@ def filter_personas_unipersonales(queryset):
 
 
 def count_personas_con_hijos_revision(personas):
-    total = 0
-    for persona in personas.select_related("caracterizacion_social"):
-        caracterizacion = getattr(persona, "caracterizacion_social", None)
-        hijos = getattr(caracterizacion, "hijos", []) or []
-        if any(hijo.get("requiere_revision_documental") for hijo in hijos):
-            total += 1
-    return total
+    # Consulta liviana: solo descarga la columna JSON hijos evitando instanciar modelos completos
+    return sum(
+        1
+        for hijos in CaracterizacionSocial.objects.filter(persona__in=personas).values_list("hijos", flat=True)
+        if hijos and any(h.get("requiere_revision_documental") for h in hijos if isinstance(h, dict))
+    )
 
 
 

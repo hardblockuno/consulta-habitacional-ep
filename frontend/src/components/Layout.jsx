@@ -156,7 +156,10 @@ export default function Layout({ children }) {
             <img
               src="/sigep-symbol.png"
               alt="SIGEP"
+              width="36"
+              height="36"
               className="h-9 w-9 object-contain shrink-0"
+              loading="eager"
             />
             <div>
               <h1 className="text-sm font-semibold tracking-tight text-slate-900 leading-tight">SIGEP</h1>
@@ -223,6 +226,8 @@ export default function Layout({ children }) {
                   <img
                     src="/sigep-symbol.png"
                     alt="SIGEP"
+                    width="32"
+                    height="32"
                     className="h-8 w-8 object-contain shrink-0"
                   />
                   <div>

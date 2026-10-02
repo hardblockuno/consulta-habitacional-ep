@@ -89,6 +89,9 @@ class Persona(TimeStampedModel):
     class Meta:
         ordering = ["nombre"]
         indexes = [
+            models.Index(fields=["comite", "estado_general"], name="idx_pers_comite_est"),
+            models.Index(fields=["comite", "persona_mayor"], name="idx_pers_comite_may"),
+            models.Index(fields=["comite", "discapacidad"], name="idx_pers_comite_disc"),
             models.Index(fields=["nombre"]),
             models.Index(fields=["telefono"]),
             models.Index(fields=["estado_general"]),
@@ -273,6 +276,8 @@ class Alerta(TimeStampedModel):
     class Meta:
         ordering = ["-creado_en"]
         indexes = [
+            models.Index(fields=["persona", "activa", "impacta_estado"], name="idx_alerta_p_act_imp"),
+            models.Index(fields=["persona", "activa", "severidad"], name="idx_alerta_p_act_sev"),
             models.Index(fields=["activa", "severidad"]),
             models.Index(fields=["tipo"]),
         ]

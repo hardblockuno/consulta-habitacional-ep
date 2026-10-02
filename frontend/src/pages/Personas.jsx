@@ -1,32 +1,46 @@
-import { Search } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { api, listFromResponse, money, percent } from "../api/client.js";
 import StatusBadge from "../components/StatusBadge.jsx";
 import { EmptyState, ErrorState, LoadingState } from "../components/StateViews.jsx";
+import { useDebounce } from "../hooks/useDebounce.js";
+
+const PAGE_SIZE = 25;
 
 export default function Personas() {
   const searchInputRef = useRef(null);
   const [searchParams, setSearchParams] = useSearchParams();
-  const [query, setQuery] = useState("");
+
+  // Estados locales para los inputs
+  const [queryInput, setQueryInput] = useState("");
+  const [comiteInput, setComiteInput] = useState(searchParams.get("comite") || "");
   const [estado, setEstado] = useState(searchParams.get("estado") || "");
   const [filtro, setFiltro] = useState(searchParams.get("filtro") || "");
-  const [comite, setComite] = useState(searchParams.get("comite") || "");
+
+  // Debouncing a 350ms para evitar spam de peticiones HTTP
+  const debouncedQuery = useDebounce(queryInput, 350);
+  const debouncedComite = useDebounce(comiteInput, 350);
+
   const [personas, setPersonas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [pagina, setPagina] = useState(1);
 
+  // Petición con AbortController usando valores debounced
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
+    setPagina(1);
+
     api
-      .get(query ? "/personas/buscar/" : "/personas/", {
+      .get(debouncedQuery ? "/personas/buscar/" : "/personas/", {
         params: {
-          q: query || undefined,
+          q: debouncedQuery || undefined,
           estado: estado || undefined,
           filtro: filtro || undefined,
-          comite: comite || undefined,
+          comite: debouncedComite || undefined,
         },
         signal: controller.signal,
       })
@@ -35,11 +49,12 @@ export default function Personas() {
         setError("");
       })
       .catch((err) => {
-        if (err.name !== "CanceledError") setError("No se pudo ejecutar la busqueda.");
+        if (err.name !== "CanceledError") setError("No se pudo ejecutar la búsqueda.");
       })
       .finally(() => setLoading(false));
+
     return () => controller.abort();
-  }, [query, estado, filtro, comite]);
+  }, [debouncedQuery, estado, filtro, debouncedComite]);
 
   useEffect(() => {
     if (window.matchMedia("(min-width: 700px)").matches) {
@@ -48,25 +63,38 @@ export default function Personas() {
   }, []);
 
   useEffect(() => {
-    setFiltro(searchParams.get("filtro") || "");
+    setComiteInput(searchParams.get("comite") || "");
     setEstado(searchParams.get("estado") || "");
-    setComite(searchParams.get("comite") || "");
+    setFiltro(searchParams.get("filtro") || "");
   }, [searchParams]);
+
+  // Actualizador de URL
+  const updateUrlParam = (key, value) => {
+    const p = new URLSearchParams(searchParams);
+    if (value) p.set(key, value);
+    else p.delete(key);
+    setSearchParams(p);
+  };
+
+  // Paginación en cliente para limitar nodos DOM a < 250
+  const totalPaginas = Math.ceil(personas.length / PAGE_SIZE) || 1;
+  const personasPaginadas = useMemo(() => {
+    const inicio = (pagina - 1) * PAGE_SIZE;
+    return personas.slice(inicio, inicio + PAGE_SIZE);
+  }, [personas, pagina]);
 
   return (
     <div className="space-y-4">
-      {comite && (
+      {comiteInput && (
         <div className="flex items-center gap-2">
           <span className="rounded border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
-            Comité: {comite}
+            Comité: {comiteInput}
           </span>
           <button
             type="button"
             onClick={() => {
-              setComite("");
-              const p = new URLSearchParams(searchParams);
-              p.delete("comite");
-              setSearchParams(p);
+              setComiteInput("");
+              updateUrlParam("comite", "");
             }}
             className="text-xs text-slate-500 hover:text-slate-800 underline cursor-pointer"
           >
@@ -81,8 +109,8 @@ export default function Personas() {
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
             <input
               ref={searchInputRef}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              value={queryInput}
+              onChange={(e) => setQueryInput(e.target.value)}
               placeholder="RUT, nombre o comité"
               autoComplete="off"
               className="h-9 w-full rounded-md border border-slate-200 bg-white pl-9 pr-3 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 focus:outline-none transition-all"
@@ -90,27 +118,19 @@ export default function Personas() {
           </label>
           <input
             type="text"
-            value={comite}
-            onChange={(event) => {
-              const val = event.target.value;
-              setComite(val);
-              const p = new URLSearchParams(searchParams);
-              if (val) p.set("comite", val);
-              else p.delete("comite");
-              setSearchParams(p);
+            value={comiteInput}
+            onChange={(e) => {
+              setComiteInput(e.target.value);
+              updateUrlParam("comite", e.target.value);
             }}
             placeholder="Filtrar comité..."
             className="h-9 rounded-md border border-slate-200 bg-white px-3 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 focus:outline-none transition-all"
           />
           <select
             value={estado}
-            onChange={(event) => {
-              const val = event.target.value;
-              setEstado(val);
-              const p = new URLSearchParams(searchParams);
-              if (val) p.set("estado", val);
-              else p.delete("estado");
-              setSearchParams(p);
+            onChange={(e) => {
+              setEstado(e.target.value);
+              updateUrlParam("estado", e.target.value);
             }}
             className="h-9 rounded-md border border-slate-200 bg-white px-3 text-[13px] text-slate-900 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 focus:outline-none transition-all"
           >
@@ -121,13 +141,9 @@ export default function Personas() {
           </select>
           <select
             value={filtro}
-            onChange={(event) => {
-              const value = event.target.value;
-              setFiltro(value);
-              const p = new URLSearchParams(searchParams);
-              if (value) p.set("filtro", value);
-              else p.delete("filtro");
-              setSearchParams(p);
+            onChange={(e) => {
+              setFiltro(e.target.value);
+              updateUrlParam("filtro", e.target.value);
             }}
             className="h-9 rounded-md border border-slate-200 bg-white px-3 text-[13px] text-slate-900 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 focus:outline-none transition-all"
           >
@@ -141,11 +157,12 @@ export default function Personas() {
         </div>
       </section>
 
-      {loading ? <LoadingState label="Cargando personas" /> : null}
+      {loading ? <LoadingState label="Cargando personas..." /> : null}
       {error ? <ErrorState message={error} /> : null}
       {!loading && !error && personas.length === 0 ? <EmptyState label="No hay personas para mostrar" /> : null}
-      {!loading && !error && personas.length > 0 ? (
-        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+
+      {!loading && !error && personas.length > 0 && (
+        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xs">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead className="bg-slate-50/80 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200">
@@ -159,50 +176,86 @@ export default function Personas() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {personas.map((persona) => (
-                  <tr key={persona.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="px-4 py-3">
-                      <Link to={`/personas/${persona.id}`} className="font-medium text-slate-900 hover:underline">
-                        {persona.nombre}
-                      </Link>
-                      <PersonFlags persona={persona} />
-                      <div className="mt-1 font-mono text-[11px] text-slate-400">
-                        {persona.rut} · {persona.telefono || "Sin teléfono"}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-slate-700">
-                      <div className="font-medium text-slate-800">{persona.comite_nombre}</div>
-                      <div className="text-[11px] text-slate-400">{persona.comite_comuna || "Sin comuna"}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge value={persona.estado_general} />
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-xs font-medium text-slate-700">
-                      {percent(persona.rsh_porcentaje)}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-xs font-medium text-slate-700">
-                      {money(persona.ahorro_monto)}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-xs font-semibold text-slate-900">
-                      {persona.alertas_activas}
-                    </td>
-                  </tr>
+                {personasPaginadas.map((persona) => (
+                  <PersonRow key={persona.id} persona={persona} />
                 ))}
               </tbody>
             </table>
           </div>
+
+          {/* Barra de paginación optimizada */}
+          <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50/50 px-4 py-2.5 text-xs text-slate-600">
+            <span>
+              Mostrando <strong>{((pagina - 1) * PAGE_SIZE) + 1}</strong> a <strong>{Math.min(pagina * PAGE_SIZE, personas.length)}</strong> de <strong>{personas.length}</strong> socios
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                disabled={pagina <= 1}
+                onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                className="inline-flex h-7 w-7 items-center justify-center rounded border border-slate-200 bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 cursor-pointer shadow-2xs"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <span className="px-2 font-medium tabular-nums">Página {pagina} de {totalPaginas}</span>
+              <button
+                type="button"
+                disabled={pagina >= totalPaginas}
+                onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+                className="inline-flex h-7 w-7 items-center justify-center rounded border border-slate-200 bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 cursor-pointer shadow-2xs"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
         </section>
-      ) : null}
+      )}
     </div>
   );
 }
 
-function PersonFlags({ persona }) {
-  const flags = [];
-  if (persona.persona_mayor) flags.push({ label: "60+", title: "Persona mayor" });
-  if (persona.discapacidad) flags.push({ label: "DIS", title: "Persona con discapacidad" });
-  if (hasEtnia(persona)) flags.push({ label: "ETN", title: `Etnia o pueblo originario: ${persona.etnia}` });
-  if (persona.postulacion_unipersonal) flags.push({ label: "UNI", title: "Postulación unipersonal" });
+const PersonRow = memo(function PersonRow({ persona }) {
+  return (
+    <tr className="hover:bg-slate-50/70 transition-colors">
+      <td className="px-4 py-3">
+        <Link to={`/personas/${persona.id}`} className="font-medium text-slate-900 hover:underline">
+          {persona.nombre}
+        </Link>
+        <PersonFlags persona={persona} />
+        <div className="mt-1 font-mono text-[11px] text-slate-400">
+          {persona.rut} · {persona.telefono || "Sin teléfono"}
+        </div>
+      </td>
+      <td className="px-4 py-3 text-slate-700">
+        <div className="font-medium text-slate-800">{persona.comite_nombre}</div>
+        <div className="text-[11px] text-slate-400">{persona.comite_comuna || "Sin comuna"}</div>
+      </td>
+      <td className="px-4 py-3">
+        <StatusBadge value={persona.estado_general} />
+      </td>
+      <td className="px-4 py-3 text-right tabular-nums text-xs font-medium text-slate-700">
+        {percent(persona.rsh_porcentaje)}
+      </td>
+      <td className="px-4 py-3 text-right tabular-nums text-xs font-medium text-slate-700">
+        {money(persona.ahorro_monto)}
+      </td>
+      <td className="px-4 py-3 text-right tabular-nums text-xs font-semibold text-slate-900">
+        {persona.alertas_activas}
+      </td>
+    </tr>
+  );
+});
+
+const PersonFlags = memo(function PersonFlags({ persona }) {
+  const flags = useMemo(() => {
+    const list = [];
+    if (persona.persona_mayor) flags.push({ label: "60+", title: "Persona mayor" });
+    if (persona.discapacidad) flags.push({ label: "DIS", title: "Persona con discapacidad" });
+    if (hasEtnia(persona)) flags.push({ label: "ETN", title: `Etnia o pueblo originario: ${persona.etnia}` });
+    if (persona.postulacion_unipersonal) list.push({ label: "UNI", title: "Postulación unipersonal" });
+    return list;
+  }, [persona.persona_mayor, persona.discapacidad, persona.etnia, persona.postulacion_unipersonal]);
+
   if (!flags.length) return null;
 
   return (
@@ -218,29 +271,10 @@ function PersonFlags({ persona }) {
       ))}
     </div>
   );
-}
+});
 
 function hasEtnia(persona) {
-  const text = String(persona.etnia || "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-  return Boolean(
-    text &&
-      ![
-        "no",
-        "n",
-        "ninguna",
-        "ninguno",
-        "sin dato",
-        "sindato",
-        "no aplica",
-        "noaplica",
-        "no informado",
-        "noinformado",
-        "no informada",
-        "noinformada",
-      ].includes(text)
-  );
+  if (!persona.etnia) return false;
+  const text = String(persona.etnia).trim().toLowerCase();
+  return !["no", "n", "ninguna", "ninguno", "sin dato", "sindato", "no aplica", "no informado"].includes(text);
 }
