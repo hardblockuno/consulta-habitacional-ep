@@ -279,7 +279,10 @@ def fill_formulario_phr(
         t8 = doc.tables[8]
         t8_data = data.get("tabla_8")
         if not t8_data:
-            from src.gemini_auditor import build_tabla_8
+            try:
+                from src.gemini_auditor import build_tabla_8
+            except ImportError:
+                from gemini_auditor import build_tabla_8
             t8_data = build_tabla_8({}, data.get("recinto_complementario", {}))
 
         # Mapeo oficial de filas en Tabla 8 de la plantilla DTS:
@@ -322,7 +325,10 @@ def fill_formulario_phr(
         t9 = doc.tables[9]
         t9_data = data.get("tabla_9")
         if not t9_data:
-            from src.gemini_auditor import build_tabla_9
+            try:
+                from src.gemini_auditor import build_tabla_9
+            except ImportError:
+                from gemini_auditor import build_tabla_9
             t9_data = build_tabla_9()
 
         c_info = t9_data.get("construccion", {})
@@ -348,7 +354,10 @@ def fill_formulario_phr(
         t15 = doc.tables[15]
         t15_data = data.get("tabla_15")
         if not t15_data:
-            from src.gemini_auditor import build_tabla_15
+            try:
+                from src.gemini_auditor import build_tabla_15
+            except ImportError:
+                from gemini_auditor import build_tabla_15
             t15_data = build_tabla_15()
 
         # Mapeo de filas en Tabla 15 de la plantilla Word:
@@ -415,7 +424,10 @@ def fill_formulario_phr(
 
         apartado_9_data = data.get("apartado_9")
         if not apartado_9_data:
-            from src.gemini_auditor import build_apartado_9
+            try:
+                from src.gemini_auditor import build_apartado_9
+            except ImportError:
+                from gemini_auditor import build_apartado_9
             apartado_9_data = build_apartado_9()
 
         secciones_9 = apartado_9_data.get("secciones", [])

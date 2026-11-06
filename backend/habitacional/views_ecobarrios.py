@@ -28,10 +28,15 @@ class EcobarriosAnalizarAPIView(APIView):
         try:
             resumen = analizar_excel_ecobarrios(archivo)
             return Response(resumen, status=status.HTTP_200_OK)
+        except (ValueError, FileNotFoundError) as ve:
+            return Response(
+                {"error": str(ve)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         except Exception as e:
             return Response(
-                {"error": f"Error al analizar el archivo Excel: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                {"error": f"Error al procesar la planilla: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
 

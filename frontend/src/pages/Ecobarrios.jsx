@@ -91,9 +91,17 @@ export default function Ecobarrios() {
       setAnalisis(res.data);
     } catch (err) {
       console.error("Error al analizar Excel:", err);
-      setErrorMsg(
-        err.response?.data?.error || "No se pudo procesar la planilla Excel. Verifica que tenga una hoja con los postulantes."
-      );
+      let mensaje = "No se pudo procesar la planilla Excel. Verifica que tenga una hoja con los postulantes.";
+      if (err.response?.status === 404) {
+        mensaje = "El backend en la nube (Render) se encuentra desplegando la actualización del módulo Ecobarrios. Por favor espera 1 a 2 minutos y vuelve a presionar 'Seleccionar Excel'.";
+      } else if (err.response?.data?.error) {
+        mensaje = err.response.data.error;
+      } else if (err.userFriendlyMessage) {
+        mensaje = err.userFriendlyMessage;
+      } else if (err.message) {
+        mensaje = err.message;
+      }
+      setErrorMsg(mensaje);
     } finally {
       setAnalizando(false);
     }

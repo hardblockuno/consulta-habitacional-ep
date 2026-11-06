@@ -8,8 +8,12 @@ import re
 import json
 import time
 from typing import Dict, Any, List, Optional
-from google import genai
-from google.genai import types
+try:
+    from google import genai
+    from google.genai import types
+except ImportError:
+    genai = None
+    types = None
 
 
 # Nombres comunes chilenos masculinos y femeninos para auditoría local

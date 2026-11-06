@@ -17,7 +17,10 @@ import docx
 from docx.shared import Pt, Inches, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-from src.gemini_auditor import consolidate_postulante_local, TERRENO_PROYECTO_CONSOLIDADO
+try:
+    from src.gemini_auditor import consolidate_postulante_local, TERRENO_PROYECTO_CONSOLIDADO
+except ImportError:
+    from gemini_auditor import consolidate_postulante_local, TERRENO_PROYECTO_CONSOLIDADO
 
 
 def set_cell_value(

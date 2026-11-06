@@ -17,11 +17,15 @@ SERVICE_DIR = Path(__file__).resolve().parent
 SRC_DIR = SERVICE_DIR / "src"
 TEMPLATES_DIR = SERVICE_DIR / "templates"
 
+if str(SERVICE_DIR) not in sys.path:
+    sys.path.insert(0, str(SERVICE_DIR))
+
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from docx_generator import fill_formulario_phr
 from excel_reader import format_rut, read_all_postulantes
+from gemini_auditor import consolidate_postulante_local
 from informe_social_generator import (
     calculate_informe_social_aggregates,
     fill_informe_social_docx,
@@ -49,14 +53,35 @@ def analizar_excel_ecobarrios(archivo_bytes_o_ruta: Any) -> Dict[str, Any]:
     """Analiza una base Excel y retorna las métricas oficiales D.S. 10."""
     tmp_path, es_temp = _guardar_temp_excel(archivo_bytes_o_ruta)
     try:
-        postulantes = read_all_postulantes(tmp_path, sheet_name="base")
-        if not postulantes:
-            # Intento de fallback con la primera hoja
-            postulantes = read_all_postulantes(tmp_path, sheet_name=None)
+        postulantes = read_all_postulantes(tmp_path, sheet_name=None)
         
         agg = calculate_informe_social_aggregates(postulantes)
         demo = agg.get("demografia", {})
         req = agg.get("requerimientos_vivienda", {})
+
+        postulantes_list = []
+        for i, p in enumerate(postulantes):
+            c = consolidate_postulante_local(p)
+            t4 = c.get("tabla_4", {})
+            td = c.get("tercer_dormitorio", {})
+            aplica_3d = bool(td.get("aplica", False))
+            es_may = bool(t4.get("adultos_mayores", {}).get("si") == "X") or ((p.get("edad") or 0) >= 60)
+            es_ind = bool(t4.get("indigena", {}).get("si") == "X") or (str(p.get("etnia", "")).upper() not in ["", "NO", "NINGUNO", "NINGUNA"])
+            es_disc = bool(t4.get("discapacidad", {}).get("si") == "X") or (str(p.get("discapacidad", "")).upper() not in ["", "NO", "NINGUNA", "0"])
+
+            tipo = "3ER DORMITORIO" if aplica_3d else "VIVIENDA BASE"
+
+            postulantes_list.append({
+                "n": p.get("nro_orden", i + 1),
+                "nombre": p.get("nombre", ""),
+                "rut": p.get("rut", ""),
+                "estado_civil": p.get("estado_civil", "SOLTERO/A"),
+                "tipo_vivienda": tipo,
+                "tercer_dormitorio": aplica_3d,
+                "adulto_mayor": es_may,
+                "conadi": es_ind,
+                "discapacidad": es_disc,
+            })
         
         resumen = {
             "total_familias": len(postulantes),
@@ -71,20 +96,7 @@ def analizar_excel_ecobarrios(archivo_bytes_o_ruta: Any) -> Dict[str, Any]:
             "familias_discapacidad": demo.get("familias_con_discapacidad", 0),
             "viviendas_3d": req.get("d3_conjunto", 0),
             "viviendas_base": len(postulantes) - req.get("d3_conjunto", 0),
-            "postulantes": [
-                {
-                    "n": p.get("n", i + 1),
-                    "nombre": p.get("nombre", ""),
-                    "rut": p.get("rut", ""),
-                    "estado_civil": p.get("estado_civil", "SOLTERO/A"),
-                    "tipo_vivienda": p.get("tipo_vivienda", "VIVIENDA BASE"),
-                    "tercer_dormitorio": p.get("requiere_3d", False),
-                    "adulto_mayor": p.get("es_adulto_mayor", False),
-                    "conadi": p.get("es_indigena", False),
-                    "discapacidad": p.get("tiene_discapacidad", False),
-                }
-                for i, p in enumerate(postulantes)
-            ],
+            "postulantes": postulantes_list,
         }
         return resumen
     finally:
@@ -178,9 +190,7 @@ def generar_expediente_zip(archivo_bytes_o_ruta: Any, metadata: Dict[str, Any]) 
     """Genera en lote todos los archivos del expediente y los empaqueta en un ZIP."""
     tmp_path, es_temp = _guardar_temp_excel(archivo_bytes_o_ruta)
     try:
-        postulantes = read_all_postulantes(tmp_path, sheet_name="base")
-        if not postulantes:
-            postulantes = read_all_postulantes(tmp_path, sheet_name=None)
+        postulantes = read_all_postulantes(tmp_path, sheet_name=None)
         
         metadata["total_familias"] = len(postulantes)
         comite_slug = metadata.get("comite_nombre", "Ecobarrios").replace(" ", "_")

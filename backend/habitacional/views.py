@@ -823,7 +823,7 @@ class SistemaDiagnosticoAPIView(APIView):
         return Response({
             "sistema": {
                 "plataforma": "Plan Social · Sistema EP",
-                "version": "1.2.0",
+                "version": "1.3.0",
                 "python": sys.version.split()[0],
                 "base_datos": db_engine,
                 "debug_activo": settings.DEBUG,
