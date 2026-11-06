@@ -128,6 +128,7 @@ export default function Ecobarrios() {
       const res = await api.post("/ecobarrios/generar/", formData, {
         headers: { "Content-Type": "multipart/form-data" },
         responseType: "blob",
+        timeout: 300000,
       });
 
       // Crear descarga en navegador
