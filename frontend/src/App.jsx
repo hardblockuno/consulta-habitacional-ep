@@ -20,6 +20,7 @@ const OrganizacionDemanda = lazy(() => import("./pages/OrganizacionDemanda.jsx")
 const PersonaDetail = lazy(() => import("./pages/PersonaDetail.jsx"));
 const Postventa = lazy(() => import("./pages/Postventa.jsx"));
 const Reportes = lazy(() => import("./pages/Reportes.jsx"));
+const Ecobarrios = lazy(() => import("./pages/Ecobarrios.jsx"));
 
 function PageLoadingFallback() {
   return (
@@ -77,6 +78,11 @@ export default function App() {
             <Route element={<ProtectedRoute allowedRoles={["tecnico", "coordinador", "admin"]} />}>
               <Route path="/tecnica" element={<AreaTecnica />} />
               <Route path="/postventa" element={<Postventa />} />
+            </Route>
+
+            {/* MÓDULO ECOBARRIOS (Disponible para toda la EP: Social, Técnico, Coordinador, Admin) */}
+            <Route element={<ProtectedRoute allowedRoles={["social", "tecnico", "coordinador", "admin"]} />}>
+              <Route path="/ecobarrios" element={<Ecobarrios />} />
             </Route>
 
             {/* SEGUIMIENTO COMÚN */}

@@ -9,7 +9,6 @@ media/
 build/
 staticfiles/
 
-
 # Node
 node_modules/
 dist/
@@ -21,6 +20,10 @@ dist/
 
 # Local source data with personal/sensitive records
 Bases datos Comites 2026/
+ecobarrios/bases/*.xlsx
+!ecobarrios/bases/.gitkeep
+ecobarrios/output/
+ecobarrios/formularios_generados/
 
 # OS
 .DS_Store

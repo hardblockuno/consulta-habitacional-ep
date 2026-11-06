@@ -31,9 +31,9 @@ if errorlevel 1 (
   exit /b 1
 )
 
-"%PYTHON%" -c "import django, rest_framework, corsheaders, pandas, openpyxl, dotenv, pypdf, PIL, pytesseract" >nul 2>nul
+"%PYTHON%" -c "import django, rest_framework, corsheaders, pandas, openpyxl, dotenv, pypdf, PIL, pytesseract, streamlit, docx, altair" >nul 2>nul
 if errorlevel 1 (
-  echo Preparando la plataforma por primera vez...
+  echo Preparando dependencias de la plataforma y motor Ecobarrios por primera vez...
   "%PYTHON%" -m pip install --disable-pip-version-check -r "%BACKEND%\requirements.txt"
   if errorlevel 1 (
     echo No se pudieron preparar las dependencias de la plataforma.
@@ -62,6 +62,7 @@ if errorlevel 1 if not exist "C:\Program Files\Tesseract-OCR\tesseract.exe" (
   exit /b 1
 )
 
+rem Iniciar API Django
 "%PYTHON%" "%BACKEND%\esperar_api.py" --segundos 2 >nul 2>nul
 if errorlevel 1 (
   "%PYTHON%" "%BACKEND%\detener_api_anterior.py" >nul 2>nul
@@ -75,6 +76,10 @@ if errorlevel 1 (
     exit /b 1
   )
 )
+
+rem Iniciar motor Streamlit de Ecobarrios en segundo plano silencioso
+if not exist "%PYTHONW%" set "PYTHONW=%PYTHON%"
+start "" "%PYTHONW%" "%BACKEND%\iniciar_ecobarrios.py"
 
 set "EDGE=%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"
 if not exist "%EDGE%" set "EDGE=%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"

@@ -1,0 +1,35 @@
+====================================================================
+SIGEP · CONSULTA HABITACIONAL EP
+Plataforma Interna de Gestión y Consulta para Entidades Patrocinantes
+====================================================================
+
+¿CÓMO INICIAR LA PLATAFORMA LOCALMENTE?
+1. Haz doble clic en el archivo:
+   "INICIAR SIGEP.bat"
+   (o en el acceso directo del escritorio "INICIAR SIGEP").
+
+2. El sistema levantará automáticamente en segundo plano:
+   - La API local de Consulta Habitacional (puerto 8000).
+   - El motor interactivo Streamlit de "Ecobarrios" (puerto 8501).
+   - Y abrirá la plataforma en el navegador Microsoft Edge.
+
+¿CÓMO USAR EL MÓDULO ECOBARRIOS (D.S. 10)?
+- En el menú lateral, haz clic en "Ecobarrios (D.S. 10)".
+- Arrastra la planilla Excel de cualquier nuevo comité o cópiala en la
+  carpeta:
+  "SIGEP\ecobarrios\bases\"
+- El sistema calculará automáticamente las 34 tablas estadísticas,
+  los requerimientos de 3er dormitorio (3D), recintos complementarios,
+  adultos mayores, CONADI y discapacidad.
+- En la pestaña "Generación Masiva" podrás generar los Formularios 6.1
+  en Word y el Informe Diagnóstico Social Consolidado (AT-6) en 1 clic.
+
+VERSIÓN WEB EN LA NUBE:
+- También puedes acceder a la versión web compartida en:
+  https://consulta-habitacional-web.onrender.com
+  (o la versión rápida sin login en https://hardblockuno.github.io/consulta-habitacional-ep/)
+
+====================================================================
+Entidad de Gestión Rural / Entidad Patrocinante
+Plan Social Ltda.
+====================================================================

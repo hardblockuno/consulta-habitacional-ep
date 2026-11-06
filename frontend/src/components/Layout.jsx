@@ -10,6 +10,7 @@ import {
   PiggyBank,
   ScanLine,
   ShieldCheck,
+  TreePine,
   User,
   Users,
   Wrench,
@@ -48,6 +49,12 @@ function getNavSectionsForUser(user) {
         ],
       },
       {
+        title: "HABITABILIDAD RURAL",
+        items: [
+          { to: "/ecobarrios", label: "Ecobarrios (D.S. 10)", icon: TreePine },
+        ],
+      },
+      {
         title: "ÁREA TÉCNICA",
         items: [
           { to: "/tecnica", label: "Proyectos y Terrenos", icon: HardHat },
@@ -70,6 +77,12 @@ function getNavSectionsForUser(user) {
         title: "COORDINACIÓN",
         items: [
           { to: "/coordinacion", label: "Consola Ejecutiva", icon: LineChart, primary: true },
+        ],
+      },
+      {
+        title: "HABITABILIDAD RURAL",
+        items: [
+          { to: "/ecobarrios", label: "Ecobarrios (D.S. 10)", icon: TreePine },
         ],
       },
       {
@@ -106,6 +119,12 @@ function getNavSectionsForUser(user) {
         ],
       },
       {
+        title: "HABITABILIDAD RURAL",
+        items: [
+          { to: "/ecobarrios", label: "Ecobarrios (D.S. 10)", icon: TreePine },
+        ],
+      },
+      {
         title: "SEGUIMIENTO",
         items: [
           { to: "/alertas", label: "Alertas Técnicas", icon: Bell },
@@ -123,6 +142,12 @@ function getNavSectionsForUser(user) {
         { to: "/bases-datos", label: "Bases de datos", icon: Database },
         { to: "/extraer-ahorro", label: "Extraer ahorro", icon: PiggyBank },
         { to: "/extraer-rukan", label: "Extraer RUKAN", icon: ScanLine },
+      ],
+    },
+    {
+      title: "HABITABILIDAD RURAL",
+      items: [
+        { to: "/ecobarrios", label: "Ecobarrios (D.S. 10)", icon: TreePine },
       ],
     },
     {

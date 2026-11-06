@@ -46,6 +46,18 @@ No abras solo `docs/index.html` ni el enlace de GitHub Pages para procesar Rukan
 
 Nota de privacidad: la lectura local procesa los PDF dentro de este computador. La lectura puede cometer errores, por lo que los resultados deben conservar estado de revision humana.
 
+### Módulo Ecobarrios (Habitabilidad Rural D.S. 10)
+
+El sistema integra de forma nativa la consola interactiva **Ecobarrios**, desarrollada en Streamlit para la formulación integral de proyectos bajo el programa de Habitabilidad Rural (D.S. N° 10 / Res. 3131):
+
+1. **Insumo único por comité:** Arrastra o selecciona la planilla Excel del comité (ej. `BASE_VILCUN.xlsx` o `BASE_PERQUENCO.xlsx`).
+2. **Previsualización de familias:** Navega la ficha individual de cada postulante, su grupo familiar, acreditaciones de discapacidad (COMPIN), ascendencia indígena (CONADI) y condiciones de habitabilidad.
+3. **Métricas y 3er Dormitorio:** Calcula automáticamente los requisitos de dormitorio adicional (3D) por hacinamiento y composición familiar, así como recintos complementarios.
+4. **Generación masiva 6.1:** Genera en lote todos los archivos Word de *Formulario PHR N° 6.1 DTS* por cada postulante y los empaqueta en un archivo ZIP listo para firma.
+5. **Informe Diagnóstico Social Consolidado (AT-6):** Genera el informe oficial con las 34 tablas estadísticas cuadradas sin descuadre humano.
+
+El motor corre localmente en el puerto `8501` y se levanta automáticamente al iniciar la plataforma mediante `Consulta Habitacional.bat`.
+
 ### Instalador de Windows
 
 La version instalable se genera con `build_installer.ps1`. El resultado es `build/installer/ConsultaHabitacionalEP-Setup.exe` e incluye la interfaz, la API local, SQLite y Tesseract OCR con espanol e ingles.

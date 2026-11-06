@@ -22,6 +22,10 @@ from .views import (
     UsuariosGestionViewSet,
     SugerenciaFeedbackViewSet,
 )
+from .views_ecobarrios import (
+    EcobarriosAnalizarAPIView,
+    EcobarriosGenerarExpedienteAPIView,
+)
 
 router = DefaultRouter()
 router.register("comites", ComiteViewSet, basename="comites")
@@ -54,4 +58,7 @@ urlpatterns = [
     ),
     path("rukan/ia-extraer/", RukanAIExtractionAPIView.as_view(), name="rukan-ia-extraer"),
     path("rukan/ia-estado/", RukanAIStatusAPIView.as_view(), name="rukan-ia-estado"),
+    # Módulo Ecobarrios (D.S. 10 Habitabilidad Rural)
+    path("ecobarrios/analizar/", EcobarriosAnalizarAPIView.as_view(), name="ecobarrios-analizar"),
+    path("ecobarrios/generar/", EcobarriosGenerarExpedienteAPIView.as_view(), name="ecobarrios-generar"),
 ]

@@ -354,6 +354,7 @@ function navigate(view, params = {}) {
     importar: renderImportar,
     ahorro: renderExtraerAhorro,
     rukan: renderRukan,
+    ecobarrios: renderEcobarrios,
     alertas: renderAlertas,
     gestion: renderGestion,
     reportes: renderReportes,
@@ -1368,6 +1369,32 @@ function exportConsolidatedDemandaExcel() {
     XLSX.utils.book_append_sheet(wb, wsDetail, "Padron Consolidado");
   }
   XLSX.writeFile(wb, `organizacion-demanda-comites-ep-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+function renderEcobarrios() {
+  const workspace = getActiveWorkspace();
+  setApp(`
+    <div style="display: flex; flex-direction: column; height: calc(100vh - 6rem); gap: 0.75rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.75rem;">
+        <div>
+          <div class="eyebrow">HABITABILIDAD RURAL · D.S. 10</div>
+          <h2 style="margin: 0.1rem 0 0 0;">Ecobarrios · Generador de Expedientes y Diagnósticos PHR</h2>
+          <p class="muted" style="margin: 0;">Comité activo: ${escapeHtml(workspaceDisplayName(workspace))}</p>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <a href="http://127.0.0.1:8501" target="_blank" rel="noreferrer" class="button secondary" style="font-size: 12px; text-decoration: none;">
+            Ventana Completa ↗
+          </a>
+          <button type="button" class="button secondary" onclick="const ifr = document.getElementById('ecobarriosIframe'); if (ifr) ifr.src = 'http://127.0.0.1:8501/?embed=true&r=' + Date.now();" style="font-size: 12px;">
+            Recargar
+          </button>
+        </div>
+      </div>
+      <div style="flex: 1; border-radius: 8px; overflow: hidden; border: 1px solid #cbd5e1; background: #ffffff;">
+        <iframe id="ecobarriosIframe" src="http://127.0.0.1:8501/?embed=true" style="width: 100%; height: 100%; border: 0;" allow="clipboard-write"></iframe>
+      </div>
+    </div>
+  `);
 }
 
 function renderAreaTecnica() {
