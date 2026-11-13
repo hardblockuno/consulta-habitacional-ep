@@ -674,8 +674,9 @@ def fill_formulario_phr(
                 run_cap.font.color.rgb = docx.shared.RGBColor(80, 80, 80)
 
     # Crear carpeta destino si no existe
-    dir_name = os.path.dirname(output_path)
-    if dir_name:
-        os.makedirs(dir_name, exist_ok=True)
+    if isinstance(output_path, (str, os.PathLike)):
+        dir_name = os.path.dirname(output_path)
+        if dir_name:
+            os.makedirs(dir_name, exist_ok=True)
     doc.save(output_path)
     return output_path

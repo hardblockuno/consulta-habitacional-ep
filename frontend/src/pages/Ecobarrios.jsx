@@ -32,6 +32,7 @@ export default function Ecobarrios() {
   const [archivo, setArchivo] = useState(null);
   const [analizando, setAnalizando] = useState(false);
   const [generando, setGenerando] = useState(false);
+  const [descargandoDoc, setDescargandoDoc] = useState(null); // 'at6' | 'nomina' | 'compromiso' | rut
   const [analisis, setAnalisis] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [busqueda, setBusqueda] = useState("");
@@ -94,8 +95,12 @@ export default function Ecobarrios() {
       let mensaje = "No se pudo procesar la planilla Excel. Verifica que tenga una hoja con los postulantes.";
       if (err.response?.status === 404) {
         mensaje = "El backend en la nube (Render) se encuentra desplegando la actualización del módulo Ecobarrios. Por favor espera 1 a 2 minutos y vuelve a presionar 'Seleccionar Excel'.";
+      } else if (err.response?.status === 502 || err.response?.status === 504) {
+        mensaje = "El servidor en la nube de Render está despertando (modo ahorro de energía). Por favor espera 30 segundos y vuelve a presionar 'Seleccionar Excel'.";
       } else if (err.response?.data?.error) {
         mensaje = err.response.data.error;
+      } else if (typeof err.response?.data === "string" && err.response.data.includes("502")) {
+        mensaje = "El servidor en la nube está despertando. Por favor espera 30 segundos y reintenta.";
       } else if (err.userFriendlyMessage) {
         mensaje = err.userFriendlyMessage;
       } else if (err.message) {
@@ -104,6 +109,62 @@ export default function Ecobarrios() {
       setErrorMsg(mensaje);
     } finally {
       setAnalizando(false);
+    }
+  };
+
+  // Descarga instantánea de un documento individual (.docx)
+  const handleDescargarIndividual = async (tipo, rut = null, defaultName = "documento.docx") => {
+    if (!archivo) return;
+    const docKey = rut || tipo;
+    setDescargandoDoc(docKey);
+    setErrorMsg("");
+
+    const formData = new FormData();
+    formData.append("archivo", archivo);
+    formData.append("tipo", tipo);
+    if (rut) formData.append("rut", rut);
+    formData.append("comite_nombre", comiteNombre);
+    formData.append("codigo_expediente", codigoExpediente);
+    formData.append("comuna", comuna);
+    formData.append("egr_nombre", egrNombre);
+    formData.append("egr_rut", egrRut);
+    formData.append("arquitecto", arquitecto);
+    formData.append("trabajador_social", trabajadorSocial);
+    formData.append("abogado", abogado);
+
+    try {
+      const res = await api.post("/ecobarrios/documento-individual/", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        responseType: "blob",
+        timeout: 60000,
+      });
+
+      let filename = defaultName;
+      const disposition = res.headers?.["content-disposition"] || res.headers?.["Content-Disposition"];
+      if (disposition && disposition.includes("filename=")) {
+        const match = disposition.match(/filename="?([^";]+)"?/);
+        if (match && match[1]) filename = match[1];
+      }
+
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(`Error al descargar documento (${tipo}):`, err);
+      let mensaje = `Error al generar documento ${tipo}. Revisa la consola o intenta nuevamente.`;
+      if (err.response?.data?.error) {
+        mensaje = err.response.data.error;
+      } else if (err.message) {
+        mensaje = err.message;
+      }
+      setErrorMsg(mensaje);
+    } finally {
+      setDescargandoDoc(null);
     }
   };
 
@@ -143,7 +204,11 @@ export default function Ecobarrios() {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Error al generar expediente:", err);
-      setErrorMsg("Ocurrió un error al compilar los documentos. Revisa la consola o intenta nuevamente.");
+      let mensaje = "Ocurrió un error al compilar los documentos. Revisa la consola o intenta nuevamente.";
+      if (err.response?.status === 502 || err.response?.status === 504) {
+        mensaje = "La generación del ZIP completo tomó más tiempo que el límite del servidor. Puedes descargar los documentos individuales al instante con los botones de abajo o reintentar.";
+      }
+      setErrorMsg(mensaje);
     } finally {
       setGenerando(false);
     }
@@ -302,7 +367,7 @@ export default function Ecobarrios() {
             <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-slate-50/50 p-6 text-center hover:bg-slate-50 transition">
               <FileSpreadsheet size={36} className="text-emerald-600 mb-2" />
               <p className="text-xs font-medium text-slate-800">
-                {archivo ? archivo.name : "Arrastra aquí la planilla Excel (.xlsx) del nuevo comité o selecciónala"}
+                {archivo ? archivo.name : "Arrastra aquí la planilla Excel (.xlsx, .xlsm) del nuevo comité o selecciónala"}
               </p>
               <p className="text-[11px] text-slate-500 mt-0.5">
                 Detecta automáticamente RUTs, edades, parentescos, RSH, CONADI, discapacidad y 3D.
@@ -312,7 +377,7 @@ export default function Ecobarrios() {
                 Seleccionar Excel
                 <input
                   type="file"
-                  accept=".xlsx,.xls"
+                  accept=".xlsx,.xls,.xlsm"
                   onChange={handleArchivoChange}
                   className="hidden"
                 />
@@ -383,31 +448,99 @@ export default function Ecobarrios() {
                 </div>
               </div>
 
-              {/* Botonera de Descarga */}
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl bg-slate-900 p-5 text-white shadow-md">
-                <div>
-                  <h3 className="text-sm font-semibold">¿Todo cuadrado? Descarga el Expediente Oficial</h3>
-                  <p className="text-xs text-slate-300 mt-0.5">
-                    Genera el archivo ZIP con todos los Formularios 6.1 individuales (.docx), el Informe AT-6 (.docx), la Nómina (.docx) y el Compromiso (.docx).
-                  </p>
+              {/* Botonera de Descarga Principal y Documentos Individuales */}
+              <div className="rounded-xl bg-slate-900 p-5 text-white shadow-md space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      <Download size={16} className="text-emerald-400" />
+                      Descarga de Documentación Oficial D.S. N° 10
+                    </h3>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      Descarga individual instantánea (&lt; 1 seg) o compila el paquete ZIP completo con las 155 carpetas.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleGenerarExpediente}
+                    disabled={generando || descargandoDoc !== null}
+                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 shadow-sm hover:bg-emerald-400 disabled:opacity-50 transition"
+                  >
+                    {generando ? (
+                      <>
+                        <Loader2 size={15} className="animate-spin" /> Compilando ZIP (155 expedientes)...
+                      </>
+                    ) : (
+                      <>
+                        <FolderArchive size={15} /> Descargar Expediente Completo (ZIP)
+                      </>
+                    )}
+                  </button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleGenerarExpediente}
-                  disabled={generando}
-                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-emerald-500 px-5 py-2.5 text-xs font-semibold text-slate-950 shadow-sm hover:bg-emerald-400 disabled:opacity-50 transition"
-                >
-                  {generando ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" /> Compilando Expediente...
-                    </>
-                  ) : (
-                    <>
-                      <Download size={16} /> Descargar Expediente Completo (ZIP)
-                    </>
-                  )}
-                </button>
+                {/* Accesos rápidos individuales */}
+                <div className="pt-3 border-t border-slate-800 grid gap-2 sm:grid-cols-3">
+                  <button
+                    type="button"
+                    onClick={() => handleDescargarIndividual("at6", null, "14. AT-6_Diagnostico_Social_Consolidado.docx")}
+                    disabled={descargandoDoc === "at6" || generando}
+                    className="flex items-center justify-between rounded-lg bg-slate-800/90 hover:bg-slate-800 border border-slate-700/80 px-3 py-2 text-xs text-slate-200 transition disabled:opacity-50"
+                  >
+                    <div className="flex items-center gap-2 text-left">
+                      <FileText size={15} className="text-indigo-400 shrink-0" />
+                      <div>
+                        <div className="font-semibold text-[11px] text-white">Informe AT-6 (.docx)</div>
+                        <div className="text-[10px] text-slate-400">Diagnóstico Social Consolidado</div>
+                      </div>
+                    </div>
+                    {descargandoDoc === "at6" ? (
+                      <Loader2 size={14} className="animate-spin text-indigo-400" />
+                    ) : (
+                      <ArrowDownToLine size={14} className="text-slate-400" />
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDescargarIndividual("nomina", null, "4. NOMINA_Oficial_Postulantes.docx")}
+                    disabled={descargandoDoc === "nomina" || generando}
+                    className="flex items-center justify-between rounded-lg bg-slate-800/90 hover:bg-slate-800 border border-slate-700/80 px-3 py-2 text-xs text-slate-200 transition disabled:opacity-50"
+                  >
+                    <div className="flex items-center gap-2 text-left">
+                      <Users size={15} className="text-emerald-400 shrink-0" />
+                      <div>
+                        <div className="font-semibold text-[11px] text-white">Nómina Oficial (.docx)</div>
+                        <div className="text-[10px] text-slate-400">Padrón 1 a N alfabético</div>
+                      </div>
+                    </div>
+                    {descargandoDoc === "nomina" ? (
+                      <Loader2 size={14} className="animate-spin text-emerald-400" />
+                    ) : (
+                      <ArrowDownToLine size={14} className="text-slate-400" />
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDescargarIndividual("compromiso", null, "3. COMPROMISO_Profesionales.docx")}
+                    disabled={descargandoDoc === "compromiso" || generando}
+                    className="flex items-center justify-between rounded-lg bg-slate-800/90 hover:bg-slate-800 border border-slate-700/80 px-3 py-2 text-xs text-slate-200 transition disabled:opacity-50"
+                  >
+                    <div className="flex items-center gap-2 text-left">
+                      <CheckCircle2 size={15} className="text-amber-400 shrink-0" />
+                      <div>
+                        <div className="font-semibold text-[11px] text-white">Compromiso (.docx)</div>
+                        <div className="text-[10px] text-slate-400">Declaración de Profesionales</div>
+                      </div>
+                    </div>
+                    {descargandoDoc === "compromiso" ? (
+                      <Loader2 size={14} className="animate-spin text-amber-400" />
+                    ) : (
+                      <ArrowDownToLine size={14} className="text-slate-400" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               {/* Listado Previo de Familias */}
@@ -438,6 +571,7 @@ export default function Ecobarrios() {
                         <th className="py-2.5 px-3">Estado Civil</th>
                         <th className="py-2.5 px-3">Tipología Asignada</th>
                         <th className="py-2.5 px-3 text-center">Atributos Especiales</th>
+                        <th className="py-2.5 px-3 text-right">Formulario 6.1</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -476,6 +610,33 @@ export default function Ecobarrios() {
                                 </span>
                               )}
                             </div>
+                          </td>
+                          <td className="py-2 px-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleDescargarIndividual(
+                                  "phr61",
+                                  p.rut || p.n,
+                                  `PHR_6.1_${String(p.rut || p.n).replace(/[^a-zA-Z0-9]/g, "_")}.docx`
+                                )
+                              }
+                              disabled={descargandoDoc === (p.rut || p.n) || generando}
+                              className="inline-flex items-center gap-1 rounded-md bg-slate-50 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-700 transition disabled:opacity-50"
+                              title={`Descargar Formulario 6.1 para ${p.nombre}`}
+                            >
+                              {descargandoDoc === (p.rut || p.n) ? (
+                                <>
+                                  <Loader2 size={11} className="animate-spin text-emerald-600" />
+                                  <span>Descargando...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <ArrowDownToLine size={11} className="text-slate-500" />
+                                  <span>F. 6.1 (.docx)</span>
+                                </>
+                              )}
+                            </button>
                           </td>
                         </tr>
                       ))}

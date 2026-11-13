@@ -24,6 +24,7 @@ from .views import (
 )
 from .views_ecobarrios import (
     EcobarriosAnalizarAPIView,
+    EcobarriosDocumentoIndividualAPIView,
     EcobarriosGenerarExpedienteAPIView,
 )
 
@@ -61,4 +62,5 @@ urlpatterns = [
     # Módulo Ecobarrios (D.S. 10 Habitabilidad Rural)
     path("ecobarrios/analizar/", EcobarriosAnalizarAPIView.as_view(), name="ecobarrios-analizar"),
     path("ecobarrios/generar/", EcobarriosGenerarExpedienteAPIView.as_view(), name="ecobarrios-generar"),
+    path("ecobarrios/documento-individual/", EcobarriosDocumentoIndividualAPIView.as_view(), name="ecobarrios-documento-individual"),
 ]
