@@ -26,6 +26,8 @@ from .views_ecobarrios import (
     EcobarriosAnalizarAPIView,
     EcobarriosDocumentoIndividualAPIView,
     EcobarriosGenerarExpedienteAPIView,
+    EcobarriosPlantillaModeloAPIView,
+    EcobarriosRedactarAT6IAAPIView,
 )
 
 router = DefaultRouter()
@@ -63,4 +65,6 @@ urlpatterns = [
     path("ecobarrios/analizar/", EcobarriosAnalizarAPIView.as_view(), name="ecobarrios-analizar"),
     path("ecobarrios/generar/", EcobarriosGenerarExpedienteAPIView.as_view(), name="ecobarrios-generar"),
     path("ecobarrios/documento-individual/", EcobarriosDocumentoIndividualAPIView.as_view(), name="ecobarrios-documento-individual"),
+    path("ecobarrios/plantilla-modelo/", EcobarriosPlantillaModeloAPIView.as_view(), name="ecobarrios-plantilla-modelo"),
+    path("ecobarrios/redactar-at6-ia/", EcobarriosRedactarAT6IAAPIView.as_view(), name="ecobarrios-redactar-at6-ia"),
 ]

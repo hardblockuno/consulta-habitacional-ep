@@ -66,6 +66,7 @@ def calculate_informe_social_aggregates(
     egr_nombre: str = "CONSULTORA PLAN SOCIAL LIMITADA",
     egr_rut: str = "77.235.354-5",
     codigo_expediente: Optional[str] = None,
+    textos_personalizados: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     """
     Calcula de manera 100% determinista todos los agregados y matrices del
@@ -237,6 +238,31 @@ def calculate_informe_social_aggregates(
         f"las actividades económicas y de sustento rural de las familias."
     )
 
+    custom = textos_personalizados or {}
+    if custom.get("opinion_profesional"):
+        opinion_profesional_txt = str(custom["opinion_profesional"]).strip()
+
+    predio_txt = terr.get("calle") or f"predio del proyecto {nombre_grupo}"
+    obs_servicios_default = (
+        f"Para el abastecimiento de agua potable de las {tot_familias} familias, se proyecta un sistema normativo de "
+        f"captación y potabilización para el {predio_txt} (comuna de {comuna_nombre}), garantizando caudal y calidad de agua según NCh 409. "
+        f"En cuanto a la disposición de aguas servidas, se contempla una solución sanitaria y ambientalmente sustentable "
+        f"aprobada por la autoridad sectorial, cumpliendo con los estándares ambientales vigentes. El suministro eléctrico se conectará a la "
+        f"red de distribución de la empresa concesionaria de la zona."
+    )
+    obs_servicios_txt = str(custom.get("obs_servicios_basicos") or "").strip() or obs_servicios_default
+
+    terr_ref = f"{terr.get('calle', 'Predio del Proyecto')}"
+    if terr.get("rol_sii") and terr.get("rol_sii") != "En trámite":
+        terr_ref += f", Rol SII {terr['rol_sii']}"
+    riesgos_default = (
+        f"El predio del proyecto ({terr_ref}, comuna de {comuna_nombre}) se ubica en un terreno plano "
+        f"con pendiente menor al 3%, libre de riesgos de remoción en masa, derrumbes, aluviones o inundaciones fluviales. "
+        f"Cuenta con condiciones geográficas, mecánicas de suelo y de escorrentía superficial completamente aptas para el "
+        f"emplazamiento seguro de las viviendas y su infraestructura comunitaria."
+    )
+    riesgos_txt = str(custom.get("riesgos_naturales") or "").strip() or riesgos_default
+
     return {
         "generales": {
             "nombre_grupo": nombre_grupo,
@@ -273,6 +299,8 @@ def calculate_informe_social_aggregates(
         },
         "recintos_complementarios": recintos_counts,
         "opinion_profesional": opinion_profesional_txt,
+        "obs_servicios_basicos": obs_servicios_txt,
+        "riesgos_naturales": riesgos_txt,
         "nomina": nomina
     }
 
@@ -473,7 +501,7 @@ def fill_informe_social_docx(
     if len(doc.tables) > 26:
         t26 = doc.tables[26]
         predio_txt = gen.get("terreno_calle") or f"predio del proyecto {gen['nombre_grupo']}"
-        obs_servicios_txt = (
+        obs_servicios_txt = data.get("obs_servicios_basicos") or (
             f"Para el abastecimiento de agua potable de las {gen['tot_familias']} familias, se proyecta un sistema normativo de "
             f"captación y potabilización para el {predio_txt} (comuna de {gen['comuna']}), garantizando caudal y calidad de agua según NCh 409. "
             f"En cuanto a la disposición de aguas servidas, se contempla una solución sanitaria y ambientalmente sustentable "
@@ -515,7 +543,7 @@ def fill_informe_social_docx(
         terr_ref = f"{gen.get('terreno_calle', 'Predio del Proyecto')}"
         if gen.get("terreno_rol") and gen.get("terreno_rol") != "En trámite":
             terr_ref += f", Rol SII {gen['terreno_rol']}"
-        riesgos_txt = (
+        riesgos_txt = data.get("riesgos_naturales") or (
             f"El predio del proyecto ({terr_ref}, comuna de {gen['comuna']}) se ubica en un terreno plano "
             f"con pendiente menor al 3%, libre de riesgos de remoción en masa, derrumbes, aluviones o inundaciones fluviales. "
             f"Cuenta con condiciones geográficas, mecánicas de suelo y de escorrentía superficial completamente aptas para el "

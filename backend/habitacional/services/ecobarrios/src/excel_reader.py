@@ -6,6 +6,7 @@ Principio: Máxima resiliencia en la ingesta, fidelidad estricta a la fuente, si
 """
 
 import datetime
+import io
 import math
 import os
 import re
@@ -13,6 +14,8 @@ import unicodedata
 from typing import Any, Dict, List, Optional, Tuple
 
 import openpyxl
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import get_column_letter
 
 
 def norm_str(s: Any) -> str:
@@ -780,3 +783,303 @@ def read_all_postulantes(excel_path: str, sheet_name: Optional[str] = None) -> L
         )
 
     return postulantes
+
+
+def generar_plantilla_modelo_excel() -> io.BytesIO:
+    """
+    Genera un archivo Excel (.xlsx) con la plantilla oficial estandarizada
+    para nóminas de comités habitacionales D.S. N° 10 / RUKAN.
+    Incluye 2 hojas:
+      1. NOMINA_POSTULANTES: Columnas oficiales con estilos y 3 filas modelo.
+      2. GUIA_COLUMNAS_Y_REGLAS: Diccionario de datos y reglas de negocio.
+    """
+    wb = openpyxl.Workbook()
+
+    # Estilos institucionales MINVU / SERVIU
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="1B365D", end_color="1B365D", fill_type="solid")
+    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    data_font = Font(name="Calibri", size=10, color="0F172A")
+    data_font_bold = Font(name="Calibri", size=10, bold=True, color="0F172A")
+    data_align_center = Alignment(horizontal="center", vertical="center")
+    data_align_left = Alignment(horizontal="left", vertical="center")
+
+    thin_border_side = Side(style="thin", color="CBD5E1")
+    border_all = Border(left=thin_border_side, right=thin_border_side, top=thin_border_side, bottom=thin_border_side)
+
+    # -------------------------------------------------------------
+    # HOJA 1: NOMINA_POSTULANTES
+    # -------------------------------------------------------------
+    ws1 = wb.active
+    ws1.title = "NOMINA_POSTULANTES"
+    ws1.views.sheetView[0].showGridLines = True
+
+    columnas_nomina = [
+        ("N°", 6),
+        ("NOMBRE COMPLETO", 36),
+        ("RUT", 15),
+        ("COMUNA", 18),
+        ("DIRECCION RSH", 30),
+        ("SEXO", 8),
+        ("ESTADO CIVIL", 16),
+        ("FEC NAC", 14),
+        ("EDAD", 8),
+        ("TIPO FAM", 22),
+        ("GRUP FAM", 12),
+        ("TIPO DE VIVIENDA", 24),
+        ("DISCAPACIDAD", 16),
+        ("ETNIA", 14),
+        ("FONO", 14),
+        ("RUT CONYUGE", 15),
+        ("NOMBRE CONYUGE", 32),
+        ("OBSERVACIONES", 35),
+    ]
+
+    ws1.row_dimensions[1].height = 28
+    for col_idx, (col_name, col_width) in enumerate(columnas_nomina, start=1):
+        cell = ws1.cell(row=1, column=col_idx, value=col_name)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+        cell.border = border_all
+        ws1.column_dimensions[get_column_letter(col_idx)].width = col_width
+
+    filas_ejemplo = [
+        [
+            1,
+            "PÉREZ SOTO JUAN ANDRÉS",
+            "12.345.678-9",
+            "Loncoche",
+            "Calle Los Notros 123",
+            "M",
+            "CASADO",
+            "15/05/1982",
+            44,
+            "BIPARENTAL CON HIJOS",
+            5,
+            "AHORRO 35 UF (3D)",
+            "NO",
+            "NO",
+            "987654321",
+            "13.456.789-0",
+            "GONZÁLEZ ROJAS MARÍA JOSÉ",
+            "Aplica a 3° dormitorio por grupo familiar >= 5 integrantes",
+        ],
+        [
+            2,
+            "CATRILEO HUENCHUMAN ROSA ELENA",
+            "15.876.543-2",
+            "Loncoche",
+            "Pasaje El Roble 456",
+            "F",
+            "SOLTERA",
+            "20/08/1989",
+            37,
+            "MONOPARENTAL",
+            3,
+            "BASE",
+            "NO",
+            "MAPUCHE",
+            "976543210",
+            "",
+            "",
+            "Acreditación de calidad indígena CONADI vigente",
+        ],
+        [
+            3,
+            "MUÑOZ CONTRERAS LUIS HERNÁN",
+            "8.765.432-1",
+            "Loncoche",
+            "Camino Rural Km 4",
+            "M",
+            "VIUDO",
+            "10/02/1954",
+            72,
+            "UNIPERSONAL",
+            1,
+            "MOVILIDAD REDUCIDA (3D)",
+            "SI",
+            "NO",
+            "965432109",
+            "",
+            "",
+            "Adulto mayor con credencial de discapacidad y movilidad reducida",
+        ],
+    ]
+
+    for row_idx, fila in enumerate(filas_ejemplo, start=2):
+        ws1.row_dimensions[row_idx].height = 22
+        for col_idx, valor in enumerate(fila, start=1):
+            cell = ws1.cell(row=row_idx, column=col_idx, value=valor)
+            cell.font = data_font
+            cell.border = border_all
+            if col_idx in [1, 3, 6, 8, 9, 11, 15, 16]:
+                cell.alignment = data_align_center
+            else:
+                cell.alignment = data_align_left
+
+    # -------------------------------------------------------------
+    # HOJA 2: GUIA_COLUMNAS_Y_REGLAS
+    # -------------------------------------------------------------
+    ws2 = wb.create_sheet(title="GUIA_COLUMNAS_Y_REGLAS")
+    ws2.views.sheetView[0].showGridLines = True
+
+    encabezados_guia = [
+        ("COLUMNA", 22),
+        ("OBLIGATORIA", 16),
+        ("FORMATO / VALORES ESPERADOS", 32),
+        ("IMPACTO EN D.S. N° 10 / RUKAN / FORMULARIO 6.1 Y AT-6", 60),
+    ]
+
+    ws2.row_dimensions[1].height = 28
+    for col_idx, (col_name, col_width) in enumerate(encabezados_guia, start=1):
+        cell = ws2.cell(row=1, column=col_idx, value=col_name)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+        cell.border = border_all
+        ws2.column_dimensions[get_column_letter(col_idx)].width = col_width
+
+    filas_guia = [
+        ("N°", "Recomendada", "Número entero (1, 2, 3...)", "Correlativo de postulación. Permite ordenar la nómina y correlacionar con carpetas de expedientes."),
+        ("NOMBRE COMPLETO", "OBLIGATORIA", "Texto (Nombres y Apellidos)", "Identificación civil oficial. Se imprime en Carátula PHR 6.1, Nómina Oficial y Diagnóstico Social AT-6."),
+        ("RUT", "OBLIGATORIA", "XX.XXX.XXX-X o con DV separado", "Clave única nacional. El sistema valida el Módulo 11 y formatea con puntos y guión. Cruce con RUKAN."),
+        ("COMUNA", "OBLIGATORIA", "Texto (ej: Loncoche, Perquenco)", "Determina la jurisdicción comunal, provincia, región y parámetros de ruralidad del proyecto."),
+        ("DIRECCION RSH", "Recomendada", "Texto (Calle, N°, Población/Sector)", "Domicilio registrado en Registro Social de Hogares. Se inserta en Tabla 1 del Formulario 6.1."),
+        ("SEXO", "Recomendada", "M / F (o Masculino / Femenino)", "Permite determinar la proporción de jefatura de hogar femenina para la Tabla 6 y diagnóstico social."),
+        ("ESTADO CIVIL", "Recomendada", "SOLTERO/A, CASADO/A, etc.", "Requerido en Tabla 2 del PHR 6.1 y antecedentes de postulación en plataforma MINVU."),
+        ("FEC NAC", "Recomendada", "DD/MM/AAAA", "Fecha de nacimiento. Si la columna EDAD falta o viene vacía, el sistema la calcula automáticamente."),
+        ("EDAD", "Recomendada", "Número entero (ej: 42)", "Identifica menores de 18 años y adultos mayores (>=60 años) para recintos adicionales y puntajes."),
+        ("TIPO FAM", "Recomendada", "MONOPARENTAL, BIPARENTAL, etc.", "Clave para caracterización social y deducción matemática de composición familiar en megaproyectos."),
+        ("GRUP FAM", "Recomendada", "Número entero (ej: 1 a 8)", "Cantidad de personas en el hogar. Hogares de 5 o más integrantes califican automáticamente para 3er Dormitorio."),
+        ("TIPO DE VIVIENDA", "OBLIGATORIA", "BASE, 3D, AHORRO 35 UF, DISCAPACIDAD", "Asigna la tipología habitacional oficial. Define si requiere 3er dormitorio por ahorro, grupo o discapacidad."),
+        ("DISCAPACIDAD", "Recomendada", "NO, SI, o MOVILIDAD REDUCIDA", "Acredita derecho a subsidio complementario de movilidad reducida y 3er dormitorio con adecuación."),
+        ("ETNIA", "Recomendada", "NO, MAPUCHE, o nombre de pueblo", "Acredita pertinencia indígena CONADI. Genera puntaje de priorización regional en comités rurales."),
+        ("FONO", "Recomendada", "9 dígitos (ej: 987654321)", "Teléfono de contacto de la familia para citaciones, encuestas sociales y verificación SERVIU."),
+        ("RUT CONYUGE", "Opcional", "XX.XXX.XXX-X", "RUT de cónyuge o conviviente. Requerido para verificar núcleo en RUKAN y evitar duplicidades."),
+        ("NOMBRE CONYUGE", "Opcional", "Texto", "Nombre de cónyuge o conviviente para Formulario 6.1 y resoluciones."),
+        ("OBSERVACIONES", "Opcional", "Texto libre", "Notas adicionales de la EGR (solicitud de bodega de resguardo, taller productivo, etc.)."),
+    ]
+
+    for row_idx, fila in enumerate(filas_guia, start=2):
+        ws2.row_dimensions[row_idx].height = 26
+        for col_idx, valor in enumerate(fila, start=1):
+            cell = ws2.cell(row=row_idx, column=col_idx, value=valor)
+            cell.font = data_font
+            cell.border = border_all
+            if col_idx == 1:
+                cell.font = data_font_bold
+                cell.alignment = data_align_center
+            elif col_idx == 2:
+                cell.alignment = data_align_center
+                if valor == "OBLIGATORIA":
+                    cell.font = Font(name="Calibri", size=10, bold=True, color="991B1B")
+                    cell.fill = PatternFill(start_color="FEE2E2", end_color="FEE2E2", fill_type="solid")
+                else:
+                    cell.font = Font(name="Calibri", size=10, color="047857")
+                    cell.fill = PatternFill(start_color="ECFDF5", end_color="ECFDF5", fill_type="solid")
+            elif col_idx == 3:
+                cell.alignment = data_align_center
+            else:
+                cell.alignment = data_align_left
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
+def diagnosticar_columnas_excel(col_map: Dict[str, int]) -> Dict[str, Any]:
+    """
+    Evalúa el mapa de columnas detectado en la planilla y genera un diagnóstico
+    completo de compatibilidad con el estándar D.S. 10 y RUKAN.
+    """
+    col_definitions = [
+        {"campo": "nombre", "label": "Nombre Completo", "obligatoria": True, "peso": 25, "aliases": COLUMN_ALIASES["nombre"]},
+        {"campo": "rut", "label": "RUT Postulante", "obligatoria": True, "peso": 25, "aliases": COLUMN_ALIASES["rut"]},
+        {"campo": "comuna", "label": "Comuna", "obligatoria": True, "peso": 15, "aliases": COLUMN_ALIASES["comuna"]},
+        {"campo": "tipo_vivienda", "label": "Tipo de Vivienda (Base / 3D)", "obligatoria": True, "peso": 15, "aliases": COLUMN_ALIASES["tipo_vivienda"]},
+        {"campo": "sexo", "label": "Sexo / Género", "obligatoria": False, "peso": 4, "aliases": COLUMN_ALIASES["sexo"]},
+        {"campo": "fec_nac", "label": "Fecha de Nacimiento", "obligatoria": False, "peso": 4, "aliases": COLUMN_ALIASES["fec_nac"]},
+        {"campo": "edad", "label": "Edad", "obligatoria": False, "peso": 4, "aliases": COLUMN_ALIASES["edad"]},
+        {"campo": "estado_civil", "label": "Estado Civil", "obligatoria": False, "peso": 3, "aliases": COLUMN_ALIASES["estado_civil"]},
+        {"campo": "tipo_fam", "label": "Tipo de Familia (Monoparental, etc.)", "obligatoria": False, "peso": 3, "aliases": COLUMN_ALIASES["tipo_fam"]},
+        {"campo": "grupo_fam_cant", "label": "Integrantes Grupo Familiar (GRUP FAM)", "obligatoria": False, "peso": 4, "aliases": COLUMN_ALIASES["grupo_fam_cant"]},
+        {"campo": "direccion_rsh", "label": "Dirección RSH", "obligatoria": False, "peso": 3, "aliases": COLUMN_ALIASES["direccion_rsh"]},
+        {"campo": "discapacidad", "label": "Discapacidad / Movilidad", "obligatoria": False, "peso": 3, "aliases": COLUMN_ALIASES["discapacidad"]},
+        {"campo": "etnia", "label": "Etnia / CONADI", "obligatoria": False, "peso": 3, "aliases": COLUMN_ALIASES["etnia"]},
+        {"campo": "fono", "label": "Teléfono / Fono de Contacto", "obligatoria": False, "peso": 2, "aliases": COLUMN_ALIASES["fono"]},
+        {"campo": "orden", "label": "N° Correlativo", "obligatoria": False, "peso": 2, "aliases": COLUMN_ALIASES["orden"]},
+        {"campo": "c_rut", "label": "RUT Cónyuge / Pareja", "obligatoria": False, "peso": 1, "aliases": COLUMN_ALIASES["c_rut"]},
+        {"campo": "c_nombre", "label": "Nombre Cónyuge / Pareja", "obligatoria": False, "peso": 1, "aliases": COLUMN_ALIASES["c_nombre"]},
+    ]
+
+    puntos_obtenidos = 0
+    puntos_totales = sum(item["peso"] for item in col_definitions)
+    detectadas = []
+    faltantes_criticas = []
+    faltantes_recomendadas = []
+
+    for item in col_definitions:
+        col_found = None
+        for alias in item["aliases"]:
+            norm_a = norm_str(alias)
+            if norm_a in col_map:
+                col_found = col_map[norm_a]
+                break
+
+        # Fallback inteligente: si no está nombre completo pero sí nombres y apellidos
+        if not col_found and item["campo"] == "nombre":
+            for a_nom in COLUMN_ALIASES.get("nombres", []):
+                norm_an = norm_str(a_nom)
+                if norm_an in col_map:
+                    col_found = col_map[norm_an]
+                    break
+
+        # Fallback inteligente: si no está edad pero sí fecha de nacimiento
+        if not col_found and item["campo"] == "edad":
+            for a_fn in COLUMN_ALIASES.get("fec_nac", []):
+                norm_afn = norm_str(a_fn)
+                if norm_afn in col_map:
+                    col_found = col_map[norm_afn]
+                    break
+
+        if col_found:
+            puntos_obtenidos += item["peso"]
+            letra_col = get_column_letter(col_found) if isinstance(col_found, int) and col_found > 0 else "?"
+            detectadas.append({
+                "campo": item["campo"],
+                "label": item["label"],
+                "obligatoria": item["obligatoria"],
+                "columna": letra_col,
+                "indice": col_found,
+            })
+        else:
+            if item["obligatoria"]:
+                faltantes_criticas.append(item["label"])
+            else:
+                faltantes_recomendadas.append(item["label"])
+
+    pct = round((puntos_obtenidos / puntos_totales) * 100, 1)
+    es_valida = len(faltantes_criticas) == 0
+
+    sugerencias = []
+    if not es_valida:
+        sugerencias.append(f"Atención: Faltan columnas críticas obligatorias ({', '.join(faltantes_criticas)}). Puedes descargar la plantilla modelo oficial.")
+    elif pct >= 90:
+        sugerencias.append("Excelente: La nómina cumple con el 100% de los estándares oficiales D.S. N° 10 y RUKAN.")
+    else:
+        sugerencias.append(f"Compatibilidad buena ({pct}%). Para un informe social más completo, se recomienda incluir: {', '.join(faltantes_recomendadas[:3])}.")
+
+    return {
+        "porcentaje_compatibilidad": pct,
+        "es_valida": es_valida,
+        "total_detectadas": len(detectadas),
+        "total_estandar": len(col_definitions),
+        "columnas_detectadas": detectadas,
+        "faltantes_criticas": faltantes_criticas,
+        "faltantes_recomendadas": faltantes_recomendadas,
+        "sugerencias": sugerencias,
+    }
+
