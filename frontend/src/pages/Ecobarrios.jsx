@@ -95,16 +95,6 @@ export default function Ecobarrios() {
     setAnalizando(true);
     setAnalisis(null);
 
-    // Sugerencia suave si los campos de comité están vacíos y el nombre del archivo contiene palabras clave
-    if (!comiteNombre) {
-      const fname = file.name.toUpperCase();
-      if (fname.includes("PERQUENCO")) {
-        setComiteNombre("COMITÉ DE VIVIENDA ECOBARRIOS DE PERQUENCO");
-        if (!comuna) setComuna("Perquenco");
-        if (!codigoExpediente) setCodigoExpediente("42005");
-      }
-    }
-
     const formData = new FormData();
     formData.append("archivo", file);
 
@@ -113,6 +103,15 @@ export default function Ecobarrios() {
         headers: { "Content-Type": "multipart/form-data" },
       });
       setAnalisis(res.data);
+      if (res.data?.comite_detectado && !comiteNombre) {
+        setComiteNombre(res.data.comite_detectado);
+      }
+      if (res.data?.comuna_detectada && !comuna) {
+        setComuna(res.data.comuna_detectada);
+      }
+      if (res.data?.codigo_expediente_detectado && !codigoExpediente) {
+        setCodigoExpediente(res.data.codigo_expediente_detectado);
+      }
     } catch (err) {
       console.error("Error al analizar Excel:", err);
       let mensaje = "No se pudo procesar la planilla Excel. Verifica que tenga una hoja con los postulantes.";

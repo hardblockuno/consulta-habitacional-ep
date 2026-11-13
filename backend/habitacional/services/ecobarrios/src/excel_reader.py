@@ -189,12 +189,18 @@ COLUMN_ALIASES = {
     "comuna": ["comuna", "ciudad", "localidad"],
     "factor_aislamiento": ["factoraislamiento", "factor", "aislamiento"],
     "grupo_fam_cant": [
-        "gfcant", "cantgrupofam", "integrantes", "grupofamiliar",
-        "totalintegrantes", "habitantes", "cantintegrantes", "numerodeintegrantes"
+        "gfcant", "cantgrupofam", "integrantes", "grupofamiliar", "grupfam", "grupofam",
+        "grupo_fam", "gf", "totalintegrantes", "habitantes", "cantintegrantes", "numerodeintegrantes"
     ],
     "tipo_vivienda": [
-        "tipovivienda", "tipo_vivienda", "vivienda", "tipologia",
+        "tipovivienda", "tipo_vivienda", "tipodevivienda", "vivienda", "tipologia",
         "tipologiapropuesta", "3d", "tercerdormitorio", "tipologiasiniva"
+    ],
+    "tipo_fam": [
+        "tipofam", "tipofamilia", "tipodefamilia", "composicionfamiliar", "parentescojefe", "tipologiafam"
+    ],
+    "parentezco": [
+        "parentezco", "parentesco", "relacion", "parentescojefe"
     ],
     "fundamento": ["fundamento", "observacion", "observaciones", "detalle", "justificacion"],
     "c_nombre": ["conyugenombre", "nombreconyuge", "nombrepareja", "parejanombre"],
@@ -311,6 +317,87 @@ def detectar_hoja_y_encabezados(
 
     # Fallback al activo y fila 1
     return wb.active, 1
+
+
+def detectar_metadatos_comite(
+    wb: openpyxl.Workbook,
+    sheet: Optional[openpyxl.worksheet.worksheet.Worksheet] = None,
+    filename: Optional[str] = None
+) -> Dict[str, str]:
+    """
+    Detecta automáticamente nombre del comité, comuna y código de expediente RUKAN
+    inspeccionando la fila superior (título), nombres de hojas y nombre de archivo.
+    """
+    target_sheet = sheet or wb.active
+    metadatos = {
+        "comite_nombre": "",
+        "comuna": "",
+        "codigo_expediente": "",
+    }
+
+    # Textos candidatos a evaluar
+    textos_candidatos = []
+    if filename:
+        textos_candidatos.append(str(filename))
+    
+    # 1. Primeras 2 filas de la hoja objetivo
+    if target_sheet:
+        for r in range(1, min(3, (target_sheet.max_row or 1) + 1)):
+            for c in range(1, min(15, (target_sheet.max_column or 1) + 1)):
+                val = target_sheet.cell(r, c).value
+                if val and isinstance(val, str) and len(val.strip()) > 5:
+                    textos_candidatos.append(val.strip())
+
+    # 2. Nombres de hojas
+    for sname in wb.sheetnames:
+        textos_candidatos.append(sname.strip())
+
+    # Lista conocida de comunas para matcheo rápido
+    comunas_conocidas = [
+        "LONCOCHE", "PERQUENCO", "TEMUCO", "PADRE LAS CASAS", "VILLARRICA",
+        "PUCON", "LAUTARO", "VICTORIA", "TRAIGUEN", "ANGOL", "COLLIPULLI",
+        "GORBEA", "PITRUFQUEN", "FREIRE", "CURARREHUE", "VILCUN", "CHOLCHOL",
+        "CARAHUE", "SAAVEDRA", "TOLTEN", "TEODORO SCHMIDT", "CUNCO", "MELIPEUCO"
+    ]
+
+    for txt in textos_candidatos:
+        txt_upper = txt.upper()
+
+        # RUKAN
+        if not metadatos["codigo_expediente"]:
+            m_rukan = re.search(r"RUKAN\s*[:#\-]?\s*(\d{4,8})", txt_upper)
+            if m_rukan:
+                metadatos["codigo_expediente"] = m_rukan.group(1).strip()
+
+        # Comuna
+        if not metadatos["comuna"]:
+            for com in comunas_conocidas:
+                if com in txt_upper:
+                    metadatos["comuna"] = com.title()
+                    break
+
+        # Comité
+        if not metadatos["comite_nombre"]:
+            # e.g., "BASE COMITÉ LA HACIENDA, LONCOCHE..." -> "COMITÉ LA HACIENDA"
+            m_com = re.search(r"(COMIT[ÉE]\s+(?:DE\s+VIVIENDA\s+|HABITACIONAL\s+)?[A-Z0-9\sÁÉÍÓÚÑ]+?)(?:,|\s+RUKAN|\s+\d{2}-\d{2}-\d{4}|$)", txt_upper)
+            if m_com:
+                nombre_c = m_com.group(1).strip()
+                if len(nombre_c) >= 7 and "COMITE" in nombre_c:
+                    metadatos["comite_nombre"] = nombre_c
+
+    # Fallback por nombre de hoja o archivo si aún no hay comité
+    if not metadatos["comite_nombre"] and target_sheet:
+        title_u = target_sheet.title.upper()
+        if "HACIENDA" in title_u:
+            metadatos["comite_nombre"] = "COMITÉ LA HACIENDA"
+            if not metadatos["comuna"]:
+                metadatos["comuna"] = "Loncoche"
+        elif "PERQUENCO" in title_u:
+            metadatos["comite_nombre"] = "COMITÉ DE VIVIENDA ECOBARRIOS DE PERQUENCO"
+            if not metadatos["comuna"]:
+                metadatos["comuna"] = "Perquenco"
+
+    return metadatos
 
 
 def build_column_mapping(sheet, header_row: int) -> Dict[str, int]:
@@ -504,6 +591,8 @@ def read_all_postulantes(excel_path: str, sheet_name: Optional[str] = None) -> L
     col_factor = get_col_by_alias(col_map, COLUMN_ALIASES["factor_aislamiento"], 0)
     col_gf_cant = get_col_by_alias(col_map, COLUMN_ALIASES["grupo_fam_cant"], 0)
     col_tipo_viv = get_col_by_alias(col_map, COLUMN_ALIASES["tipo_vivienda"], 0)
+    col_tipo_fam = get_col_by_alias(col_map, COLUMN_ALIASES["tipo_fam"], 0)
+    col_parentezco = get_col_by_alias(col_map, COLUMN_ALIASES["parentezco"], 0)
     col_fundamento = get_col_by_alias(col_map, COLUMN_ALIASES["fundamento"], 0)
 
     # Columnas de cónyuge en la misma fila si existen
@@ -582,7 +671,7 @@ def read_all_postulantes(excel_path: str, sheet_name: Optional[str] = None) -> L
         fecha_nac = sheet.cell(r, col_fec_nac).value if col_fec_nac else None
         edad = sheet.cell(r, col_edad).value if col_edad else None
         discapacidad = sheet.cell(r, col_disc).value if col_disc else ""
-        comuna = sheet.cell(r, col_comuna).value if col_comuna else "PERQUENCO"
+        comuna = sheet.cell(r, col_comuna).value if col_comuna else ""
         grupo_fam_cant = sheet.cell(r, col_gf_cant).value if col_gf_cant else None
         raw_tipo_viv = sheet.cell(r, col_tipo_viv).value if col_tipo_viv else ""
         factor_aislamiento = sheet.cell(r, col_factor).value if col_factor else ""
@@ -663,11 +752,13 @@ def read_all_postulantes(excel_path: str, sheet_name: Optional[str] = None) -> L
             "direccion_rsh": clean_s(dir_rsh),
             "direccion_terreno": clean_s(dir_terreno),
             "rol_sii": clean_s(rol_sii),
-            "comuna": clean_s(comuna) or "PERQUENCO",
+            "comuna": clean_s(comuna),
             "provincia": "Cautín",
             "region": "La Araucanía",
             "factor_aislamiento": str(factor_aislamiento).strip() if factor_aislamiento is not None else "",
             "grupo_familiar_cant": gf_num,
+            "tipo_fam": clean_s(sheet.cell(r, col_tipo_fam).value) if col_tipo_fam else "",
+            "parentezco": clean_s(sheet.cell(r, col_parentezco).value) if col_parentezco else "",
             "conyuge": {
                 "nombre": conyuge_nombre_final,
                 "rut": conyuge_rut_final,

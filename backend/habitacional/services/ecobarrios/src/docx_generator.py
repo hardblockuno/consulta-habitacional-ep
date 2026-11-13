@@ -107,7 +107,7 @@ def fill_formulario_phr(
     set_cell_value(t2.cell(2, 3), t2_data.get("lote", ""))
     # Fila 3: Región y Comuna
     set_cell_value(t2.cell(3, 1), t2_data.get("region", "La Araucanía"))
-    set_cell_value(t2.cell(3, 3), t2_data.get("comuna", "PERQUENCO"))
+    set_cell_value(t2.cell(3, 3), t2_data.get("comuna", ""))
     # Fila 4: Provincia y Localidad (INE)
     set_cell_value(t2.cell(4, 1), t2_data.get("provincia", "Cautín"))
     set_cell_value(t2.cell(4, 3), t2_data.get("localidad", ""))
@@ -123,7 +123,7 @@ def fill_formulario_phr(
     set_cell_value(t3.cell(2, 1), t3_data.get("localidad", ""))
     set_cell_value(t3.cell(2, 3), t3_data.get("factor_aislamiento", ""))
     # Fila 3: Comuna | Provincia
-    set_cell_value(t3.cell(3, 1), t3_data.get("comuna", "PERQUENCO"))
+    set_cell_value(t3.cell(3, 1), t3_data.get("comuna", ""))
     set_cell_value(t3.cell(3, 3), t3_data.get("provincia", "Cautín"))
     # Fila 4: Región | Rol de Propiedad del SII
     set_cell_value(t3.cell(4, 1), t3_data.get("region", "La Araucanía"))
@@ -623,7 +623,7 @@ def fill_formulario_phr(
             final_fotos = [default_f1, default_f2, default_f3]
 
     epigrafes_fotos = [
-        "Fotografía 1: Emplazamiento satelital y acceso por servidumbre predio Perquenco",
+        "Fotografía 1: Emplazamiento satelital y acceso por servidumbre del predio proyectado",
         "Fotografía 2: Vista aérea perspectiva general del conjunto y áreas productivas",
         "Fotografía 3: Vista aérea nivel de calle, parque y viviendas proyectadas"
     ]

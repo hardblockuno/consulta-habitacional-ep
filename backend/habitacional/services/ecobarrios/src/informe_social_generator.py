@@ -18,9 +18,12 @@ from docx.shared import Pt, Inches, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 try:
-    from src.gemini_auditor import consolidate_postulante_local, TERRENO_PROYECTO_CONSOLIDADO
-except ImportError:
-    from gemini_auditor import consolidate_postulante_local, TERRENO_PROYECTO_CONSOLIDADO
+    from .gemini_auditor import consolidate_postulante_local, TERRENO_PROYECTO_CONSOLIDADO
+except (ImportError, ValueError):
+    try:
+        from gemini_auditor import consolidate_postulante_local, TERRENO_PROYECTO_CONSOLIDADO
+    except ImportError:
+        from src.gemini_auditor import consolidate_postulante_local, TERRENO_PROYECTO_CONSOLIDADO
 
 
 def set_cell_value(
@@ -53,19 +56,52 @@ def set_cell_value(
         run.font.italic = italic
 
 
+from collections import Counter
+
+
 def calculate_informe_social_aggregates(
     postulantes: List[Dict[str, Any]],
     datos_terreno: Optional[Dict[str, str]] = None,
-    nombre_grupo: str = "Comité Habitacional Perquenco",
+    nombre_grupo: Optional[str] = None,
     egr_nombre: str = "CONSULTORA PLAN SOCIAL LIMITADA",
-    egr_rut: str = "76.543.210-K"
+    egr_rut: str = "77.235.354-5",
+    codigo_expediente: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Calcula de manera 100% determinista todos los agregados y matrices del
     Informe Diagnóstico Social Consolidado para las familias del proyecto.
     """
-    terr = datos_terreno or TERRENO_PROYECTO_CONSOLIDADO
     tot_familias = len(postulantes)
+
+    # 0. Detección dinámica de comuna predominante y parametrización de territorio
+    comunas = [p.get("comuna") for p in postulantes if p.get("comuna") and str(p.get("comuna")).strip()]
+    comuna_pred = Counter(comunas).most_common(1)[0][0] if comunas else "Perquenco"
+
+    comuna_detectada = (datos_terreno.get("comuna") if datos_terreno else None) or comuna_pred or "Perquenco"
+    comuna_nombre = comuna_detectada.strip().title()
+
+    # Detección dinámica de nombre de grupo si no viene especificado
+    if not nombre_grupo or not str(nombre_grupo).strip() or ("ECOBARRIOS DE PERQUENCO" in str(nombre_grupo).upper() and "PERQUENCO" not in comuna_nombre.upper()):
+        nombre_grupo = f"COMITÉ DE VIVIENDA {comuna_nombre.upper()}"
+
+    egr_nombre = str(egr_nombre or "").strip() or "CONSULTORA PLAN SOCIAL LIMITADA"
+    egr_rut = str(egr_rut or "").strip() or "77.235.354-5"
+
+    # Terreno consolidado dinámico
+    if datos_terreno:
+        terr = datos_terreno
+    elif "PERQUENCO" in comuna_nombre.upper():
+        terr = TERRENO_PROYECTO_CONSOLIDADO
+    else:
+        terr = {
+            "calle": f"Terreno Proyecto {nombre_grupo}",
+            "lote": "Lote Proyecto",
+            "rol_sii": "En trámite",
+            "comuna": comuna_nombre.upper(),
+            "provincia": "Cautín",
+            "region": "La Araucanía",
+            "localidad": comuna_nombre
+        }
 
     # 1. Cuantificación Demográfica (Tabla 2)
     tot_personas = 0
@@ -170,16 +206,16 @@ def calculate_informe_social_aggregates(
             "telefono": t1.get("titular_telefono", ""),
             "calle_actual": t2.get("calle", ""),
             "numero_actual": t2.get("numero", ""),
-            "comuna_actual": t2.get("comuna", "PERQUENCO"),
-            "comuna_subsidio": terr.get("comuna", "PERQUENCO"),
+            "comuna_actual": t2.get("comuna") or comuna_nombre,
+            "comuna_subsidio": terr.get("comuna") or comuna_nombre,
             "provincia_subsidio": terr.get("provincia", "Cautín"),
-            "localidad_subsidio": terr.get("localidad", "Perquenco")
+            "localidad_subsidio": terr.get("localidad", comuna_nombre)
         })
 
     # Texto formal de observaciones familiares (Tabla 3)
     pct_mapuche = round((familias_mapuche / tot_familias) * 100, 1)
     obs_familiares_txt = (
-        f"El proyecto habitacional está compuesto por {tot_familias} familias vulnerables de la comuna de Perquenco, "
+        f"El proyecto habitacional está compuesto por {tot_familias} familias vulnerables de la comuna de {comuna_nombre}, "
         f"totalizando {tot_personas} habitantes ({tot_hombres} hombres y {tot_mujeres} mujeres). "
         f"En el grupo residen {tot_menores} niños, niñas y adolescentes menores de 18 años y {tot_mayores} adultos mayores (≥60 años). "
         f"Se identifican {familias_con_discapacidad} familias con acreditación técnica de condición de discapacidad física y/o "
@@ -192,7 +228,7 @@ def calculate_informe_social_aggregates(
     # Texto opinión profesional EGR (Tabla 31)
     opinion_profesional_txt = (
         f"El presente proyecto de habitabilidad rural atiende a {tot_familias} familias de alta vulnerabilidad socioeconómica "
-        f"(pertenecientes al 40% del RSH) de la comuna de Perquenco, caracterizadas por una destacada jefatura de hogar femenina "
+        f"(pertenecientes al 40% del RSH) de la comuna de {comuna_nombre}, caracterizadas por una destacada jefatura de hogar femenina "
         f"y un {pct_mapuche}% de pertinencia indígena Mapuche ({familias_mapuche} familias). La tipología de Construcción de Vivienda Nueva "
         f"en Conjunto Habitacional permite dar respuesta definitiva a la precariedad habitacional y condiciones de allegamiento "
         f"en que residen actualmente. La solución habitacional incorpora {d3_conjunto} viviendas con 3° dormitorio por composición de grupo "
@@ -204,12 +240,14 @@ def calculate_informe_social_aggregates(
     return {
         "generales": {
             "nombre_grupo": nombre_grupo,
-            "codigo_grupo": "",
+            "codigo_grupo": codigo_expediente or "",
             "tot_familias": tot_familias,
-            "region": "La Araucanía",
-            "provincia": "Cautín",
-            "comuna": "Perquenco",
-            "localidad": "Perquenco",
+            "region": terr.get("region", "La Araucanía"),
+            "provincia": terr.get("provincia", "Cautín"),
+            "comuna": comuna_nombre,
+            "localidad": terr.get("localidad", comuna_nombre),
+            "terreno_calle": terr.get("calle", ""),
+            "terreno_rol": terr.get("rol_sii", ""),
             "egr_nombre": egr_nombre,
             "egr_rut": egr_rut
         },
@@ -434,12 +472,13 @@ def fill_informe_social_docx(
     # =========================================================================
     if len(doc.tables) > 26:
         t26 = doc.tables[26]
+        predio_txt = gen.get("terreno_calle") or f"predio del proyecto {gen['nombre_grupo']}"
         obs_servicios_txt = (
-            "Para el abastecimiento de agua potable de las 155 familias, se proyecta un sistema autónomo de captación y potabilización "
-            "mediante pozo profundo ubicado en el predio común (Hijuela El Molino), garantizando caudal y calidad de agua según NCh 409. "
-            "En cuanto a la disposición de aguas servidas, se contempla una Planta de Tratamiento Ecológica y Sustentable mediante sistema "
-            "de Lombrifiltro, cumpliendo con los estándares sanitarios y ambientales vigentes. El suministro eléctrico se conectará a la "
-            "red de distribución de la empresa concesionaria de la zona."
+            f"Para el abastecimiento de agua potable de las {gen['tot_familias']} familias, se proyecta un sistema normativo de "
+            f"captación y potabilización para el {predio_txt} (comuna de {gen['comuna']}), garantizando caudal y calidad de agua según NCh 409. "
+            f"En cuanto a la disposición de aguas servidas, se contempla una solución sanitaria y ambientalmente sustentable "
+            f"aprobada por la autoridad sectorial, cumpliendo con los estándares ambientales vigentes. El suministro eléctrico se conectará a la "
+            f"red de distribución de la empresa concesionaria de la zona."
         )
         set_cell_value(t26.cell(0, 0), obs_servicios_txt, font_size_pt=8.0, center=False)
 
@@ -473,11 +512,14 @@ def fill_informe_social_docx(
     # =========================================================================
     if len(doc.tables) > 30:
         t30 = doc.tables[30]
+        terr_ref = f"{gen.get('terreno_calle', 'Predio del Proyecto')}"
+        if gen.get("terreno_rol") and gen.get("terreno_rol") != "En trámite":
+            terr_ref += f", Rol SII {gen['terreno_rol']}"
         riesgos_txt = (
-            "El predio del proyecto (Hijuela El Molino, Lote 3 Foja 1169 N°722, Rol SII 202-43) se ubica en un terreno plano "
-            "con pendiente menor al 3%, libre de riesgos de remoción en masa, derrumbes, aluviones o inundaciones fluviales. "
-            "Cuenta con condiciones geográficas, mecánicas de suelo y de escorrentía superficial completamente aptas para el "
-            "emplazamiento seguro de las viviendas y su infraestructura comunitaria."
+            f"El predio del proyecto ({terr_ref}, comuna de {gen['comuna']}) se ubica en un terreno plano "
+            f"con pendiente menor al 3%, libre de riesgos de remoción en masa, derrumbes, aluviones o inundaciones fluviales. "
+            f"Cuenta con condiciones geográficas, mecánicas de suelo y de escorrentía superficial completamente aptas para el "
+            f"emplazamiento seguro de las viviendas y su infraestructura comunitaria."
         )
         set_cell_value(t30.cell(0, 0), riesgos_txt, font_size_pt=8.0, center=False)
 
@@ -529,7 +571,7 @@ def fill_informe_social_docx(
             "_____________________________________\n"
             "NOMBRE Y FIRMA REPRESENTANTE DEL GRUPO\n"
             "RUT:\n"
-            "Comité Habitacional Perquenco"
+            f"{gen['nombre_grupo']}"
         )
         rep_legal_txt = (
             "_____________________________________\n"

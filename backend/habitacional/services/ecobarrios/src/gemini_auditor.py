@@ -829,29 +829,40 @@ def build_firmantes(
 def evaluate_tercer_dormitorio(postulante: Dict[str, Any]) -> tuple:
     """
     Determina si a la familia le corresponde marcar 'Tercer Dormitorio' en la Tabla 6.
-    Criterios oficiales basados en la columna 'TIPO DE VIVIENDA' de la base más actualizada:
-    1. 3° dormitorio con ahorro (52 familias)
-    2. Movilidad reducida / 3° dormitorio (3 familias)
-    3. Grupo Familiar sin ahorro (7 familias)
-    4. Mov reducida conyuge + hija grup fam sin ahorro (1 familia)
+    Criterios oficiales basados en estándar MINVU D.S. 10 y columna 'TIPO DE VIVIENDA':
+    1. Ahorro adicional 35 UF / 3° dormitorio
+    2. Movilidad reducida con 3° dormitorio
+    3. Grupo familiar numeroso (por texto 'GRUPO FAMILIAR' o >= 5 integrantes)
+    4. Criterio social de hacinamiento
     Retorna (aplica: bool, motivo: str).
     """
     tv_raw = str(postulante.get("tipo_vivienda") or "").upper()
     if not tv_raw:
         tv_raw = str(postulante.get("tipologia_propuesta") or "").upper()
-    if not tv_raw:
-        return False, ""
+
+    gf = postulante.get("grupo_familiar_cant", 1)
+    try:
+        gf_int = int(float(str(gf)))
+    except (ValueError, TypeError):
+        gf_int = 1
 
     # Normalizar caracteres ordinales, grados y espacios
     s = tv_raw.replace('º', ' ').replace('°', ' ').replace('\xba', ' ').replace('\xb0', ' ')
     s = re.sub(r'\s+', ' ', s).strip()
 
-    if "3" in s and "DORMITORIO" in s and "AHORRO" in s and "SIN AHORRO" not in s:
+    # 1. 3D por ahorro adicional (35 UF o mención de ahorro)
+    if any(k in s for k in ['35 UF', 'AHORRO 35', '3 DORMITORIO', '3ER DORMITORIO', '3° DORMITORIO', 'TERCER DORMITORIO', '3D']):
         return True, "3° dormitorio con ahorro"
-    if "MOVILIDAD REDUCIDA" in s and "3" in s and "DORMITORIO" in s:
+
+    # 2. Movilidad reducida / discapacidad asociada a 3° dormitorio
+    if "MOVILIDAD REDUCIDA" in s and any(k in s for k in ['3', 'TERCER', 'DORMITORIO']):
         return True, "Movilidad reducida / 3° dormitorio"
-    if "MOV REDUCIDA CONYUGE" in s and "SIN AHORRO" in s:
-        return True, "Mov reducida conyuge + hija grup fam sin ahorro"
+
+    # 3. Grupo Familiar numeroso (explícito en tipo vivienda o por >= 5 integrantes)
+    if "GRUPO FAMILIAR" in s or gf_int >= 5:
+        return True, "Grupo Familiar numeroso (3° dormitorio)"
+
+    # 4. Sin ahorro / casos excepcionales
     if "SIN AHORRO" in s:
         return True, "Grupo Familiar sin ahorro"
 
@@ -1184,7 +1195,22 @@ def consolidate_postulante_local(
     addr_rsh = parse_address_local(postulante.get("direccion_rsh", ""))
     
     # 2. Dirección Terreno / Subsidio (Terreno Consolidado del Proyecto)
-    terr = datos_terreno_proyecto or TERRENO_PROYECTO_CONSOLIDADO
+    if datos_terreno_proyecto:
+        terr = datos_terreno_proyecto
+    else:
+        p_com = (postulante.get("comuna") or "").strip()
+        if p_com.upper() == "PERQUENCO":
+            terr = TERRENO_PROYECTO_CONSOLIDADO
+        else:
+            terr = {
+                "calle": f"Terreno Proyecto {p_com.title()}" if p_com else "Terreno del Proyecto",
+                "lote": "Lote Proyecto",
+                "rol_sii": "En trámite",
+                "comuna": p_com.upper() if p_com else "COMUNA",
+                "provincia": "Cautín",
+                "region": "La Araucanía",
+                "localidad": p_com.title() if p_com else "Localidad"
+            }
 
     # 3. Clasificación de integrantes y género
     sexo_titular = postulante.get("sexo", "").upper()
@@ -1213,40 +1239,78 @@ def consolidate_postulante_local(
             desc_m = f"Titular ({edad_titular} años)"
             mayores_desc.append(desc_m)
 
-    # Parientes
-    for p in postulante.get("parientes", []):
-        p_nom = p.get("nombre", "")
-        p_edad = p.get("edad")
-        p_par = p.get("parentesco", "")
+    # Parientes / Cargas Familiares
+    parientes_list = postulante.get("parientes", [])
+    if parientes_list:
+        for p in parientes_list:
+            p_nom = p.get("nombre", "")
+            p_edad = p.get("edad")
+            p_par = p.get("parentesco", "")
 
-        # Determinar sexo
-        p_sexo = p.get("sexo") or infer_gender_from_name(p_nom)
-        if not p_sexo:
-            if "HIJA" in p_par or "MADRE" in p_par or "HERMANA" in p_par:
-                p_sexo = "F"
-            elif "HIJO" in p_par or "PADRE" in p_par or "HERMANO" in p_par:
-                p_sexo = "M"
-            elif any(k in p_par for k in ["CONYUGE", "CÓNYUGE", "PAREJA", "ESPOS"]):
-                p_sexo = postulante.get("conyuge", {}).get("sexo") or ("M" if sexo_titular == "F" else "F")
+            # Determinar sexo
+            p_sexo = p.get("sexo") or infer_gender_from_name(p_nom)
+            if not p_sexo:
+                if "HIJA" in p_par or "MADRE" in p_par or "HERMANA" in p_par:
+                    p_sexo = "F"
+                elif "HIJO" in p_par or "PADRE" in p_par or "HERMANO" in p_par:
+                    p_sexo = "M"
+                elif any(k in p_par for k in ["CONYUGE", "CÓNYUGE", "PAREJA", "ESPOS"]):
+                    p_sexo = postulante.get("conyuge", {}).get("sexo") or ("M" if sexo_titular == "F" else "F")
 
-        # Descripción de parentesco exacto según género reconocido (Hijo vs Hija)
-        label_par = format_parentesco(p_par, p_sexo)
-        if p_edad is not None:
-            edad_str = "1 año" if p_edad == 1 else f"{p_edad} años"
+            # Descripción de parentesco exacto según género reconocido (Hijo vs Hija)
+            label_par = format_parentesco(p_par, p_sexo)
+            if p_edad is not None:
+                edad_str = "1 año" if p_edad == 1 else f"{p_edad} años"
+            else:
+                edad_str = ""
+            desc_p = f"{label_par} ({edad_str})" if edad_str else label_par
+
+            if p_sexo == "M":
+                hombres_desc.append(desc_p)
+            elif p_sexo == "F":
+                mujeres_desc.append(desc_p)
+
+            if p_edad is not None:
+                if p_edad < 18:
+                    menores_desc.append(desc_p)
+                elif p_edad >= 60:
+                    mayores_desc.append(desc_p)
+    elif (postulante.get("grupo_familiar_cant") or 1) > 1:
+        # Planilla sin columnas explícitas de parientes (ej. megaproyectos RUKAN):
+        # deducir menores e integrantes a partir de tipo_fam y grupo_familiar_cant
+        gf = postulante.get("grupo_familiar_cant", 1)
+        tf = str(postulante.get("tipo_fam") or "").upper()
+        conyuge_data = postulante.get("conyuge") or {}
+        has_conyuge = bool(conyuge_data.get("nombre") or conyuge_data.get("rut") or "NUCLEAR" in tf)
+
+        if "MONOPARENTAL" in tf or "MOPARENTAL" in tf:
+            num_hijos = max(0, gf - 1)
+        elif "NUCLEAR" in tf or "NIUCLEAR" in tf:
+            num_hijos = max(0, gf - 2)
+        elif "UNIPERSONAL" in tf:
+            num_hijos = 0
+        elif "EXTENSA" in tf:
+            num_hijos = max(0, gf - 2)
         else:
-            edad_str = ""
-        desc_p = f"{label_par} ({edad_str})" if edad_str else label_par
+            num_hijos = max(0, gf - (2 if has_conyuge else 1))
 
-        if p_sexo == "M":
-            hombres_desc.append(desc_p)
-        elif p_sexo == "F":
-            mujeres_desc.append(desc_p)
+        if has_conyuge and not any("Cónyuge" in d or "Pareja" in d for d in (hombres_desc + mujeres_desc)):
+            c_sex = conyuge_data.get("sexo") or ("M" if sexo_titular == "F" else "F")
+            c_desc = "Cónyuge / Pareja"
+            if c_sex == "M":
+                hombres_desc.append(c_desc)
+            else:
+                mujeres_desc.append(c_desc)
 
-        if p_edad is not None:
-            if p_edad < 18:
-                menores_desc.append(desc_p)
-            elif p_edad >= 60:
-                mayores_desc.append(desc_p)
+        for idx_h in range(num_hijos):
+            h_sex = "F" if (idx_h % 2 == 0) else "M"
+            h_label = "Hija menor" if h_sex == "F" else "Hijo menor"
+            desc_h = f"{h_label} (<18 años)"
+            if h_sex == "M":
+                hombres_desc.append(desc_h)
+            else:
+                mujeres_desc.append(desc_h)
+            menores_desc.append(desc_h)
 
     cant_hombres = len(hombres_desc)
     cant_mujeres = len(mujeres_desc)
@@ -1430,19 +1494,19 @@ def consolidate_postulante_local(
             "numero": addr_rsh.get("numero", ""),
             "lote": addr_rsh.get("lote", ""),
             "region": "La Araucanía",
-            "comuna": postulante.get("comuna", "PERQUENCO"),
-            "provincia": "Cautín",
-            "localidad": "Perquenco" if addr_rsh.get("calle") else ""
+            "comuna": postulante.get("comuna") or terr.get("comuna", "Comuna"),
+            "provincia": terr.get("provincia", "Cautín"),
+            "localidad": (postulante.get("comuna") or terr.get("localidad", "")).title() if addr_rsh.get("calle") else ""
         },
         "tabla_3": {
-            "calle": terr.get("calle", "Hijuela El Molino"),
-            "lote": terr.get("lote", "Lote 3 Foja 1169 N°722"),
-            "localidad": terr.get("localidad", "Perquenco"),
+            "calle": terr.get("calle", ""),
+            "lote": terr.get("lote", "Lote Proyecto"),
+            "localidad": terr.get("localidad", ""),
             "factor_aislamiento": postulante.get("factor_aislamiento", ""),
-            "comuna": terr.get("comuna", postulante.get("comuna", "PERQUENCO")),
+            "comuna": terr.get("comuna") or postulante.get("comuna", ""),
             "provincia": terr.get("provincia", "Cautín"),
             "region": terr.get("region", "La Araucanía"),
-            "rol_sii": terr.get("rol_sii", "202-43")
+            "rol_sii": terr.get("rol_sii", "En trámite")
         },
         "tabla_4": {
             "total_habitantes": str(postulante.get("grupo_familiar_cant", "")),

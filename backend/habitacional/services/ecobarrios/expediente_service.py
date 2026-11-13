@@ -23,13 +23,74 @@ if str(SERVICE_DIR) not in sys.path:
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
+import openpyxl
+from collections import Counter
 from docx_generator import fill_formulario_phr
-from excel_reader import format_rut, read_all_postulantes
-from gemini_auditor import consolidate_postulante_local
+from excel_reader import format_rut, read_all_postulantes, detectar_metadatos_comite, detectar_hoja_y_encabezados
+from gemini_auditor import consolidate_postulante_local, TERRENO_PROYECTO_CONSOLIDADO
 from informe_social_generator import (
     calculate_informe_social_aggregates,
     fill_informe_social_docx,
 )
+
+
+def _resolver_metadatos_y_terreno(
+    postulantes: List[Dict[str, Any]],
+    metadata: Optional[Dict[str, Any]] = None,
+    tmp_path: Optional[str] = None
+) -> Tuple[Dict[str, Any], Dict[str, str]]:
+    """
+    Resuelve los metadatos del proyecto y el predio de forma completamente dinámica
+    sin asociar datos estáticos de Perquenco u otro comité si la planilla corresponde a otro.
+    """
+    meta = dict(metadata or {})
+
+    # Detectar metadatos desde Excel
+    detectados = {}
+    if tmp_path and os.path.exists(tmp_path):
+        try:
+            wb = openpyxl.load_workbook(tmp_path, data_only=True)
+            sheet, _ = detectar_hoja_y_encabezados(wb)
+            detectados = detectar_metadatos_comite(wb, sheet=sheet, filename=Path(tmp_path).name)
+        except Exception:
+            pass
+
+    # Predominancia de comuna desde las filas de postulantes
+    comunas = [p.get("comuna") for p in postulantes if p.get("comuna") and str(p.get("comuna")).strip()]
+    comuna_pred = Counter(comunas).most_common(1)[0][0] if comunas else ""
+
+    comuna_raw = meta.get("comuna") or detectados.get("comuna") or comuna_pred or "Perquenco"
+    comuna_final = str(comuna_raw).strip().title()
+
+    comite_raw = meta.get("comite_nombre") or detectados.get("comite_nombre")
+    if not comite_raw or ("ECOBARRIOS DE PERQUENCO" in str(comite_raw).upper() and "PERQUENCO" not in comuna_final.upper()):
+        comite_final = f"COMITÉ DE VIVIENDA {comuna_final.upper()}" if comuna_final else "COMITÉ HABITACIONAL"
+    else:
+        comite_final = str(comite_raw).strip().upper()
+
+    codigo_raw = meta.get("codigo_expediente") or detectados.get("codigo_expediente") or "En trámite"
+    codigo_final = str(codigo_raw).strip()
+
+    meta["comuna"] = comuna_final
+    meta["comite_nombre"] = comite_final
+    meta["codigo_expediente"] = codigo_final
+    meta["total_familias"] = len(postulantes)
+
+    # Terreno del proyecto
+    if "PERQUENCO" in comuna_final.upper():
+        terr = TERRENO_PROYECTO_CONSOLIDADO
+    else:
+        terr = {
+            "calle": f"Terreno Proyecto {comite_final}",
+            "lote": "Lote Proyecto",
+            "rol_sii": "En trámite",
+            "comuna": comuna_final.upper(),
+            "provincia": "Cautín",
+            "region": "La Araucanía",
+            "localidad": comuna_final
+        }
+
+    return meta, terr
 
 
 def _guardar_temp_excel(archivo_bytes_o_ruta: Any) -> Tuple[str, bool]:
@@ -56,14 +117,20 @@ def analizar_excel_ecobarrios(archivo_bytes_o_ruta: Any) -> Dict[str, Any]:
     tmp_path, es_temp = _guardar_temp_excel(archivo_bytes_o_ruta)
     try:
         postulantes = read_all_postulantes(tmp_path, sheet_name=None)
+        meta, terr = _resolver_metadatos_y_terreno(postulantes, tmp_path=tmp_path)
 
-        agg = calculate_informe_social_aggregates(postulantes)
+        agg = calculate_informe_social_aggregates(
+            postulantes,
+            datos_terreno=terr,
+            nombre_grupo=meta["comite_nombre"],
+            codigo_expediente=meta["codigo_expediente"]
+        )
         demo = agg.get("demografia", {})
         req = agg.get("requerimientos_vivienda", {})
 
         postulantes_list = []
         for i, p in enumerate(postulantes):
-            c = consolidate_postulante_local(p)
+            c = consolidate_postulante_local(p, datos_terreno_proyecto=terr)
             t4 = c.get("tabla_4", {})
             td = c.get("tercer_dormitorio", {})
             aplica_3d = bool(td.get("aplica", False))
@@ -98,6 +165,9 @@ def analizar_excel_ecobarrios(archivo_bytes_o_ruta: Any) -> Dict[str, Any]:
             "familias_discapacidad": demo.get("familias_con_discapacidad", 0),
             "viviendas_3d": req.get("d3_conjunto", 0),
             "viviendas_base": len(postulantes) - req.get("d3_conjunto", 0),
+            "comite_detectado": meta["comite_nombre"],
+            "comuna_detectada": meta["comuna"],
+            "codigo_expediente_detectado": meta["codigo_expediente"],
             "postulantes": postulantes_list,
         }
         return resumen
@@ -118,7 +188,7 @@ def generar_nomina_docx(postulantes: List[Dict[str, Any]], metadata: Dict[str, A
         doc = docx.Document()
         doc.add_heading("NÓMINA OFICIAL DE POSTULANTES", 0)
 
-    nombre_grupo = metadata.get("comite_nombre", "COMITÉ DE VIVIENDA ECOBARRIOS DE PERQUENCO").upper()
+    nombre_grupo = str(metadata.get("comite_nombre") or "COMITÉ DE VIVIENDA").upper()
     for p in doc.paragraphs:
         if "COMITÉ" in p.text.upper() or "COMITE" in p.text.upper():
             p.text = f"PROYECTO: {nombre_grupo}"
@@ -166,10 +236,21 @@ def generar_compromiso_docx(metadata: Dict[str, Any], output_path_or_buf: Any) -
         doc = docx.Document()
         doc.add_heading("DECLARACIÓN JURADA DE COMPROMISO DE PROFESIONALES", 0)
 
-    comite = metadata.get("comite_nombre", "COMITÉ DE VIVIENDA ECOBARRIOS DE PERQUENCO").upper()
-    expediente = metadata.get("codigo_expediente", "42005")
-    comuna = metadata.get("comuna", "PERQUENCO").upper()
-    familias = str(metadata.get("total_familias", 155))
+    comite = str(metadata.get("comite_nombre") or "COMITÉ DE VIVIENDA").upper()
+    expediente = str(metadata.get("codigo_expediente") or "En trámite")
+    comuna = str(metadata.get("comuna") or "Comuna").upper()
+    familias = str(metadata.get("total_familias") or 1)
+
+    target_phrase = f"{comite}, CÓDIGO DE EXPEDIENTE {expediente}, compuesto de {familias} familias de la comuna de {comuna}"
+    for p in doc.paragraphs:
+        if "COMITÉ DE VIVIENDA" in p.text.upper() or "COMITE DE VIVIENDA" in p.text.upper():
+            for run in p.runs:
+                if any(k in run.text.upper() for k in ["COMITÉ", "COMITE", "EXPEDIENTE"]):
+                    run.text = target_phrase
+                    run.font.bold = True
+
+    doc.save(output_path_or_buf)
+    return output_path_or_buf
 
     target_phrase = f"{comite}, CÓDIGO DE EXPEDIENTE {expediente}, compuesto de {familias} familias de la comuna de {comuna}"
     for p in doc.paragraphs:
@@ -194,7 +275,7 @@ def generar_documento_individual(
     tmp_path, es_temp = _guardar_temp_excel(archivo_bytes_o_ruta)
     try:
         postulantes = read_all_postulantes(tmp_path, sheet_name=None)
-        meta["total_familias"] = len(postulantes)
+        meta, terr = _resolver_metadatos_y_terreno(postulantes, meta, tmp_path)
         buf = io.BytesIO()
 
         profesionales_firmantes = {
@@ -217,9 +298,11 @@ def generar_documento_individual(
             at6_tpl = TEMPLATES_DIR / "Formato_AT6_Base.docx"
             agg_data = calculate_informe_social_aggregates(
                 postulantes,
+                datos_terreno=terr,
                 nombre_grupo=meta.get("comite_nombre"),
                 egr_nombre=meta.get("egr_nombre"),
                 egr_rut=meta.get("egr_rut"),
+                codigo_expediente=meta.get("codigo_expediente"),
             )
             # Usar archivo temporal para fill_informe_social_docx
             with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp_out:
@@ -268,7 +351,7 @@ def generar_documento_individual(
             consolidated = consolidate_postulante_local(
                 post_target,
                 usar_rsh_en_terreno=False,
-                datos_terreno_proyecto=None,
+                datos_terreno_proyecto=terr,
                 profesionales_firmantes=p_firmantes
             )
 
@@ -300,9 +383,10 @@ def generar_expediente_zip(archivo_bytes_o_ruta: Any, metadata: Dict[str, Any]) 
     tmp_path, es_temp = _guardar_temp_excel(archivo_bytes_o_ruta)
     try:
         postulantes = read_all_postulantes(tmp_path, sheet_name=None)
+        meta, terr = _resolver_metadatos_y_terreno(postulantes, metadata, tmp_path)
+        metadata.update(meta)
 
-        metadata["total_familias"] = len(postulantes)
-        comite_slug = metadata.get("comite_nombre", "Ecobarrios").replace(" ", "_")
+        comite_slug = metadata.get("comite_nombre", "Comite").replace(" ", "_")
         zip_filename = f"Expediente_{comite_slug}.zip"
 
         profesionales_firmantes = {
@@ -342,7 +426,7 @@ def generar_expediente_zip(archivo_bytes_o_ruta: Any, metadata: Dict[str, Any]) 
                     consolidated = consolidate_postulante_local(
                         p,
                         usar_rsh_en_terreno=False,
-                        datos_terreno_proyecto=None,
+                        datos_terreno_proyecto=terr,
                         profesionales_firmantes=p_firmantes
                     )
 
@@ -366,9 +450,11 @@ def generar_expediente_zip(archivo_bytes_o_ruta: Any, metadata: Dict[str, Any]) 
                     at6_out_path = tmp_at6.name
                 agg_data = calculate_informe_social_aggregates(
                     postulantes,
+                    datos_terreno=terr,
                     nombre_grupo=metadata.get("comite_nombre"),
                     egr_nombre=metadata.get("egr_nombre"),
                     egr_rut=metadata.get("egr_rut"),
+                    codigo_expediente=metadata.get("codigo_expediente"),
                 )
                 fill_informe_social_docx(str(at6_tpl), agg_data, at6_out_path)
                 with open(at6_out_path, "rb") as f:
