@@ -55,14 +55,14 @@ class EcobarriosGenerarExpedienteAPIView(APIView):
             )
 
         metadata = {
-            "comite_nombre": request.data.get("comite_nombre", "Comité de Vivienda Ecobarrios").strip(),
-            "codigo_expediente": request.data.get("codigo_expediente", "En trámite").strip(),
-            "comuna": request.data.get("comuna", "Perquenco").strip(),
-            "egr_nombre": request.data.get("egr_nombre", "CONSULTORA PLAN SOCIAL LIMITADA").strip(),
-            "egr_rut": request.data.get("egr_rut", "77.235.354-5").strip(),
-            "arquitecto": request.data.get("arquitecto", "Vanessa Schneider Martínez").strip(),
-            "trabajador_social": request.data.get("trabajador_social", "Erica Reyes Peña").strip(),
-            "abogado": request.data.get("abogado", "Rodrigo Pedreros").strip(),
+            "comite_nombre": request.data.get("comite_nombre", "").strip() or "Comité Habitacional Ecobarrios",
+            "codigo_expediente": request.data.get("codigo_expediente", "").strip() or "En trámite",
+            "comuna": request.data.get("comuna", "").strip() or "Perquenco",
+            "egr_nombre": request.data.get("egr_nombre", "").strip() or "CONSULTORA PLAN SOCIAL LIMITADA",
+            "egr_rut": request.data.get("egr_rut", "").strip() or "77.235.354-5",
+            "arquitecto": request.data.get("arquitecto", "").strip() or "Vanessa Schneider Martínez",
+            "trabajador_social": request.data.get("trabajador_social", "").strip() or "Erica Reyes Peña",
+            "abogado": request.data.get("abogado", "").strip() or "Rodrigo Pedreros",
         }
 
         try:
@@ -95,14 +95,14 @@ class EcobarriosDocumentoIndividualAPIView(APIView):
         rut = request.data.get("rut", "").strip()
 
         metadata = {
-            "comite_nombre": request.data.get("comite_nombre", "Comité de Vivienda Ecobarrios").strip(),
-            "codigo_expediente": request.data.get("codigo_expediente", "En trámite").strip(),
-            "comuna": request.data.get("comuna", "Perquenco").strip(),
-            "egr_nombre": request.data.get("egr_nombre", "CONSULTORA PLAN SOCIAL LIMITADA").strip(),
-            "egr_rut": request.data.get("egr_rut", "77.235.354-5").strip(),
-            "arquitecto": request.data.get("arquitecto", "Vanessa Schneider Martínez").strip(),
-            "trabajador_social": request.data.get("trabajador_social", "Erica Reyes Peña").strip(),
-            "abogado": request.data.get("abogado", "Rodrigo Pedreros").strip(),
+            "comite_nombre": request.data.get("comite_nombre", "").strip() or "Comité Habitacional Ecobarrios",
+            "codigo_expediente": request.data.get("codigo_expediente", "").strip() or "En trámite",
+            "comuna": request.data.get("comuna", "").strip() or "Perquenco",
+            "egr_nombre": request.data.get("egr_nombre", "").strip() or "CONSULTORA PLAN SOCIAL LIMITADA",
+            "egr_rut": request.data.get("egr_rut", "").strip() or "77.235.354-5",
+            "arquitecto": request.data.get("arquitecto", "").strip() or "Vanessa Schneider Martínez",
+            "trabajador_social": request.data.get("trabajador_social", "").strip() or "Erica Reyes Peña",
+            "abogado": request.data.get("abogado", "").strip() or "Rodrigo Pedreros",
         }
 
         try:
