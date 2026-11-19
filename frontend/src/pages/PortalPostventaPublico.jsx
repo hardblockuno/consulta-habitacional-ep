@@ -535,11 +535,11 @@ function FormularioPublico({ onIrAConsulta }) {
 
         <div>
           <label className="block text-[11px] font-medium text-slate-600">
-            N° de Casa, Lote o Dirección de la Vivienda
+            Dirección de la Vivienda
           </label>
           <input
             type="text"
-            placeholder="Ej: Lote 14 Mz D / Pasaje Los Aromos 123"
+            placeholder="Ej: Pasaje Los Aromos 123 (o sector / lote)"
             value={vivienda}
             onChange={(e) => setVivienda(e.target.value)}
             className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 focus:outline-none transition-all"
