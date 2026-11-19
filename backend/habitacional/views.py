@@ -586,22 +586,40 @@ class TicketPostventaViewSet(viewsets.ModelViewSet):
     def consultar(self, request):
         rut = request.query_params.get("rut", "").strip()
         codigo = request.query_params.get("codigo", "").strip()
+        q_param = request.query_params.get("q", "").strip()
+        termino = rut or codigo or q_param
 
-        if not rut and not codigo:
+        if not termino:
             return Response(
-                {"detail": "Debe indicar RUT o Código de solicitud para consultar."},
+                {"detail": "Debe indicar su RUT o Código de solicitud para consultar."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         queryset = self.get_queryset()
-        if codigo:
-            queryset = queryset.filter(codigo__iexact=codigo)
-        elif rut:
-            clean_rut = rut.replace(".", "").replace(" ", "").upper()
-            queryset = queryset.filter(
-                Q(rut__iexact=rut)
-                | Q(rut__icontains=clean_rut)
-            )
+        if termino.upper().startswith("PV-"):
+            queryset = queryset.filter(codigo__iexact=termino)
+        else:
+            # Buscar por RUT en todas sus variantes (con puntos, sin puntos, con o sin guion)
+            clean = "".join(c for c in termino.upper() if c.isalnum())
+            variantes = {termino, clean}
+            if len(clean) >= 2:
+                cuerpo = clean[:-1]
+                dv = clean[-1]
+                try:
+                    cuerpo_num = int(cuerpo)
+                    variantes.add(f"{cuerpo_num:,}".replace(",", ".") + f"-{dv}")
+                except ValueError:
+                    pass
+                variantes.add(f"{cuerpo}-{dv}")
+
+            q_filtro = Q()
+            for v in variantes:
+                q_filtro |= Q(rut__iexact=v)
+            if len(clean) >= 6:
+                cuerpo_solo = clean[:-1] if not clean.isdigit() else clean
+                q_filtro |= Q(rut__icontains=cuerpo_solo)
+
+            queryset = queryset.filter(q_filtro)
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)

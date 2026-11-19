@@ -275,6 +275,7 @@ class ImportacionExcelSerializer(serializers.ModelSerializer):
 class TicketPostventaSerializer(serializers.ModelSerializer):
     estado_display = serializers.CharField(source="get_estado_display", read_only=True)
     urgencia_display = serializers.CharField(source="get_urgencia_display", read_only=True)
+    recintos = serializers.ListField(child=serializers.CharField(), required=False)
 
     class Meta:
         model = TicketPostventa
@@ -287,6 +288,7 @@ class TicketPostventaSerializer(serializers.ModelSerializer):
             "comite_nombre",
             "vivienda_direccion",
             "recinto",
+            "recintos",
             "descripcion",
             "foto",
             "estado",
@@ -300,6 +302,23 @@ class TicketPostventaSerializer(serializers.ModelSerializer):
             "actualizado_en",
         ]
         read_only_fields = ["id", "codigo", "fecha_resolucion", "creado_en", "actualizado_en"]
+
+    def to_internal_value(self, data):
+        if hasattr(data, "copy"):
+            data = data.copy()
+        raw_recintos = data.get("recintos")
+        if isinstance(raw_recintos, str):
+            try:
+                data["recintos"] = json.loads(raw_recintos)
+            except Exception:
+                data["recintos"] = [r.strip() for r in raw_recintos.split(",") if r.strip()]
+        return super().to_internal_value(data)
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        if not ret.get("recintos") and instance.recinto:
+            ret["recintos"] = [r.strip() for r in instance.recinto.split(",") if r.strip()]
+        return ret
 
 
 class PerfilUsuarioSerializer(serializers.ModelSerializer):

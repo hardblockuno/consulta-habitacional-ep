@@ -35,17 +35,43 @@ class TicketPostventaAPITests(TestCase):
             recinto="Baño",
             descripcion="Gotera en grifo",
         )
-        # Consulta por RUT
+        # Consulta por RUT exacto
         response = self.client.get(f"/api/postventa/tickets/consultar/?rut={ticket.rut}")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]["codigo"], ticket.codigo)
+
+        # Consulta por RUT sin puntos (12345678-9)
+        response_sin_puntos = self.client.get("/api/postventa/tickets/consultar/?rut=12345678-9")
+        self.assertEqual(response_sin_puntos.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response_sin_puntos.data), 1)
+
+        # Consulta por RUT sin puntos ni guión (123456789)
+        response_limpio = self.client.get("/api/postventa/tickets/consultar/?rut=123456789")
+        self.assertEqual(response_limpio.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response_limpio.data), 1)
 
         # Consulta por código
         response = self.client.get(f"/api/postventa/tickets/consultar/?codigo={ticket.codigo}")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]["id"], ticket.id)
+
+    def test_multiples_recintos_ticket(self):
+        payload = {
+            "rut": "18.765.432-1",
+            "nombre": "María Rojas",
+            "telefono": "+56987654321",
+            "recintos": ["Baño", "Cocina", "Techumbre / Cubierta"],
+            "descripcion": "Filtración en baño y gotera en cubierta de cocina",
+            "urgencia": "normal",
+        }
+        response = self.client.post("/api/postventa/tickets/", payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(response.data["recintos"]), 3)
+        self.assertIn("Baño", response.data["recinto"])
+        self.assertIn("Cocina", response.data["recinto"])
+        self.assertIn("Techumbre", response.data["recinto"])
 
     def test_resolver_ticket_equipo_ep(self):
         ticket = TicketPostventa.objects.create(

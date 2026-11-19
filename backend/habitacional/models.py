@@ -351,7 +351,8 @@ class TicketPostventa(TimeStampedModel):
     telefono = models.CharField(max_length=40, blank=True)
     comite_nombre = models.CharField(max_length=255, blank=True)
     vivienda_direccion = models.CharField(max_length=255, blank=True)
-    recinto = models.CharField(max_length=100, blank=True)
+    recinto = models.CharField(max_length=255, blank=True)
+    recintos = models.JSONField(default=list, blank=True)
     descripcion = models.TextField()
     foto = models.ImageField(upload_to="postventa/fotos/%Y/%m/", null=True, blank=True)
 
@@ -392,6 +393,20 @@ class TicketPostventa(TimeStampedModel):
             self.fecha_resolucion = timezone.now()
         elif self.estado != self.ESTADO_RESUELTA:
             self.fecha_resolucion = None
+
+        # Sincronizar recintos (JSON) y recinto (texto concatenado)
+        if self.recintos:
+            if isinstance(self.recintos, list):
+                if not self.recinto:
+                    self.recinto = ", ".join(str(r).strip() for r in self.recintos if str(r).strip())
+            elif isinstance(self.recintos, str):
+                parsed = [r.strip() for r in self.recintos.split(",") if r.strip()]
+                self.recintos = parsed
+                if not self.recinto:
+                    self.recinto = ", ".join(parsed)
+        elif self.recinto:
+            self.recintos = [r.strip() for r in self.recinto.split(",") if r.strip()]
+
         super().save(*args, **kwargs)
 
 

@@ -243,10 +243,20 @@ function BandejaEP() {
                 </div>
 
                 <div className="mt-3 rounded border border-slate-100 bg-slate-50/70 p-2.5 text-xs">
-                  {t.recinto && (
-                    <span className="text-[10px] font-medium tracking-wider uppercase text-slate-400 block mb-0.5">
-                      Recinto: {t.recinto}
-                    </span>
+                  {((t.recintos && t.recintos.length > 0) || t.recinto) && (
+                    <div className="mb-1.5 flex flex-wrap gap-1">
+                      {(t.recintos && t.recintos.length > 0
+                        ? t.recintos
+                        : t.recinto.split(",").map((s) => s.trim())
+                      ).map((rec, i) => (
+                        <span
+                          key={i}
+                          className="rounded bg-slate-200/80 px-1.5 py-0.5 text-[10px] font-medium text-slate-700"
+                        >
+                          {rec}
+                        </span>
+                      ))}
+                    </div>
                   )}
                   <p className="text-slate-700 line-clamp-2 text-[12px] leading-relaxed">{t.descripcion}</p>
                 </div>
@@ -365,10 +375,20 @@ function ModalGestionTicket({ ticket, onClose, onGuardado }) {
               {ticket.comite_nombre ? `${ticket.comite_nombre} · ` : ""}
               {ticket.vivienda_direccion || "Sin dirección"}
             </p>
-            {ticket.recinto && (
-              <p className="text-slate-500 mt-0.5 text-[11px]">
-                Recinto: <span className="text-slate-800">{ticket.recinto}</span>
-              </p>
+            {((ticket.recintos && ticket.recintos.length > 0) || ticket.recinto) && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {(ticket.recintos && ticket.recintos.length > 0
+                  ? ticket.recintos
+                  : ticket.recinto.split(",").map((s) => s.trim())
+                ).map((rec, i) => (
+                  <span
+                    key={i}
+                    className="rounded bg-slate-200/80 px-1.5 py-0.5 text-[10px] font-medium text-slate-700"
+                  >
+                    {rec}
+                  </span>
+                ))}
+              </div>
             )}
           </div>
           <div>
