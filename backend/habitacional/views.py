@@ -24,6 +24,7 @@ from .models import (
     PerfilUsuario,
     Persona,
     TicketPostventa,
+    ItemTicketPostventa,
     SugerenciaFeedback,
 )
 from .serializers import (
@@ -555,12 +556,12 @@ def count_personas_con_hijos_revision(personas):
 
 
 class TicketPostventaViewSet(viewsets.ModelViewSet):
-    queryset = TicketPostventa.objects.all()
+    queryset = TicketPostventa.objects.all().prefetch_related("items")
     serializer_class = TicketPostventaSerializer
     parser_classes = [parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = super().get_queryset().prefetch_related("items")
         estado = self.request.query_params.get("estado", "").strip()
         urgencia = self.request.query_params.get("urgencia", "").strip()
         q = self.request.query_params.get("q", "").strip()
@@ -581,6 +582,84 @@ class TicketPostventaViewSet(viewsets.ModelViewSet):
                 | Q(descripcion__icontains=q)
             )
         return queryset
+
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        import json
+
+        if hasattr(request.data, "dict"):
+            data = request.data.dict()
+        else:
+            data = dict(request.data)
+
+        for k, v in request.FILES.items():
+            data[k] = v
+
+        raw_items = data.get("items")
+        parsed_items = []
+        if isinstance(raw_items, str):
+            try:
+                parsed_items = json.loads(raw_items)
+            except Exception:
+                parsed_items = []
+        elif isinstance(raw_items, list):
+            parsed_items = raw_items
+
+        if parsed_items:
+            recintos_nombres = []
+            descripciones_partes = []
+            for idx, it in enumerate(parsed_items):
+                r_nom = (it.get("recinto") or "").strip() or f"Recinto {idx + 1}"
+                recintos_nombres.append(r_nom)
+                obs = (it.get("observaciones") or it.get("descripcion") or "").strip()
+                if obs:
+                    descripciones_partes.append(f"[{r_nom}]: {obs}")
+
+            data["recintos"] = recintos_nombres
+            data["recinto"] = ", ".join(recintos_nombres)
+            if not data.get("descripcion") or not str(data.get("descripcion")).strip():
+                data["descripcion"] = "\n\n".join(descripciones_partes) or "Solicitud con múltiples recintos"
+
+            if not data.get("foto"):
+                foto_0 = request.FILES.get("item_foto_0") or request.FILES.get(
+                    parsed_items[0].get("foto_key", "")
+                )
+                if foto_0:
+                    data["foto"] = foto_0
+
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        ticket = serializer.save()
+
+        # Crear registros ItemTicketPostventa para cada recinto
+        if parsed_items:
+            for idx, it in enumerate(parsed_items):
+                foto_key = it.get("foto_key") or f"item_foto_{idx}"
+                item_foto = request.FILES.get(foto_key)
+                obs = (it.get("observaciones") or it.get("descripcion") or "").strip()
+                ItemTicketPostventa.objects.create(
+                    ticket=ticket,
+                    recinto=(it.get("recinto") or "").strip() or f"Recinto {idx + 1}",
+                    observaciones=obs,
+                    foto=item_foto,
+                )
+        else:
+            if ticket.recinto or ticket.descripcion or ticket.foto:
+                ItemTicketPostventa.objects.create(
+                    ticket=ticket,
+                    recinto=ticket.recinto or "General",
+                    observaciones=ticket.descripcion or "",
+                    foto=ticket.foto,
+                )
+
+        # Retornar la representación fresca con prefetch de items
+        ticket_refrescado = TicketPostventa.objects.prefetch_related("items").get(id=ticket.id)
+        headers = self.get_success_headers(serializer.data)
+        return Response(
+            self.get_serializer(ticket_refrescado).data,
+            status=status.HTTP_201_CREATED,
+            headers=headers,
+        )
 
     @action(detail=False, methods=["get"])
     def consultar(self, request):

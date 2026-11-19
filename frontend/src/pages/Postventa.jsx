@@ -407,25 +407,72 @@ function ModalGestionTicket({ ticket, onClose, onGuardado }) {
           </div>
         </div>
 
-        <div className="mt-3.5">
-          <label className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Descripción del Caso</label>
-          <div className="mt-1 rounded border border-slate-200 bg-white p-3 text-xs text-slate-800 leading-relaxed">
-            {ticket.descripcion}
-          </div>
-        </div>
-
-        {ticket.foto && (
-          <div className="mt-3.5">
-            <label className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Fotografía Adjunta</label>
-            <div className="mt-1 overflow-hidden rounded border border-slate-200 bg-slate-50 max-h-56 flex items-center justify-center">
-              <img
-                src={ticket.foto}
-                alt="Foto de la falla"
-                className="max-h-56 object-contain w-full cursor-pointer"
-                onClick={() => window.open(ticket.foto, "_blank")}
-              />
+        {/* Detalle por Recintos (Observaciones y Fotos) */}
+        {ticket.items && ticket.items.length > 0 ? (
+          <div className="mt-3.5 space-y-2">
+            <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 block">
+              Recintos Reportados con Observaciones y Fotos ({ticket.items.length})
+            </label>
+            <div className="space-y-2.5">
+              {ticket.items.map((it, idx) => (
+                <div key={it.id || idx} className="rounded border border-slate-200 bg-slate-50/70 p-3 text-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-800 text-[9px] font-semibold text-white">
+                        {idx + 1}
+                      </span>
+                      {it.recinto}
+                    </span>
+                  </div>
+                  <p className="text-slate-800 text-[12px] leading-relaxed">
+                    {it.observaciones || "Sin observaciones específicas"}
+                  </p>
+                  {it.foto && (
+                    <div className="pt-1">
+                      <a
+                        href={it.foto}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 rounded border border-slate-200 bg-white p-1 hover:bg-slate-50 transition"
+                      >
+                        <img
+                          src={it.foto}
+                          alt={it.recinto}
+                          className="h-16 w-16 object-cover rounded border border-slate-200 shrink-0 cursor-pointer"
+                        />
+                        <span className="text-[11px] font-medium text-slate-700 underline">
+                          Ver fotografía en tamaño original ↗
+                        </span>
+                      </a>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
+        ) : (
+          <>
+            <div className="mt-3.5">
+              <label className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Descripción del Caso</label>
+              <div className="mt-1 rounded border border-slate-200 bg-white p-3 text-xs text-slate-800 leading-relaxed">
+                {ticket.descripcion}
+              </div>
+            </div>
+
+            {ticket.foto && (
+              <div className="mt-3.5">
+                <label className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Fotografía Adjunta</label>
+                <div className="mt-1 overflow-hidden rounded border border-slate-200 bg-slate-50 max-h-56 flex items-center justify-center">
+                  <img
+                    src={ticket.foto}
+                    alt="Foto de la falla"
+                    className="max-h-56 object-contain w-full cursor-pointer"
+                    onClick={() => window.open(ticket.foto, "_blank")}
+                  />
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         <form onSubmit={handleGuardar} className="mt-4 border-t border-slate-100 pt-3.5 space-y-3">

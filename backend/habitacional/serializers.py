@@ -10,6 +10,7 @@ from .models import (
     ImportacionExcel,
     PerfilUsuario,
     TicketPostventa,
+    ItemTicketPostventa,
     SugerenciaFeedback,
     Observacion,
     Persona,
@@ -272,10 +273,24 @@ class ImportacionExcelSerializer(serializers.ModelSerializer):
 
 
 
+class ItemTicketPostventaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ItemTicketPostventa
+        fields = [
+            "id",
+            "recinto",
+            "observaciones",
+            "foto",
+            "creado_en",
+        ]
+        read_only_fields = ["id", "creado_en"]
+
+
 class TicketPostventaSerializer(serializers.ModelSerializer):
     estado_display = serializers.CharField(source="get_estado_display", read_only=True)
     urgencia_display = serializers.CharField(source="get_urgencia_display", read_only=True)
     recintos = serializers.ListField(child=serializers.CharField(), required=False)
+    items = ItemTicketPostventaSerializer(many=True, read_only=True)
 
     class Meta:
         model = TicketPostventa
@@ -291,6 +306,7 @@ class TicketPostventaSerializer(serializers.ModelSerializer):
             "recintos",
             "descripcion",
             "foto",
+            "items",
             "estado",
             "estado_display",
             "urgencia",
@@ -304,14 +320,33 @@ class TicketPostventaSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "codigo", "fecha_resolucion", "creado_en", "actualizado_en"]
 
     def to_internal_value(self, data):
-        if hasattr(data, "copy"):
+        if hasattr(data, "dict"):
+            data = data.dict()
+        elif hasattr(data, "copy"):
             data = data.copy()
+
         raw_recintos = data.get("recintos")
         if isinstance(raw_recintos, str):
             try:
                 data["recintos"] = json.loads(raw_recintos)
             except Exception:
                 data["recintos"] = [r.strip() for r in raw_recintos.split(",") if r.strip()]
+        elif isinstance(raw_recintos, list):
+            flat = []
+            for item in raw_recintos:
+                if isinstance(item, list):
+                    flat.extend(str(x).strip() for x in item if str(x).strip())
+                elif isinstance(item, str):
+                    if item.startswith("[") and item.endswith("]"):
+                        try:
+                            flat.extend(json.loads(item))
+                        except Exception:
+                            flat.append(item.strip())
+                    else:
+                        flat.append(item.strip())
+                else:
+                    flat.append(str(item).strip())
+            data["recintos"] = flat
         return super().to_internal_value(data)
 
     def to_representation(self, instance):

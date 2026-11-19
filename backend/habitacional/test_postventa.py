@@ -109,3 +109,45 @@ class TicketPostventaAPITests(TestCase):
         self.assertEqual(response.data["en_gestion"], 1)
         self.assertEqual(response.data["resueltas"], 1)
         self.assertEqual(response.data["urgentes"], 1)
+
+    def test_crear_ticket_con_items_recintos(self):
+        import json
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        # Imagen GIF válida de 1x1 pixel para pasar la validación de Pillow ImageField
+        gif_bytes = (
+            b"GIF89a\x01\x00\x01\x00\x80\x00\x00\xff\xff\xff\x00\x00\x00!\xf9"
+            b"\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;"
+        )
+        foto_bano = SimpleUploadedFile("bano.gif", gif_bytes, content_type="image/gif")
+        foto_techo = SimpleUploadedFile("techo.gif", gif_bytes, content_type="image/gif")
+
+        payload = {
+            "rut": "15.999.888-7",
+            "nombre": "Ana Valenzuela",
+            "telefono": "+56955554444",
+            "items": json.dumps([
+                {
+                    "recinto": "Baño",
+                    "observaciones": "Filtración en flexible de lavamanos",
+                    "foto_key": "item_foto_0",
+                },
+                {
+                    "recinto": "Techumbre / Cubierta",
+                    "observaciones": "Gotera cerca de cumbrera en días de lluvia",
+                    "foto_key": "item_foto_1",
+                },
+            ]),
+            "item_foto_0": foto_bano,
+            "item_foto_1": foto_techo,
+        }
+        response = self.client.post("/api/postventa/tickets/", payload, format="multipart")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(response.data["items"]), 2)
+        self.assertEqual(response.data["items"][0]["recinto"], "Baño")
+        self.assertEqual(response.data["items"][0]["observaciones"], "Filtración en flexible de lavamanos")
+        self.assertTrue("bano" in response.data["items"][0]["foto"])
+        self.assertEqual(response.data["items"][1]["recinto"], "Techumbre / Cubierta")
+        self.assertTrue("techo" in response.data["items"][1]["foto"])
+        self.assertIn("Baño", response.data["recinto"])
+        self.assertIn("Techumbre / Cubierta", response.data["recinto"])

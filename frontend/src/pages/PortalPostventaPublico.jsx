@@ -13,6 +13,7 @@ import {
   Info,
   Paperclip,
   Phone,
+  Plus,
   Search,
   Send,
   Trash2,
@@ -23,7 +24,7 @@ import {
 } from "lucide-react";
 import { api } from "../api/client.js";
 
-const RECINTOS_PREDEFINIDOS = [
+const OPCIONES_RECINTOS = [
   "Baño",
   "Cocina",
   "Techumbre / Cubierta",
@@ -34,6 +35,7 @@ const RECINTOS_PREDEFINIDOS = [
   "Instalación Eléctrica",
   "Instalación Sanitaria / Gas",
   "Patio / Cierros / Acceso",
+  "Otro",
 ];
 
 export default function PortalPostventaPublico() {
@@ -122,7 +124,8 @@ export default function PortalPostventaPublico() {
 }
 
 /* =========================================================================
-   FORMULARIO DE INGRESO
+   FORMULARIO DE INGRESO DINÁMICO POR RECINTO
+   Cada recinto tiene su propio tipo, observación y foto
    ========================================================================= */
 function FormularioPublico({ onIrAConsulta }) {
   const [rut, setRut] = useState("");
@@ -130,96 +133,142 @@ function FormularioPublico({ onIrAConsulta }) {
   const [telefono, setTelefono] = useState("");
   const [comite, setComite] = useState("");
   const [vivienda, setVivienda] = useState("");
-
-  // Recintos múltiples
-  const [recintosSeleccionados, setRecintosSeleccionados] = useState([]);
-  const [incluirOtro, setIncluirOtro] = useState(false);
-  const [otroRecinto, setOtroRecinto] = useState("");
-
-  const [descripcion, setDescripcion] = useState("");
   const [esUrgente, setEsUrgente] = useState(false);
 
-  // Foto obligatoria y preview
-  const [foto, setFoto] = useState(null);
-  const [fotoPreview, setFotoPreview] = useState(null);
+  // Lista dinámica de recintos afectados
+  const [recintosItems, setRecintosItems] = useState([
+    {
+      id: "item-1",
+      recinto: "Baño",
+      otroRecinto: "",
+      observaciones: "",
+      foto: null,
+      fotoPreview: null,
+    },
+  ]);
 
   const [enviando, setEnviando] = useState(false);
   const [errorValidacion, setErrorValidacion] = useState("");
   const [ticketCreado, setTicketCreado] = useState(null);
 
-  const toggleRecinto = (nombreRecinto) => {
-    setRecintosSeleccionados((prev) =>
-      prev.includes(nombreRecinto)
-        ? prev.filter((r) => r !== nombreRecinto)
-        : [...prev, nombreRecinto]
+  // Agregar nuevo recinto
+  const agregarRecinto = () => {
+    // Sugerir un recinto que aún no esté en la lista si es posible
+    const usados = recintosItems.map((r) => r.recinto);
+    const siguienteSugerido =
+      OPCIONES_RECINTOS.find((op) => op !== "Otro" && !usados.includes(op)) ||
+      "Cocina";
+
+    setRecintosItems((prev) => [
+      ...prev,
+      {
+        id: `item-${Date.now()}`,
+        recinto: siguienteSugerido,
+        otroRecinto: "",
+        observaciones: "",
+        foto: null,
+        fotoPreview: null,
+      },
+    ]);
+  };
+
+  // Eliminar recinto
+  const eliminarRecinto = (id) => {
+    if (recintosItems.length <= 1) return;
+    const itemABorrar = recintosItems.find((r) => r.id === id);
+    if (itemABorrar?.fotoPreview) {
+      URL.revokeObjectURL(itemABorrar.fotoPreview);
+    }
+    setRecintosItems((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  // Modificar campo de un recinto
+  const actualizarRecinto = (id, campo, valor) => {
+    setRecintosItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, [campo]: valor } : item))
     );
   };
 
-  const handleFotoChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (!file.type.startsWith("image/")) {
-        alert("Por favor seleccione un archivo de imagen válido (JPG, PNG, WEBP).");
-        return;
-      }
-      setFoto(file);
-      setFotoPreview(URL.createObjectURL(file));
-      setErrorValidacion("");
+  // Manejar cambio de foto en un recinto
+  const handleFotoRecinto = (id, file) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      alert("Por favor seleccione un archivo de imagen válido (JPG, PNG, WEBP).");
+      return;
     }
+
+    const previewUrl = URL.createObjectURL(file);
+    setRecintosItems((prev) =>
+      prev.map((item) => {
+        if (item.id === id) {
+          if (item.fotoPreview) URL.revokeObjectURL(item.fotoPreview);
+          return { ...item, foto: file, fotoPreview: previewUrl };
+        }
+        return item;
+      })
+    );
+    setErrorValidacion("");
   };
 
-  const eliminarFoto = () => {
-    setFoto(null);
-    if (fotoPreview) {
-      URL.revokeObjectURL(fotoPreview);
-      setFotoPreview(null);
-    }
+  // Quitar foto de un recinto
+  const quitarFotoRecinto = (id) => {
+    setRecintosItems((prev) =>
+      prev.map((item) => {
+        if (item.id === id) {
+          if (item.fotoPreview) URL.revokeObjectURL(item.fotoPreview);
+          return { ...item, foto: null, fotoPreview: null };
+        }
+        return item;
+      })
+    );
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorValidacion("");
 
-    // 1. Validación de RUT Obligatorio
+    // 1. Validaciones generales
     const rutLimpio = rut.trim();
     if (!rutLimpio) {
-      setErrorValidacion("El RUT del beneficiario es obligatorio para registrar y consultar su solicitud.");
+      setErrorValidacion("El RUT del beneficiario es obligatorio.");
       return;
     }
-
-    // 2. Validación de Nombre
     if (!nombre.trim()) {
       setErrorValidacion("Por favor ingrese su Nombre Completo.");
       return;
     }
-
-    // 3. Validación de Teléfono
     if (!telefono.trim()) {
       setErrorValidacion("Por favor ingrese su Teléfono de Contacto.");
       return;
     }
 
-    // 4. Validación de Recintos Afectados
-    const listaFinalRecintos = [...recintosSeleccionados];
-    if (incluirOtro && otroRecinto.trim()) {
-      listaFinalRecintos.push(otroRecinto.trim());
-    }
-
-    if (listaFinalRecintos.length === 0) {
-      setErrorValidacion("Debe seleccionar al menos un recinto afectado en su vivienda.");
+    // 2. Validación de cada recinto
+    if (recintosItems.length === 0) {
+      setErrorValidacion("Debe registrar al menos un recinto afectado.");
       return;
     }
 
-    // 5. Validación de Descripción
-    if (!descripcion.trim()) {
-      setErrorValidacion("Por favor detalle la falla u observación técnica.");
-      return;
-    }
+    for (let i = 0; i < recintosItems.length; i++) {
+      const it = recintosItems[i];
+      const nombreRecinto =
+        it.recinto === "Otro" ? it.otroRecinto.trim() : it.recinto;
 
-    // 6. Validación de Foto Obligatoria
-    if (!foto) {
-      setErrorValidacion("Es obligatorio adjuntar al menos una fotografía clara del lugar afectado para que el equipo técnico evalúe la solución.");
-      return;
+      if (!nombreRecinto) {
+        setErrorValidacion(`Por favor indique el nombre del Recinto #${i + 1}.`);
+        return;
+      }
+      if (!it.observaciones.trim()) {
+        setErrorValidacion(
+          `Por favor escriba las observaciones o descripción de la falla para el Recinto #${i + 1} (${nombreRecinto}).`
+        );
+        return;
+      }
+      if (!it.foto) {
+        setErrorValidacion(
+          `Es obligatorio adjuntar la fotografía del lugar afectado para el Recinto #${i + 1} (${nombreRecinto}).`
+        );
+        return;
+      }
     }
 
     setEnviando(true);
@@ -230,24 +279,35 @@ function FormularioPublico({ onIrAConsulta }) {
       formData.append("telefono", telefono.trim());
       formData.append("comite_nombre", comite.trim());
       formData.append("vivienda_direccion", vivienda.trim());
-
-      // Múltiples recintos: se envía tanto el texto consolidado como el array JSON
-      formData.append("recinto", listaFinalRecintos.join(", "));
-      formData.append("recintos", JSON.stringify(listaFinalRecintos));
-
-      formData.append("descripcion", descripcion.trim());
       formData.append("urgencia", esUrgente ? "urgente" : "normal");
-      formData.append("foto", foto);
+
+      // Construir payload de items estructurados
+      const itemsPayload = recintosItems.map((it, idx) => ({
+        recinto: it.recinto === "Otro" ? it.otroRecinto.trim() : it.recinto,
+        observaciones: it.observaciones.trim(),
+        foto_key: `item_foto_${idx}`,
+      }));
+
+      formData.append("items", JSON.stringify(itemsPayload));
+
+      // Adjuntar cada archivo de foto con su clave respectiva
+      recintosItems.forEach((it, idx) => {
+        if (it.foto) {
+          formData.append(`item_foto_${idx}`, it.foto);
+        }
+      });
 
       const res = await api.post("/postventa/tickets/", formData, {
         headers: { "Content-Type": "multipart/form-data" },
         timeout: 120000,
       });
 
-      setTicketCreado({ ...res.data, recintosLista: listaFinalRecintos });
+      setTicketCreado(res.data);
     } catch (err) {
       console.error("Error al ingresar solicitud:", err);
-      const msg = err.response?.data?.detail || "Ocurrió un error al registrar la solicitud. Intente nuevamente.";
+      const msg =
+        err.response?.data?.detail ||
+        "Ocurrió un error al registrar la solicitud. Intente nuevamente.";
       setErrorValidacion(msg);
     } finally {
       setEnviando(false);
@@ -265,14 +325,14 @@ function FormularioPublico({ onIrAConsulta }) {
             </p>
           </div>
           <h3 className="mt-1 text-sm font-semibold text-slate-900">
-            Estimado(a) {ticketCreado.nombre}, su caso ha sido ingresado al sistema.
+            Estimado(a) {ticketCreado.nombre}, su solicitud ha sido ingresada al sistema.
           </h3>
           <p className="mt-1 text-xs text-slate-700 leading-relaxed">
-            Nuestro equipo técnico revisará los antecedentes y la fotografía enviada para coordinar la inspección o reparación correspondiente.
+            Hemos recibido el registro de {ticketCreado.items?.length || 1} recinto(s) con sus respectivas observaciones y fotografías de respaldo.
           </p>
         </div>
 
-        {/* Resumen del Ticket */}
+        {/* Resumen del Ticket Creado */}
         <div className="rounded-lg border border-slate-200/90 bg-slate-50/40 p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/70 pb-2.5">
             <div>
@@ -294,27 +354,47 @@ function FormularioPublico({ onIrAConsulta }) {
           </div>
 
           <div>
-            <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400 mb-1">
-              Recintos Reportados
+            <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400 mb-2">
+              Recintos Registrados ({ticketCreado.items?.length || 1})
             </p>
-            <div className="flex flex-wrap gap-1">
-              {(ticketCreado.recintos || ticketCreado.recintosLista || [ticketCreado.recinto]).map((rec, i) => (
-                <span
-                  key={i}
-                  className="rounded-full bg-slate-200/80 px-2 py-0.5 text-[11px] font-medium text-slate-700"
-                >
-                  {rec}
-                </span>
-              ))}
+            <div className="space-y-2">
+              {ticketCreado.items && ticketCreado.items.length > 0 ? (
+                ticketCreado.items.map((it, idx) => (
+                  <div
+                    key={it.id || idx}
+                    className="flex items-center gap-3 rounded-md border border-slate-200 bg-white p-2.5 text-xs"
+                  >
+                    {it.foto && (
+                      <img
+                        src={it.foto}
+                        alt={it.recinto}
+                        className="h-12 w-12 rounded object-cover border border-slate-200 shrink-0"
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <span className="font-semibold text-slate-900 block">
+                        {it.recinto}
+                      </span>
+                      <p className="text-slate-600 line-clamp-1 text-[11px]">
+                        {it.observaciones}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded bg-white p-2 text-xs text-slate-700 border border-slate-200">
+                  {ticketCreado.recinto || "Recinto registrado"}
+                </div>
+              )}
             </div>
           </div>
 
           <div className="rounded-md bg-indigo-50/80 border border-indigo-200/70 p-3 text-xs text-indigo-950 flex items-start gap-2.5">
             <Info size={16} className="text-indigo-600 shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold">¡Consulta simple solo con su RUT!</p>
+              <p className="font-semibold">¡Consulte el avance solo con su RUT!</p>
               <p className="text-indigo-800 text-[11px] mt-0.5 leading-normal">
-                No necesita memorizar ningún código complicado. Para ver los avances, la visita técnica o la resolución, simplemente ingrese a la pestaña <strong>"Consultar Estado por RUT"</strong> y escriba su RUT.
+                No necesita memorizar ningún código. Puede consultar las visitas o resoluciones técnicas ingresando su RUT en la pestaña <strong>"Consultar Estado por RUT"</strong>.
               </p>
             </div>
           </div>
@@ -332,11 +412,16 @@ function FormularioPublico({ onIrAConsulta }) {
             type="button"
             onClick={() => {
               setTicketCreado(null);
-              setDescripcion("");
-              setRecintosSeleccionados([]);
-              setOtroRecinto("");
-              setIncluirOtro(false);
-              eliminarFoto();
+              setRecintosItems([
+                {
+                  id: "item-1",
+                  recinto: "Baño",
+                  otroRecinto: "",
+                  observaciones: "",
+                  foto: null,
+                  fotoPreview: null,
+                },
+              ]);
             }}
             className="rounded-md border border-slate-200 bg-white py-2 px-3 text-center text-xs font-medium text-slate-700 hover:bg-slate-50 transition"
           >
@@ -347,8 +432,6 @@ function FormularioPublico({ onIrAConsulta }) {
     );
   }
 
-  const totalRecintos = recintosSeleccionados.length + (incluirOtro && otroRecinto.trim() ? 1 : 0);
-
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="border-b border-slate-100 pb-2.5">
@@ -356,7 +439,7 @@ function FormularioPublico({ onIrAConsulta }) {
           Formulario Oficial de Solicitud de Postventa
         </h3>
         <p className="text-[11px] text-slate-500 mt-0.5">
-          Ingrese los antecedentes de la vivienda. Los campos con asterisco (*) son obligatorios.
+          Ingrese los datos del beneficiario y agregue cada recinto afectado con su observación y fotografía.
         </p>
       </div>
 
@@ -443,155 +526,185 @@ function FormularioPublico({ onIrAConsulta }) {
         />
       </div>
 
-      {/* SECCIÓN MÚLTIPLES RECINTOS AFECTADOS */}
-      <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-3.5 space-y-2.5">
-        <div className="flex items-center justify-between">
-          <label className="text-[11px] font-semibold text-slate-800 flex items-center gap-1.5">
-            <span>Recintos Afectados en la Vivienda</span>
-            <span className="text-rose-600 font-bold">*</span>
-          </label>
+      {/* SECCIÓN DINÁMICA: RECINTOS AFECTADOS */}
+      <div className="space-y-3 pt-1">
+        <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-800">
+              Recintos Afectados en la Vivienda ({recintosItems.length})
+            </h4>
+            <p className="text-[11px] text-slate-500">
+              Cada recinto debe llevar su observación específica y su fotografía de respaldo.
+            </p>
+          </div>
           <span className="text-[11px] font-medium text-slate-500">
-            {totalRecintos === 0
-              ? "Seleccione uno o más"
-              : `${totalRecintos} recinto(s) seleccionado(s)`}
+            {recintosItems.length === 1 ? "1 recinto" : `${recintosItems.length} recintos`}
           </span>
         </div>
-        <p className="text-[11px] text-slate-500">
-          Puede marcar más de un recinto afectado en la misma solicitud (ej. Baño y Techumbre) sin necesidad de crear tickets separados:
-        </p>
 
-        {/* Chips de Selección Múltiple */}
-        <div className="flex flex-wrap gap-1.5 pt-1">
-          {RECINTOS_PREDEFINIDOS.map((rec) => {
-            const seleccionado = recintosSeleccionados.includes(rec);
-            return (
-              <button
-                key={rec}
-                type="button"
-                onClick={() => toggleRecinto(rec)}
-                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                  seleccionado
-                    ? "bg-slate-900 text-white shadow-2xs"
-                    : "bg-white text-slate-700 border border-slate-200/90 hover:bg-slate-100"
-                }`}
-              >
-                {seleccionado && <Check size={12} className="stroke-[3]" />}
-                {rec}
-              </button>
-            );
-          })}
+        {/* Tarjetas de Cada Recinto */}
+        <div className="space-y-3.5">
+          {recintosItems.map((item, index) => (
+            <div
+              key={item.id}
+              className="rounded-lg border border-slate-200/90 bg-slate-50/40 p-3.5 space-y-3 transition-all"
+            >
+              {/* Encabezado del Recinto */}
+              <div className="flex items-center justify-between border-b border-slate-200/70 pb-2">
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 text-[10px] font-semibold text-white">
+                    {index + 1}
+                  </span>
+                  Recinto Afectado #{index + 1}
+                </span>
 
-          {/* Opción Otro Recinto */}
-          <button
-            type="button"
-            onClick={() => setIncluirOtro(!incluirOtro)}
-            className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-              incluirOtro
-                ? "bg-slate-900 text-white shadow-2xs"
-                : "bg-white text-slate-700 border border-slate-200/90 hover:bg-slate-100"
-            }`}
-          >
-            {incluirOtro && <Check size={12} className="stroke-[3]" />}
-            + Otro recinto
-          </button>
-        </div>
+                {recintosItems.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => eliminarRecinto(item.id)}
+                    className="inline-flex items-center gap-1 text-[11px] font-medium text-rose-600 hover:text-rose-800 transition"
+                    title="Eliminar este recinto"
+                  >
+                    <Trash2 size={13} />
+                    <span>Eliminar</span>
+                  </button>
+                )}
+              </div>
 
-        {incluirOtro && (
-          <div className="pt-1">
-            <input
-              type="text"
-              placeholder="Especifique el otro recinto afectado..."
-              value={otroRecinto}
-              onChange={(e) => setOtroRecinto(e.target.value)}
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[12px] text-slate-900 placeholder:text-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 focus:outline-none"
-            />
-          </div>
-        )}
-      </div>
+              {/* Selector de Recinto */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700">
+                    Tipo de Recinto <span className="text-rose-600 font-bold">*</span>
+                  </label>
+                  <select
+                    value={item.recinto}
+                    onChange={(e) => actualizarRecinto(item.id, "recinto", e.target.value)}
+                    className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[13px] text-slate-900 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 focus:outline-none"
+                  >
+                    {OPCIONES_RECINTOS.map((op) => (
+                      <option key={op} value={op}>
+                        {op}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-      {/* Descripción del Daño */}
-      <div>
-        <label className="block text-[11px] font-semibold text-slate-700">
-          Descripción de la Observación o Falla <span className="text-rose-600 font-bold">*</span>
-        </label>
-        <textarea
-          rows={3}
-          required
-          placeholder="Describa con la mayor claridad posible la situación técnica observada (ej: filtración de agua en zona de cielo, desprendimiento de sellos, falla en interruptor, etc.)..."
-          value={descripcion}
-          onChange={(e) => setDescripcion(e.target.value)}
-          className="mt-1 w-full rounded-md border border-slate-200 bg-white p-3 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 focus:outline-none transition-all leading-relaxed"
-        />
-      </div>
+                {item.recinto === "Otro" && (
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700">
+                      Especifique el Recinto <span className="text-rose-600 font-bold">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej: Logia, Bodega exterior, Pasillo"
+                      value={item.otroRecinto}
+                      onChange={(e) =>
+                        actualizarRecinto(item.id, "otroRecinto", e.target.value)
+                      }
+                      className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 focus:outline-none"
+                    />
+                  </div>
+                )}
+              </div>
 
-      {/* FOTO OBLIGATORIA DEL LUGAR AFECTADO */}
-      <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-3.5 space-y-2">
-        <div className="flex items-center justify-between">
-          <label className="text-[11px] font-semibold text-slate-800 flex items-center gap-1.5">
-            <Camera size={14} className="text-slate-700" />
-            <span>Fotografía del Lugar Afectado</span>
-            <span className="text-rose-600 font-bold">* (Obligatoria)</span>
-          </label>
-          {foto && (
-            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-              <CheckCircle2 size={12} /> Foto adjuntada
-            </span>
-          )}
-        </div>
-        <p className="text-[11px] text-slate-500">
-          Adjunte una imagen clara del daño o recinto afectado para respaldar su solicitud y permitir al equipo técnico planificar los materiales de reparación.
-        </p>
+              {/* Observación / Falla de este recinto */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700">
+                  Observaciones o Falla en este Recinto <span className="text-rose-600 font-bold">*</span>
+                </label>
+                <textarea
+                  rows={2}
+                  required
+                  placeholder={`Describa qué problema presenta ${
+                    item.recinto === "Otro" ? item.otroRecinto || "este recinto" : item.recinto
+                  } (ej: filtración de agua, fisura en muro, desprendimiento de sellos, etc.)...`}
+                  value={item.observaciones}
+                  onChange={(e) =>
+                    actualizarRecinto(item.id, "observaciones", e.target.value)
+                  }
+                  className="mt-1 w-full rounded-md border border-slate-200 bg-white p-2.5 text-[12px] text-slate-900 placeholder:text-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 focus:outline-none leading-relaxed"
+                />
+              </div>
 
-        {!fotoPreview ? (
-          <label className="mt-2 flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-white p-5 text-center cursor-pointer hover:bg-slate-50 hover:border-slate-400 transition">
-            <Upload size={24} className="text-slate-400 mb-1.5" />
-            <span className="text-xs font-semibold text-slate-700">
-              Presione aquí para tomar o subir una fotografía
-            </span>
-            <span className="text-[10px] text-slate-400 mt-0.5">
-              Formatos aceptados: JPG, PNG, WEBP (hasta 15 MB)
-            </span>
-            <input
-              type="file"
-              accept="image/*"
-              required
-              onChange={handleFotoChange}
-              className="hidden"
-            />
-          </label>
-        ) : (
-          <div className="mt-2 rounded-lg border border-slate-200 bg-white p-2.5 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <img
-                src={fotoPreview}
-                alt="Vista previa del daño"
-                className="h-16 w-16 object-cover rounded-md border border-slate-200 shrink-0"
-              />
-              <div className="min-w-0">
-                <p className="text-xs font-medium text-slate-800 truncate">
-                  {foto.name}
-                </p>
-                <p className="text-[10px] text-slate-400 mt-0.5">
-                  {(foto.size / (1024 * 1024)).toFixed(2)} MB · Imagen lista para enviar
-                </p>
+              {/* Fotografía específica de este recinto */}
+              <div className="rounded-md border border-slate-200 bg-white p-3 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-semibold text-slate-800 flex items-center gap-1.5">
+                    <Camera size={13} className="text-slate-600" />
+                    <span>Fotografía de {item.recinto === "Otro" ? item.otroRecinto || "este recinto" : item.recinto}</span>
+                    <span className="text-rose-600 font-bold">* (Obligatoria)</span>
+                  </label>
+                  {item.foto && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      <CheckCircle2 size={11} /> Foto adjuntada
+                    </span>
+                  )}
+                </div>
+
+                {!item.fotoPreview ? (
+                  <label className="flex flex-col items-center justify-center rounded-md border-2 border-dashed border-slate-300 bg-slate-50/50 p-4 text-center cursor-pointer hover:bg-slate-50 hover:border-slate-400 transition">
+                    <Upload size={20} className="text-slate-400 mb-1" />
+                    <span className="text-xs font-semibold text-slate-700">
+                      Subir foto de {item.recinto === "Otro" ? item.otroRecinto || "este recinto" : item.recinto}
+                    </span>
+                    <span className="text-[10px] text-slate-400 mt-0.5">
+                      JPG, PNG, WEBP (hasta 15 MB)
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleFotoRecinto(item.id, e.target.files?.[0])}
+                      className="hidden"
+                    />
+                  </label>
+                ) : (
+                  <div className="flex items-center justify-between gap-3 rounded border border-slate-200 bg-slate-50/40 p-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <img
+                        src={item.fotoPreview}
+                        alt="Vista previa"
+                        className="h-14 w-14 object-cover rounded border border-slate-200 shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-slate-800 truncate">
+                          {item.foto.name}
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          {(item.foto.size / (1024 * 1024)).toFixed(2)} MB · Lista
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => quitarFotoRecinto(item.id)}
+                      className="inline-flex items-center gap-1 rounded border border-rose-200 bg-white px-2 py-1 text-[11px] text-rose-600 hover:bg-rose-50 transition"
+                      title="Quitar foto"
+                    >
+                      <Trash2 size={12} />
+                      <span>Quitar</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
+          ))}
+        </div>
 
-            <button
-              type="button"
-              onClick={eliminarFoto}
-              className="inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs text-rose-600 hover:bg-rose-50 transition border border-rose-200"
-              title="Cambiar o eliminar fotografía"
-            >
-              <Trash2 size={13} />
-              <span className="hidden sm:inline">Quitar</span>
-            </button>
-          </div>
-        )}
+        {/* Botón para Agregar Otro Recinto */}
+        <button
+          type="button"
+          onClick={agregarRecinto}
+          className="w-full inline-flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 bg-white py-2.5 px-4 text-xs font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 transition shadow-2xs"
+        >
+          <Plus size={15} className="text-emerald-600 stroke-[2.5]" />
+          <span>+ Agregar otro recinto afectado (ej. Cocina, Techumbre, Dormitorio...)</span>
+        </button>
       </div>
 
       {/* Marcar Urgencia */}
-      <div className="rounded-lg border border-slate-200/80 bg-slate-50/50 p-3">
+      <div className="rounded-lg border border-slate-200/80 bg-slate-50/50 p-3 mt-4">
         <label className="flex items-start gap-2.5 cursor-pointer">
           <input
             type="checkbox"
@@ -611,7 +724,7 @@ function FormularioPublico({ onIrAConsulta }) {
         className="w-full rounded-md bg-slate-900 py-2.5 text-[13px] font-semibold text-white hover:bg-slate-800 transition-colors shadow-2xs disabled:opacity-50 flex items-center justify-center gap-2"
       >
         <Send size={14} />
-        {enviando ? "Registrando Solicitud..." : "Registrar Solicitud Oficial"}
+        {enviando ? "Registrando Solicitud..." : `Registrar Solicitud Oficial (${recintosItems.length} recinto${recintosItems.length > 1 ? "s" : ""})`}
       </button>
     </form>
   );
@@ -755,66 +868,90 @@ function ConsultaPublica({ rutInicial = "" }) {
                   )}
                 </div>
 
-                {/* Recintos Afectados */}
-                {((t.recintos && t.recintos.length > 0) || t.recinto) && (
-                  <div>
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400 block mb-1">
-                      Recinto(s) Afectado(s):
+                {/* DETALLE ESTRUCTURADO POR RECINTOS (con sus observaciones y fotos) */}
+                {t.items && t.items.length > 0 ? (
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400 block">
+                      Recintos Afectados ({t.items.length}):
                     </span>
-                    <div className="flex flex-wrap gap-1">
-                      {(t.recintos && t.recintos.length > 0
-                        ? t.recintos
-                        : t.recinto.split(",").map((s) => s.trim())
-                      ).map((rec, i) => (
-                        <span
-                          key={i}
-                          className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 border border-slate-200/70"
+                    <div className="grid grid-cols-1 gap-2.5">
+                      {t.items.map((it, idx) => (
+                        <div
+                          key={it.id || idx}
+                          className="rounded-md border border-slate-200/80 bg-slate-50/70 p-3 space-y-2"
                         >
-                          {rec}
-                        </span>
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-800 text-[9px] font-semibold text-white">
+                                {idx + 1}
+                              </span>
+                              {it.recinto}
+                            </span>
+                          </div>
+
+                          <p className="text-[12px] text-slate-700 leading-relaxed">
+                            {it.observaciones || "Sin observaciones específicas"}
+                          </p>
+
+                          {it.foto && (
+                            <div className="pt-1">
+                              <a
+                                href={it.foto}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-2 rounded border border-slate-200 bg-white p-1 hover:bg-slate-50 transition"
+                              >
+                                <img
+                                  src={it.foto}
+                                  alt={it.recinto}
+                                  className="h-14 w-14 object-cover rounded border border-slate-200 shrink-0"
+                                />
+                                <span className="text-[11px] font-medium text-slate-700 flex items-center gap-1">
+                                  Ver foto de {it.recinto} <ExternalLink size={11} className="text-slate-400" />
+                                </span>
+                              </a>
+                            </div>
+                          )}
+                        </div>
                       ))}
                     </div>
                   </div>
-                )}
-
-                {/* Detalle y Fotografía */}
-                <div className="rounded-md border border-slate-100 bg-slate-50/70 p-3 space-y-2">
-                  <div>
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400 block">
-                      Detalle del Requerimiento:
-                    </span>
-                    <p className="mt-0.5 text-[12px] text-slate-800 leading-relaxed">
+                ) : (
+                  // Fallback para tickets anteriores
+                  <div className="rounded-md border border-slate-100 bg-slate-50/70 p-3 space-y-2">
+                    {t.recinto && (
+                      <span className="text-[11px] font-semibold text-slate-800 block">
+                        Recinto: {t.recinto}
+                      </span>
+                    )}
+                    <p className="text-[12px] text-slate-800 leading-relaxed">
                       {t.descripcion}
                     </p>
-                    <p className="mt-1 text-[10px] text-slate-400">
-                      Ingresado el {formatearFecha(t.creado_en)}
-                    </p>
+                    {t.foto && (
+                      <div className="pt-1">
+                        <a
+                          href={t.foto}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 rounded border border-slate-200 bg-white p-1 hover:bg-slate-50 transition"
+                        >
+                          <img
+                            src={t.foto}
+                            alt="Foto adjunta"
+                            className="h-14 w-14 object-cover rounded border border-slate-200 shrink-0"
+                          />
+                          <span className="text-[11px] font-medium text-slate-700 flex items-center gap-1">
+                            Ver imagen completa <ExternalLink size={11} className="text-slate-400" />
+                          </span>
+                        </a>
+                      </div>
+                    )}
                   </div>
+                )}
 
-                  {/* Foto adjunta */}
-                  {t.foto && (
-                    <div className="pt-2 border-t border-slate-200/60">
-                      <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400 block mb-1.5">
-                        Fotografía Adjunta de Respaldo:
-                      </span>
-                      <a
-                        href={t.foto}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white p-1.5 hover:bg-slate-50 transition"
-                      >
-                        <img
-                          src={t.foto}
-                          alt="Fotografía del lugar afectado"
-                          className="h-12 w-12 object-cover rounded shrink-0 border border-slate-200"
-                        />
-                        <span className="text-[11px] font-medium text-slate-700 flex items-center gap-1">
-                          Ver imagen completa <ExternalLink size={11} className="text-slate-400" />
-                        </span>
-                      </a>
-                    </div>
-                  )}
-                </div>
+                <p className="text-[10px] text-slate-400">
+                  Ingresado el {formatearFecha(t.creado_en)}
+                </p>
 
                 {/* Explicación del Estado Actual */}
                 {t.estado === "recibida" && (

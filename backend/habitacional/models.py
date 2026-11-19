@@ -410,6 +410,23 @@ class TicketPostventa(TimeStampedModel):
         super().save(*args, **kwargs)
 
 
+class ItemTicketPostventa(TimeStampedModel):
+    ticket = models.ForeignKey(
+        TicketPostventa,
+        related_name="items",
+        on_delete=models.CASCADE,
+    )
+    recinto = models.CharField(max_length=120)
+    observaciones = models.TextField(blank=True)
+    foto = models.ImageField(upload_to="postventa/recintos/%Y/%m/", null=True, blank=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return f"{self.ticket.codigo} - {self.recinto}"
+
+
 class PerfilUsuario(TimeStampedModel):
     ROL_ADMIN = "admin"
     ROL_COORDINADOR = "coordinador"
