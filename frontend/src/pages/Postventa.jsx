@@ -394,6 +394,14 @@ function ModalGestionTicket({ ticket, onClose, onGuardado }) {
           <div>
             <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Contacto</p>
             <p className="text-slate-800 font-medium mt-0.5">{ticket.telefono || "Sin teléfono"}</p>
+            {ticket.email && (
+              <a
+                href={`mailto:${ticket.email}`}
+                className="text-[11px] text-slate-600 hover:text-slate-900 underline block mt-0.5"
+              >
+                {ticket.email}
+              </a>
+            )}
             {whatsappUrl && (
               <a
                 href={whatsappUrl}

@@ -131,6 +131,7 @@ function FormularioPublico({ onIrAConsulta }) {
   const [rut, setRut] = useState("");
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
+  const [email, setEmail] = useState("");
   const [comite, setComite] = useState("");
   const [vivienda, setVivienda] = useState("");
   const [esUrgente, setEsUrgente] = useState(false);
@@ -277,6 +278,7 @@ function FormularioPublico({ onIrAConsulta }) {
       formData.append("rut", rutLimpio);
       formData.append("nombre", nombre.trim());
       formData.append("telefono", telefono.trim());
+      formData.append("email", email.trim());
       formData.append("comite_nombre", comite.trim());
       formData.append("vivienda_direccion", vivienda.trim());
       formData.append("urgencia", esUrgente ? "urgente" : "normal");
@@ -412,6 +414,7 @@ function FormularioPublico({ onIrAConsulta }) {
             type="button"
             onClick={() => {
               setTicketCreado(null);
+              setEmail("");
               setRecintosItems([
                 {
                   id: "item-1",
@@ -500,6 +503,24 @@ function FormularioPublico({ onIrAConsulta }) {
         </div>
 
         <div>
+          <label className="block text-[11px] font-semibold text-slate-700">
+            Correo Electrónico (Opcional)
+          </label>
+          <input
+            type="email"
+            placeholder="ejemplo@correo.cl"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 focus:outline-none transition-all"
+          />
+          <span className="text-[10px] text-slate-400 mt-0.5 block">
+            Para recibir copia y avisos de resolución.
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+        <div>
           <label className="block text-[11px] font-medium text-slate-600">
             Comité / Proyecto Habitacional (Opcional)
           </label>
@@ -511,19 +532,19 @@ function FormularioPublico({ onIrAConsulta }) {
             className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 focus:outline-none transition-all"
           />
         </div>
-      </div>
 
-      <div>
-        <label className="block text-[11px] font-medium text-slate-600">
-          N° de Casa, Lote o Dirección de la Vivienda
-        </label>
-        <input
-          type="text"
-          placeholder="Ej: Lote 14 Mz D / Pasaje Los Aromos 123"
-          value={vivienda}
-          onChange={(e) => setVivienda(e.target.value)}
-          className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 focus:outline-none transition-all"
-        />
+        <div>
+          <label className="block text-[11px] font-medium text-slate-600">
+            N° de Casa, Lote o Dirección de la Vivienda
+          </label>
+          <input
+            type="text"
+            placeholder="Ej: Lote 14 Mz D / Pasaje Los Aromos 123"
+            value={vivienda}
+            onChange={(e) => setVivienda(e.target.value)}
+            className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 focus:outline-none transition-all"
+          />
+        </div>
       </div>
 
       {/* SECCIÓN DINÁMICA: RECINTOS AFECTADOS */}
@@ -856,6 +877,9 @@ function ConsultaPublica({ rutInicial = "" }) {
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase font-medium">Beneficiario</span>
                     <strong className="text-slate-800 font-semibold">{t.nombre}</strong> (RUT: {t.rut})
+                    {t.email && (
+                      <span className="text-slate-500 block text-[10px] truncate">Correo: {t.email}</span>
+                    )}
                   </div>
                   {(t.comite_nombre || t.vivienda_direccion) && (
                     <div>

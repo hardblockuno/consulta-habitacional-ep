@@ -576,6 +576,7 @@ class TicketPostventaViewSet(viewsets.ModelViewSet):
                 | Q(rut__icontains=q)
                 | Q(nombre__icontains=q)
                 | Q(telefono__icontains=q)
+                | Q(email__icontains=q)
                 | Q(comite_nombre__icontains=q)
                 | Q(vivienda_direccion__icontains=q)
                 | Q(recinto__icontains=q)

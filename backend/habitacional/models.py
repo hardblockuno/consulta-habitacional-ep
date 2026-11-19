@@ -349,6 +349,7 @@ class TicketPostventa(TimeStampedModel):
     rut = models.CharField(max_length=16, db_index=True)
     nombre = models.CharField(max_length=255)
     telefono = models.CharField(max_length=40, blank=True)
+    email = models.EmailField(max_length=254, blank=True)
     comite_nombre = models.CharField(max_length=255, blank=True)
     vivienda_direccion = models.CharField(max_length=255, blank=True)
     recinto = models.CharField(max_length=255, blank=True)

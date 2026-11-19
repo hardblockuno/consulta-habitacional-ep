@@ -300,6 +300,7 @@ class TicketPostventaSerializer(serializers.ModelSerializer):
             "rut",
             "nombre",
             "telefono",
+            "email",
             "comite_nombre",
             "vivienda_direccion",
             "recinto",

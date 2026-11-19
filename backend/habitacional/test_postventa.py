@@ -14,6 +14,7 @@ class TicketPostventaAPITests(TestCase):
             "rut": "12.345.678-9",
             "nombre": "Juan Pérez",
             "telefono": "+56912345678",
+            "email": "juan.perez@correo.cl",
             "comite_nombre": "Comité Los Robles",
             "vivienda_direccion": "Casa 15 Mz B",
             "recinto": "Baño",
@@ -23,6 +24,7 @@ class TicketPostventaAPITests(TestCase):
         response = self.client.post("/api/postventa/tickets/", payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(response.data["codigo"].startswith("PV-"))
+        self.assertEqual(response.data["email"], "juan.perez@correo.cl")
         self.assertEqual(response.data["estado"], "recibida")
         self.assertEqual(response.data["estado_display"], "Recibida")
 
