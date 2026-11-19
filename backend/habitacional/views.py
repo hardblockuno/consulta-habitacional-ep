@@ -653,6 +653,14 @@ class TicketPostventaViewSet(viewsets.ModelViewSet):
                     foto=ticket.foto,
                 )
 
+        # Despachar notificación automática por correo a la constructora (y acuse al beneficiario)
+        # Se ejecuta mediante on_commit para asegurar que la transacción en base de datos esté cerrada
+        try:
+            from .services.postventa_mailer import despachar_correo_postventa_async
+            transaction.on_commit(lambda: despachar_correo_postventa_async(ticket.id))
+        except Exception as mail_err:
+            logger.warning(f"No fue posible encolar despacho de correo para ticket {ticket.codigo}: {mail_err}")
+
         # Retornar la representación fresca con prefetch de items
         ticket_refrescado = TicketPostventa.objects.prefetch_related("items").get(id=ticket.id)
         headers = self.get_success_headers(serializer.data)

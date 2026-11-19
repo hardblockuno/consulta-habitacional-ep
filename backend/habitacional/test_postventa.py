@@ -153,3 +153,42 @@ class TicketPostventaAPITests(TestCase):
         self.assertTrue("techo" in response.data["items"][1]["foto"])
         self.assertIn("Baño", response.data["recinto"])
         self.assertIn("Techumbre / Cubierta", response.data["recinto"])
+
+    def test_despacho_correo_constructora_y_beneficiario(self):
+        from django.core import mail
+        from habitacional.services.postventa_mailer import (
+            _enviar_correo_constructora,
+            _enviar_comprobante_beneficiario,
+        )
+
+        ticket = TicketPostventa.objects.create(
+            rut="19.876.543-2",
+            nombre="Carlos Morales",
+            telefono="+56911223344",
+            email="carlos.morales@ejemplo.cl",
+            comite_nombre="Comité Villa Verde",
+            vivienda_direccion="Pasaje Los Alerces 45",
+            recinto="Cocina",
+            descripcion="Fuga de gas en conexión a calefón",
+            urgencia="urgente",
+        )
+
+        # 1. Test envio correo constructora
+        mail.outbox = []
+        _enviar_correo_constructora(ticket)
+        self.assertEqual(len(mail.outbox), 1)
+        msg_constructora = mail.outbox[0]
+        self.assertIn("lucas.villar997@gmail.com", msg_constructora.to)
+        self.assertIn("[URGENTE]", msg_constructora.subject)
+        self.assertIn("Carlos Morales", msg_constructora.body)
+        self.assertIn("19.876.543-2", msg_constructora.body)
+        self.assertIn("Fuga de gas", msg_constructora.body)
+
+        # 2. Test envio comprobante beneficiario
+        mail.outbox = []
+        _enviar_comprobante_beneficiario(ticket)
+        self.assertEqual(len(mail.outbox), 1)
+        msg_beneficiario = mail.outbox[0]
+        self.assertIn("carlos.morales@ejemplo.cl", msg_beneficiario.to)
+        self.assertIn(ticket.codigo, msg_beneficiario.subject)
+        self.assertIn("Carlos Morales", msg_beneficiario.body)

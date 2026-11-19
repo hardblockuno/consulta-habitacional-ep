@@ -206,3 +206,28 @@ OPENAI_RESPONSES_URL = os.getenv("OPENAI_RESPONSES_URL", "https://api.openai.com
 OPENAI_TIMEOUT_SECONDS = int(os.getenv("OPENAI_TIMEOUT_SECONDS", "90"))
 RUKAN_AI_MAX_BYTES = int(os.getenv("RUKAN_AI_MAX_BYTES", str(12 * 1024 * 1024)))
 
+# ==============================================================================
+# CONFIGURACIÓN DE CORREO ELECTRÓNICO Y NOTIFICACIONES
+# ==============================================================================
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend"
+    if DEBUG and not os.getenv("EMAIL_HOST_USER")
+    else "django.core.mail.backends.smtp.EmailBackend",
+)
+EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "1") == "1"
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+DEFAULT_FROM_EMAIL = os.getenv(
+    "DEFAULT_FROM_EMAIL", "SIGEP Postventa <notificaciones@sigep.cl>"
+)
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+
+# Correo oficial por defecto para recepción de requerimientos por parte de la constructora
+CONSTRUCTORA_EMAIL_DEFAULT = os.getenv(
+    "CONSTRUCTORA_EMAIL_DEFAULT", "lucas.villar997@gmail.com"
+)
+
+
