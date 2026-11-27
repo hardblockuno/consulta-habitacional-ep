@@ -23,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { api } from "../api/client.js";
+import FooterLegal from "../components/FooterLegal.jsx";
 
 const OPCIONES_RECINTOS = [
   "Baño",
@@ -116,9 +117,10 @@ export default function PortalPostventaPublico() {
       </main>
 
       {/* Pie Institucional */}
-      <footer className="mt-12 border-t border-slate-200/70 py-6 text-center text-xs text-slate-400">
-        Plan Social · Entidad Patrocinante Habitacional
-      </footer>
+      <FooterLegal
+        subtitle="Plan Social · Entidad Patrocinante Habitacional"
+        className="mt-12 py-6"
+      />
     </div>
   );
 }

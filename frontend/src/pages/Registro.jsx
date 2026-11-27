@@ -1,6 +1,7 @@
 import { Lock, Mail, Shield, User } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import FooterLegal from "../components/FooterLegal.jsx";
 import { getHomeRouteForRole } from "../components/ProtectedRoute.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 
@@ -182,6 +183,7 @@ export default function Registro() {
           </div>
         </div>
       </div>
+      <FooterLegal className="mt-6 w-full max-w-md border-t-0" />
     </div>
   );
 }

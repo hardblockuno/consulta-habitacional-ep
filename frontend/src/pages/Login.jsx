@@ -1,6 +1,7 @@
 import { Lock, Mail } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import FooterLegal from "../components/FooterLegal.jsx";
 import { getHomeRouteForRole } from "../components/ProtectedRoute.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 
@@ -119,6 +120,7 @@ export default function Login() {
           </div>
         </div>
       </div>
+      <FooterLegal className="mt-6 w-full max-w-sm border-t-0" />
     </div>
   );
 }

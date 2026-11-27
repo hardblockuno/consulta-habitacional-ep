@@ -21,6 +21,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import BotonSugerencia from "./BotonSugerencia.jsx";
 import ErrorBoundary from "./ErrorBoundary.jsx";
+import FooterLegal from "./FooterLegal.jsx";
 
 function getNavSectionsForUser(user) {
   if (!user) return [];
@@ -319,7 +320,7 @@ export default function Layout({ children }) {
       )}
 
       {/* Contenido principal */}
-      <div className="lg:pl-64">
+      <div className="lg:pl-64 flex min-h-screen flex-col">
         {/* Header responsive para móvil y tablet */}
         <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/95 px-4 py-3 backdrop-blur lg:hidden shadow-2xs">
           <div className="flex items-center justify-between">
@@ -368,11 +369,13 @@ export default function Layout({ children }) {
           </nav>
         </header>
 
-        <main className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
+        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
           <ErrorBoundary>
             {children || <Outlet />}
           </ErrorBoundary>
         </main>
+
+        <FooterLegal className="mt-6" />
 
         {/* Flotante de sugerencias permanente para desarrollo */}
         <BotonSugerencia />
